@@ -1,0 +1,535 @@
+/* Phone rules (spec 10a: "phone-first and desktop-capable; one design,
+   responsive"; operator, 2026-09-11: "now I want you to work on mobile
+   view"). Phone means max-width: 899px, the breakpoint globals.css already
+   draws desktop rules from (@media (min-width: 900px)). Every rule below
+   lives under that breakpoint unless it says otherwise, so desktop is
+   untouched. Grouped by area, each with a short note on why. */
+
+/* ---------------------------------------------------------------------- *
+ * 1. Content header: at 430px it used to stack into four rows and take
+ *    about 40% of the screen before the first mail row. On phone it is one
+ *    scrollable row per group instead: about 112px total before the
+ *    Showing row, down from about 300px.
+ * ---------------------------------------------------------------------- */
+@media (max-width: 899px) {
+  /* Toasts come down from under the top bar on a phone: at the foot they
+     sat on the thread page's fixed action bar, over Draft with Celeste
+     (phone stress audit, 2026-09-11). */
+  .toasts { top: calc(60px + env(safe-area-inset-top)); bottom: auto; left: 12px; right: 12px; }
+
+  /* Reading one mail on a phone, the folder's chip rows above it are not
+     in use and cost a third of the screen: the pane's own "← Inbox" is the
+     way back (phone stress audit, 2026-09-11). */
+  main:has(.thread-detail) .content-head { display: none; }
+
+  /* "Deleted items" wrapped onto two lines and doubled the header's first
+     row (stress audit, 2026-09-11). A folder name is one line. */
+  .head-title {
+    white-space: nowrap;
+  }
+
+  /* The header on a phone (operator, 2026-09-11: "fix the spacing in the
+     header in the mobile view"). One rhythm for everything in it: rows of
+     48px, chips of 32px with 12px of side padding, 8px between them, and
+     every strip that scrolls fades out at its right edge instead of being
+     cut. Tabs that are underlined on desktop read as pills here, so the
+     All tab and the inbox pills beside it are one family. */
+  .content-head { padding-bottom: 4px; }
+  .head-row { padding: 0 16px; gap: 8px; min-height: 48px; }
+  /* The title and refresh on one line, the filters on their own beneath:
+     three chips never fit beside a title on a 390px screen, and scrolling
+     them out of reach was worse (operator, 2026-09-15: "mobile view header
+     layout is messed up"). */
+  .head-row.first {
+    flex-wrap: wrap;
+    min-height: 40px;
+    height: auto;
+    padding-top: 0;
+    padding-bottom: 4px;
+    gap: 4px 10px;
+  }
+  /* The title line is a line, not a band: the header had three rows of it
+     before the first mail (operator, 2026-09-15). */
+  .head-row.first > .head-title { line-height: 38px; }
+  .head-filters { order: 3; flex: 1 0 100%; height: 40px; }
+  /* Value and chevron only: the words INBOX, PERIOD and PROJECT are what the
+     panel that opens says anyway, and they cost half the room. */
+  .head-filters .filter-chip-label { display: none; }
+  .head-title { font-size: 16px; }
+  .head-div { display: none; }
+  /* Every strip that scrolls: no scrollbar, a fade at the right edge, and
+     room at the end so the last chip can come fully into view. (The rule
+     once named the Showing row too, and went out with it: 2026-09-15.) */
+  .pill-row,
+  .tab-strip,
+  .head-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+  }
+  .pill-row::-webkit-scrollbar,
+  .tab-strip::-webkit-scrollbar,
+  .head-filters::-webkit-scrollbar { display: none; }
+  .head-filters > :last-child { margin-right: 24px; }
+  /* A blank band where a group's row would be is worse than the list moving
+     a little on a phone (2026-09-15): the reserved row is phone-free. */
+  .head-row.group-row.empty { display: none; }
+
+  .head-row .chip,
+  .head-row .tab,
+  .head-row .seg .chip {
+    height: 36px;
+    padding: 0 14px;
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .head-row .tab {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--muted);
+    background: transparent;
+  }
+  .head-row .tab.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 500;
+  }
+  .head-row .tab.dim { opacity: 0.55; }
+  .head-row .inbox-pill { height: 36px; gap: 6px; }
+  .head-row .chip.edit { padding: 0 14px; }
+  /* "Mark all opened" is a small pill on a phone (operator, 2026-09-15), so
+     the window beside it keeps the row. */
+  .head-row .chip.mark-all { flex-shrink: 0; gap: 4px; height: 28px; padding: 0 9px; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .head-row .chip.mark-all .mark-all-long { display: none; }
+  .head-row .chip.mark-all .mark-all-icon,
+  .head-row .chip.mark-all .mark-all-short { display: inline-block; }
+
+  /* "Project" is said by the tabs beside it, not by this label: hidden from
+     sight but not from a screen reader, which is why this clips the box to
+     nothing rather than setting display: none (that would take it out of
+     the accessibility tree too). Applies under both the single-inbox strip
+     (ContentHeader.tsx) and the All-inboxes bar (ProjectBar.tsx), which
+     both render it as a direct child of this row. */
+  .head-row.first > .head-label,
+  .head-row.projects > .head-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .pill-row > :last-child,
+  .tab-strip > :last-child { margin-right: 24px; }
+  .pill-row { gap: 8px; }
+  .pill-row .inbox-pill,
+  .tab-strip .tab { flex-shrink: 0; }
+  .tab-strip { gap: 8px; }
+
+  /* "No projects yet…" under All inboxes stays one quiet line rather than
+     wrapping the row to two. */
+  .head-row.projects .head-hint {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 12.5px;
+    color: var(--muted);
+  }
+  .head-row.first .head-spacer { display: none; }
+
+  /* Projects on a phone are one button that opens a sheet (operator,
+     2026-09-15: the labels had too little room). The All tab, the inbox
+     pills, the strip, Edit, and an opened inbox's row give way to it. */
+  .head-row.projects > .tab,
+  .head-row.projects > .pill-row,
+  .head-row.projects > .tab-strip,
+  .head-row.projects > .chip.edit,
+  .head-row.project-row { display: none; }
+  .project-picker {
+    align-items: center;
+    gap: 6px;
+    flex: 0 1 auto;
+    min-width: 0;
+    height: 36px;
+    padding: 0 12px 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--fg);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .project-picker-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project-picker-count { flex: none; color: var(--muted); font-weight: 400; }
+  .project-picker svg { flex: none; width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* The sync control is pinned past the fade, on the card, so a strip never
+     runs under it. */
+  .head-row.first .sync-status { flex-shrink: 0; margin-left: auto; }
+
+  /* The row that says how the list is narrowed: the window and money-side
+     labels go quiet the same way as "Project" above, and the two tracks
+     that are left sit on one scrolling row together with "Sort N older". */
+  .head-filters {
+    /* Its own line under the title (2026-09-15); the rule above sets that. */
+    flex-wrap: nowrap;
+  }
+  .head-filters > :last-child { margin-right: 24px; }
+  /* The projects row, under the window: the picker, and on a group its row below (2026-09-15). */
+  .head-row.projects {
+    min-height: 44px;
+    height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    gap: 10px;
+    position: relative;
+  }
+  .head-filters > .head-group > .head-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  /* Each group is the box its hidden label is placed in, so the label's
+     1px never lands past the screen and scrolls the page sideways (seen
+     with "Sort N older" in the row, 2026-09-11). */
+  .head-row.first,
+  .head-filters .head-group { position: relative; }
+  .head-filters .head-group,
+  .head-filters .seg { flex-shrink: 0; }
+  .head-filters .seg { padding: 3px; gap: 3px; }
+  .head-filters .seg .chip { height: 32px; padding: 0 13px; }
+
+  /* An inbox's own project row, opened under All inboxes: the inbox name,
+     then its tabs as pills in a strip that scrolls on its own, then Edit
+     pinned at the end where a thumb can find it. */
+  .head-row.project-row {
+    min-height: 44px;
+    padding-top: 0;
+    padding-bottom: 0;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .head-row.project-row > .tab-strip { flex: 1 1 auto; min-width: 0; }
+  .head-row.project-row > .head-label,
+  .head-row.project-row > .chip.edit { flex-shrink: 0; }
+  .head-row.project-row .head-label.inbox { font-size: 12px; }
+  /* A group's projects on a phone: its name, then its projects as pills in a
+     strip of their own, under the picker (2026-09-15). */
+  .head-row.group-row { min-height: 40px; height: 40px; padding-top: 0; padding-bottom: 0; }
+  /* The chips divide the row rather than scroll out of it (operator,
+     2026-09-15: "improve the mobile header"). Period asks for the least,
+     Project for the most, and together they end where the screen does, so
+     there is nothing to scroll and nothing to fade. The fixed slots cut a
+     project name mid-word while Period sat half empty. */
+  .head-filters {
+    gap: 8px;
+    overflow: visible;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+  .head-filters > * { min-width: 0; }
+  .head-filters > .switcher { flex: 1 1 0; }
+  .head-filters > .filter-menu { flex: 0 0 78px; }
+  .head-filters > .filter-menu.project-menu { flex: 1.25 1 0; }
+  .head-filters > .head-hint { flex: 1 1 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .head-filters > :last-child { margin-right: 0; }
+  /* A thumb, not a cursor: 36px, the height every other chip on a phone has. */
+  .head-filters .filter-chip { width: 100%; min-width: 0; height: 36px; padding: 0 6px 0 10px; font-size: 12.5px; }
+  /* Messages has one chip and no projects (spec 10f), so a row of its own is
+     a row of almost nothing: it rides beside the title instead. */
+  .head-filters:has(> :only-child) { order: 0; flex: 0 0 auto; height: auto; margin-left: 10px; }
+  /* The × on a row keeps its touch size, the Showing row having gone. */
+  .applied-clear { width: 22px; height: 22px; }
+  .applied-clear svg { width: 12px; height: 12px; }
+  .head-row.group-row > .head-label.group { position: static; width: auto; height: auto; margin: 0; clip: auto; overflow: visible; font-size: 12.5px; }
+}
+
+/* No hover on a touch screen, so a chip's tap target is never smaller than a
+   thumb even where its row is drawn shorter than 32px above. The rows keep
+   the heights given above regardless; a chip may overflow its row by a
+   couple of pixels, which is fine. */
+@media (hover: none) {
+  .head-row .chip {
+    min-height: 32px;
+  }
+}
+
+/* ---------------------------------------------------------------------- *
+ * 2. Thread page: a sticky bottom action bar, so Draft with Celeste / Mark
+ *    handled / Delete / Move to project are never a full scroll away from a
+ *    long mail (spec 10a, 2026-09-11).
+ * ---------------------------------------------------------------------- */
+@media (max-width: 899px) {
+  /* Two rows at most (operator, 2026-09-15: "too tall"): Draft with
+     Celeste on its own, then every quiet button side by side, three to a
+     row, at 38px rather than 44px. It was three rows and about 190px. */
+  .thread-actions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin-top: 0;
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    padding: 6px 10px calc(6px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    z-index: 12;
+  }
+  /* Sized by their words, so Move to project gets the room Hide does not
+     need, and a fourth button wraps rather than cutting every label short. */
+  .thread-actions > * { min-width: 0; flex: 1 1 auto; }
+  .thread-actions > .btn.primary { flex-basis: 100%; }
+  .thread-actions .btn {
+    height: 38px;
+    padding: 0 10px;
+    font-size: 13px;
+    justify-content: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .thread-actions .btn svg { margin-right: 3px; flex: none; }
+  .thread-actions > :not(.btn) > .btn { width: 100%; }
+  .thread-actions .move-project > .btn > span { overflow: hidden; text-overflow: ellipsis; }
+  .thread-actions .move-project .switcher-panel { bottom: 42px; }
+  /* The drafter's "nothing to answer" note takes the bar's full width: the
+     words on one line or two, Draft anyway on a row of its own under them
+     (phone audit, 2026-09-11: the words squeezed into a column and the
+     button ran off the edge). */
+  .thread-actions .draft-declined { flex-basis: 100%; flex-wrap: wrap; gap: 6px 10px; }
+  .thread-actions .draft-declined > span:not(.celeste) { flex: 1 1 200px; }
+  .thread-actions .draft-declined .btn { flex: 1 1 100%; }
+
+  /* Room at the foot of the thread's own pane so the last lines of a mail
+     do not sit under the bar above. Scoped to the thread page's pane
+     (`.thread-detail`, set alongside `.inbox-detail` in ThreadPane.tsx)
+     rather than every `.inbox-detail`: the Drafts page reuses that class
+     for its own pane, which has no sticky bar and needs no extra room. */
+  .thread-detail {
+    /* The bar's own height ends in env(safe-area-inset-bottom), so the room
+       reserved for it has to as well. Without that term the pane was short by
+       exactly the home indicator, about 34px, and the bottom of the thread sat
+       under the bar. On a chat that bottom is the box you type in (operator,
+       2026-09-17: the bottom panel is covering the text input). The floating
+       scroll button next to this always had the term; the padding did not. */
+    padding-bottom: calc(124px + env(safe-area-inset-bottom));
+  }
+  /* Above the fixed action bar, not under it. */
+  .scroll-end {
+    bottom: calc(112px + env(safe-area-inset-bottom));
+  }
+  /* Opening a chat scrolls to the box to type in; the bar above is fixed
+     over the foot of the page, so the box asks for that much clearance. */
+  .text-composer {
+    /* Same term again: scrolled to without it, the box lands under the bar. */
+    scroll-margin-bottom: calc(134px + env(safe-area-inset-bottom));
+  }
+
+  /* A keyboard shortcut hint means nothing without a keyboard. */
+  .btn kbd {
+    display: none;
+  }
+
+  /* The way back on a phone, so it is a thumb-sized target, not a line of
+     small text. */
+  .inbox-back {
+    min-height: 44px;
+  }
+}
+
+/* ---------------------------------------------------------------------- *
+ * 4. Draft card, Inboxes, Usage: reflow for narrow screens.
+ * ---------------------------------------------------------------------- */
+@media (max-width: 899px) {
+  /* The draft card's action row (Send / Edit or Done / Skip / More) wraps
+     into a two-column grid instead of a single crowded line, with Send
+     leading and spanning both columns since it is the button that matters. */
+  .draft-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .draft-actions .btn.primary {
+    grid-column: 1 / -1;
+  }
+  /* The reason Send is held back reads as its own line under it, not as a
+     cell beside Done (stress audit, 2026-09-11). */
+  .draft-actions .send-block {
+    grid-column: 1 / -1;
+  }
+  /* The revise line: the instruction on a row of its own, Revise and Undo
+     under it (phone stress audit, 2026-09-11: three in a row left the
+     field four letters wide). */
+  .revise-row { flex-wrap: wrap; }
+  .revise-row > input.field { flex: 1 1 100%; }
+
+  /* A subject or a long unbroken string (an address, a token) wraps rather
+     than pushing the card wider than the viewport. */
+  main h1 {
+    overflow-wrap: anywhere;
+  }
+
+  /* A draft's "to" line in the queue list can be a long address (or several,
+     folded to "+N"); it ellipsizes instead of forcing the row wider. */
+  .inbox-sender {
+    min-width: 0;
+  }
+  .inbox-sender > span:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .inbox-sender .tag {
+    flex-shrink: 0;
+  }
+
+  /* Inboxes: a long address wraps instead of forcing the page wider. The
+     Disconnect/Reconnect buttons already wrap onto their own line (`.row`
+     is flex-wrap: wrap everywhere), so there is nothing to add for those. */
+  .who {
+    overflow-wrap: anywhere;
+  }
+
+  /* Usage: a table's columns do not shrink to a phone's width, so each
+     table scrolls sideways inside its own card (wrapper added in
+     usage/page.tsx) instead of widening the page. */
+  .usage-table-wrap {
+    overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .usage-table {
+    min-width: 480px;
+  }
+  .usage-table td.usage-chat-title {
+    max-width: 160px;
+  }
+
+  /* Attachment tiles: the filename is capped tighter than the desktop
+     260px, or the kind badge, size, and download glyph around it push a
+     single chip wider than a 390px screen. */
+  .att-name {
+    max-width: 140px;
+  }
+  /* A chip is never wider than its bubble: the name gives way, the badge,
+     size and download glyph keep their room (texts from Messages carry
+     long generated photo names, 2026-09-11). */
+  .att-chip {
+    max-width: 100%;
+  }
+  .att-chip .att-open {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .att-chip .att-name {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------- *
+ * 6. The page frame under the phone top bar. globals.css gives every main
+ *    56px of top padding on phone, but its later `main.inbox-page {
+ *    padding: 0 }` rule (written for the desktop two-pane frame) wins on
+ *    phone too, and the header's first row sat under the fixed top bar.
+ *    Seen in the phone pass, 2026-09-11.
+ * ---------------------------------------------------------------------- */
+@media (max-width: 899px) {
+  /* Plus the status bar, as the bar itself is: from the home screen the bar
+     grows by that much, and a flat 56px left "← Inbox" under it (operator,
+     2026-09-15). */
+  main.inbox-page {
+    padding-top: calc(56px + env(safe-area-inset-top));
+  }
+  /* The plain pages (Inboxes, Usage) already sit under the top bar in the
+     flow, so the 56px meant to clear a fixed bar only opened a blank band
+     above their title (phone stress audit, 2026-09-11). */
+  main:not(.inbox-page) {
+    padding-top: 16px;
+  }
+  /* The sync control keeps its glyph and drops its words on the header's
+     first row, or "Synced 2 min ago" crowds the project tabs off it. */
+  .head-row.first .sync-label {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------- *
+ * 7. Phone audit, 2026-09-11: what a walk through every page at 390px
+ *    turned up.
+ * ---------------------------------------------------------------------- */
+@media (max-width: 899px) {
+  /* The status word ("Safe to delete") wrapped into three lines beside the
+     title; the Showing row says it already. */
+  /* Which list is open, beside the folder: on a phone the tree that chose it
+     is behind the menu, so the header is the only place that says (operator,
+     2026-09-15: "I don't see when the tab is closed"). */
+  .head-row.first .head-sub { display: inline; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* On Drafts it is the only thing the row says, so it stays (2026-09-15). */
+  .head-row.first.only .head-sub { display: inline; flex-shrink: 0; }
+  /* The sync control sat over the end of the scrolling project strip; it
+     gets its own ground and a soft edge so the strip fades under it. */
+  .head-row.first .sync-status { flex-shrink: 0; background: var(--card); box-shadow: -10px 0 10px var(--card); position: relative; }
+  /* The Ask composer took a third of the screen; on a phone the keyboard
+     needs that room. It starts small and grows with the text, to a cap. */
+  textarea.field.ask-input { min-height: 44px; height: 44px; max-height: 120px; padding-top: 11px; padding-bottom: 11px; }
+  .ask-send { width: 44px; height: 44px; }
+  /* A keyboard shortcut hint means nothing without a keyboard, in the
+     drawer too. */
+  .ask-kbd { display: none; }
+}
+@media (hover: none) {
+}
+
+/* A phone on its side, or a small tablet: the bottom bar seats its four
+   buttons in one row, since three rows of bar left 130px of mail on a
+   360px-tall screen (phone stress audit, 2026-09-11). */
+@media (max-width: 899px) and (min-width: 600px) {
+  .thread-actions > *,
+  .thread-actions > .btn.primary {
+    flex: 1 1 0;
+  }
+  .thread-detail {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+  .scroll-end {
+    bottom: calc(68px + env(safe-area-inset-bottom));
+  }
+}
+
+/* iPhone zooms the page into any field whose text is under 16px the moment it
+   is focused (2026-09-15: "on mobile, open the Celeste sidebar, it is zoomed
+   in"). Every field a thumb can type into is 16px on a touch screen. */
+@media (hover: none) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea,
+  .field,
+  textarea.field,
+  textarea.field.ask-input,
+  .cat-row .field:nth-of-type(2) {
+    font-size: 16px;
+  }
+}

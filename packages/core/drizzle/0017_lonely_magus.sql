@@ -1,0 +1,1 @@
+ALTER TABLE `threads` ADD `waiting_dismissed_at` integer;

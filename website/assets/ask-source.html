@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Ask Celeste</title>
+<link rel="stylesheet" href="diagram.css">
+<!-- Renders assets/ask.png at 1440x330. See website/README.md. -->
+<style>
+  body { width: 1440px; height: 330px; }
+  .q { background: var(--panel-bg); color: var(--panel-fg); border: 1px solid var(--panel-edge); }
+  .q .text { font-size: 16px; line-height: 1.45; }
+  .ans { font-size: 14.5px; line-height: 1.62; }
+  .cites { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .cite { font-size: 12px; border: 1px solid var(--stroke); border-radius: 8px; padding: 6px 10px; background: #fcfcfa; }
+  .cite b { display: block; font-size: 12.5px; color: var(--ink); }
+  .cite span { color: var(--ink-3); }
+</style><script>if(location.search.includes("dark"))document.documentElement.dataset.theme="dark";</script>
+</head>
+<body>
+<svg class="wires" viewBox="0 0 1440 330" width="1440" height="330">
+  <defs><marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#b9bcae"/></marker></defs>
+  <path class="w" d="M446 180 L 544 180" marker-end="url(#a)"/>
+</svg>
+
+<div class="overline" style="left:40px; top:44px;">You ask</div>
+<div class="card pad q" style="left:40px; top:84px; width:400px;">
+  <div class="text">&ldquo;What did I agree with the landlord about the deposit?&rdquo;</div>
+</div>
+<div class="note" style="left:40px; top:200px; width:400px;">
+  It searches every inbox and every chat at once, mail and iMessage and WhatsApp together, because the answer is rarely all in one of them.
+</div>
+
+<div class="overline" style="left:544px; top:44px;">It answers, and shows its working</div>
+<div class="card pad" style="left:544px; top:84px; width:856px;">
+  <div class="ans">
+    You agreed to a deposit of one month, returnable within thirty days of moving out, with the
+    carpet cleaning deducted only if it is professionally invoiced. That last condition was yours,
+    added over text after the lease had been sent.
+  </div>
+  <div class="cites">
+    <span class="cite"><b>Lease, final version</b><span>mail &middot; 12 Aug</span></span>
+    <span class="cite"><b>Re: deposit and cleaning</b><span>mail &middot; 14 Aug</span></span>
+    <span class="cite"><b>Marcus</b><span>iMessage &middot; 14 Aug</span></span>
+    <span class="cite"><b>Re: keys and move-in</b><span>mail &middot; 2 Sep</span></span>
+  </div>
+</div>
+<div class="note" style="left:544px; top:262px; width:856px;">
+  Every claim carries the threads it came from. Open one and read it yourself, which is the difference between an answer and a guess.
+</div>
+</body></html>

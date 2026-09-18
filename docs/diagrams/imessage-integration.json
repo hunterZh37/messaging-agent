@@ -1,0 +1,578 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Celeste iMessage Integration",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1380,
+      1040
+    ],
+    "views": [
+      {
+        "id": "read",
+        "label": "Reading texts",
+        "focus": [
+          "chatdb",
+          "contacts",
+          "attachdir",
+          "imsg",
+          "db",
+          "blobs"
+        ],
+        "note": "chat.db read-only, every 15 s while the app runs, 30 days back on connect; attributedBody decoded, numbers named."
+      },
+      {
+        "id": "think",
+        "label": "Sorting and drafting",
+        "focus": [
+          "db",
+          "sorter",
+          "ollama",
+          "drafter",
+          "claude"
+        ],
+        "note": "Same sorter (local qwen3) and drafter (Sonnet), with a text flavour: short, no greeting, no signature."
+      },
+      {
+        "id": "send",
+        "label": "Sending a reply",
+        "focus": [
+          "messagesfolder",
+          "thread",
+          "server",
+          "imsg",
+          "messagesapp"
+        ],
+        "note": "Draft, preview, Send, six seconds with Undo, then AppleScript hands it to Messages.app. No unsend exists."
+      },
+      {
+        "id": "app",
+        "label": "In the app",
+        "focus": [
+          "messagesfolder",
+          "thread",
+          "phone",
+          "server"
+        ],
+        "note": "A Messages folder with Need to reply and Unopened; chats as threads, texts as bubbles; the phone via the Mac."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "messagesapp",
+      "type": "external",
+      "label": "Messages.app",
+      "sublabel": "signed in on this Mac",
+      "pos": [
+        40,
+        120
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "chatdb",
+      "type": "database",
+      "label": "chat.db",
+      "sublabel": "~/Library/Messages, read-only",
+      "pos": [
+        40,
+        250
+      ],
+      "size": [
+        190,
+        64
+      ],
+      "tag": "Full Disk Access"
+    },
+    {
+      "id": "contacts",
+      "type": "database",
+      "label": "Address book",
+      "sublabel": "numbers to names",
+      "pos": [
+        40,
+        360
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "attachdir",
+      "type": "database",
+      "label": "Attachments folder",
+      "sublabel": "~/Library/Messages",
+      "pos": [
+        40,
+        470
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "phone",
+      "type": "external",
+      "label": "Phone / browser",
+      "sublabel": "tailnet only",
+      "pos": [
+        40,
+        860
+      ],
+      "size": [
+        190,
+        64
+      ]
+    },
+    {
+      "id": "imsg",
+      "type": "backend",
+      "label": "iMessage connector",
+      "sublabel": "poll, decode, name, send",
+      "pos": [
+        350,
+        250
+      ],
+      "size": [
+        200,
+        64
+      ],
+      "tag": "provider: imessage"
+    },
+    {
+      "id": "blobs",
+      "type": "database",
+      "label": "Blob store",
+      "sublabel": "images, PDFs by sha256",
+      "pos": [
+        350,
+        470
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "chats and texts",
+      "pos": [
+        640,
+        250
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "sorter",
+      "type": "backend",
+      "label": "Sorter",
+      "sublabel": "needs reply, importance",
+      "pos": [
+        930,
+        160
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "drafter",
+      "type": "backend",
+      "label": "Drafter",
+      "sublabel": "short, no sign-off",
+      "pos": [
+        930,
+        340
+      ],
+      "size": [
+        180,
+        64
+      ]
+    },
+    {
+      "id": "ollama",
+      "type": "external",
+      "label": "Ollama",
+      "sublabel": "qwen3:8b, local",
+      "pos": [
+        1180,
+        160
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "claude",
+      "type": "external",
+      "label": "Claude API",
+      "sublabel": "Sonnet 5",
+      "pos": [
+        1180,
+        340
+      ],
+      "size": [
+        160,
+        64
+      ]
+    },
+    {
+      "id": "server",
+      "type": "backend",
+      "label": "Next.js app server",
+      "sublabel": "RSC pages, server actions, sync route",
+      "pos": [
+        350,
+        680
+      ],
+      "size": [
+        760,
+        56
+      ]
+    },
+    {
+      "id": "messagesfolder",
+      "type": "frontend",
+      "label": "Messages folder",
+      "sublabel": "Need to reply, Unopened",
+      "pos": [
+        350,
+        860
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "thread",
+      "type": "frontend",
+      "label": "Chat thread",
+      "sublabel": "bubbles, reply card",
+      "pos": [
+        640,
+        860
+      ],
+      "size": [
+        200,
+        64
+      ]
+    },
+    {
+      "id": "gate",
+      "type": "frontend",
+      "label": "Send gate",
+      "sublabel": "preview, 6 s with Undo",
+      "pos": [
+        930,
+        860
+      ],
+      "size": [
+        180,
+        64
+      ],
+      "tag": "gate"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "Messages data on this Mac",
+      "wraps": [
+        "messagesapp",
+        "chatdb",
+        "contacts",
+        "attachdir"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Celeste on the operator's Mac (127.0.0.1:3100)",
+      "wraps": [
+        "imsg",
+        "blobs",
+        "db",
+        "sorter",
+        "drafter",
+        "server",
+        "messagesfolder",
+        "thread",
+        "gate"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Next.js client in the browser",
+      "wraps": [
+        "messagesfolder",
+        "thread",
+        "gate"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "poll",
+      "from": "chatdb",
+      "to": "imsg",
+      "label": "poll 15 s",
+      "variant": "emphasis",
+      "labelAt": [
+        290,
+        266
+      ]
+    },
+    {
+      "id": "names",
+      "from": "contacts",
+      "to": "imsg",
+      "label": "names",
+      "variant": "dashed",
+      "fromSide": "right",
+      "toSide": "bottom",
+      "labelAt": [
+        296,
+        346
+      ]
+    },
+    {
+      "id": "files",
+      "from": "attachdir",
+      "to": "blobs",
+      "label": "copy on open",
+      "variant": "dashed",
+      "labelAt": [
+        290,
+        486
+      ]
+    },
+    {
+      "id": "store",
+      "from": "imsg",
+      "to": "db",
+      "label": "decoded texts",
+      "variant": "emphasis",
+      "labelAt": [
+        595,
+        266
+      ]
+    },
+    {
+      "id": "sort",
+      "from": "db",
+      "to": "sorter",
+      "label": "new texts",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "draft",
+      "from": "db",
+      "to": "drafter",
+      "label": "chat context",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "local",
+      "from": "sorter",
+      "to": "ollama",
+      "label": "local",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        1145,
+        172
+      ]
+    },
+    {
+      "id": "model",
+      "from": "drafter",
+      "to": "claude",
+      "label": "a text",
+      "fromSide": "right",
+      "toSide": "left",
+      "labelAt": [
+        1145,
+        352
+      ]
+    },
+    {
+      "id": "serve",
+      "from": "db",
+      "to": "server",
+      "label": "reads, actions",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        740,
+        500
+      ]
+    },
+    {
+      "id": "blobserve",
+      "from": "blobs",
+      "to": "server",
+      "label": "preview, download",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        450,
+        600
+      ]
+    },
+    {
+      "id": "approve",
+      "from": "server",
+      "to": "imsg",
+      "label": "approved send",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "right",
+      "via": [
+        [
+          730,
+          640
+        ],
+        [
+          590,
+          640
+        ],
+        [
+          590,
+          282
+        ]
+      ],
+      "labelAt": [
+        600,
+        560
+      ]
+    },
+    {
+      "id": "applescript",
+      "from": "imsg",
+      "to": "messagesapp",
+      "label": "AppleScript send",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "right",
+      "via": [
+        [
+          450,
+          152
+        ]
+      ],
+      "labelAt": [
+        300,
+        110
+      ]
+    },
+    {
+      "id": "ui-folder",
+      "from": "messagesfolder",
+      "to": "server",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "ui-thread",
+      "from": "thread",
+      "to": "server",
+      "label": "draft, mark handled",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "ui-gate",
+      "from": "gate",
+      "to": "server",
+      "label": "send, undo",
+      "variant": "security",
+      "fromSide": "top",
+      "toSide": "bottom"
+    },
+    {
+      "id": "phone-access",
+      "from": "phone",
+      "to": "messagesfolder",
+      "label": "HTTPS over Tailscale"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Data model",
+      "items": [
+        "One account, provider imessage, shown under its own Messages section",
+        "Thread = one chat (guid); subject = contact name or number",
+        "Message = one text (guid); from = handle, isFromOperator = is_from_me",
+        "folder always inbox; sentAt from Apple nanoseconds since 2001",
+        "contacts cache: handle, name, refreshedAt"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Sync and decoding",
+      "items": [
+        "chat.db opened read-only (WAL); highest ROWID kept as the watermark",
+        "attributedBody decoded to text (2,792 of 2,833 recent messages have no plain text)",
+        "One-to-one chats only, 30 days on connect, then live every 15 s",
+        "Edits and unsends in Messages ignored; a deleted chat stays until deleted here"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Sending",
+      "items": [
+        "Same gate as mail: draft, preview, Send, six seconds with Undo",
+        "osascript tells Messages.app to send to the handle on iMessage, SMS or RCS",
+        "First send asks macOS to allow control of Messages, once",
+        "No unsend exists; the six seconds are the safety net"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Sorter and drafter",
+      "items": [
+        "Sorter on local qwen3: needs reply, importance; no dollar cost",
+        "Drafter on Sonnet with a text flavour: short, no greeting, no signature, matches the chat's tone",
+        "Ask Celeste searches texts beside mail, cites them the same way"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Permissions and failures",
+      "items": [
+        "Node needs Full Disk Access, granted in System Settings",
+        "chat.db busy: retry next tick; never write to it",
+        "Messages.app not running: launched by the send; not signed in: the send fails and says so",
+        "Contact not found: the number is the name"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Not in this phase",
+      "items": [
+        "Group chats",
+        "History older than 30 days",
+        "Reactions, edits, unsends",
+        "Sending attachments"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1403 @@
+:root {
+  color-scheme: dark;
+  /* Protocol Z tokens (night, site default). Do not alter these hex values. */
+  --bg: #0d0e0b; --bg-elev: #151612; --surface: #1c1d17; --hairline: #26271f; --hairline-strong: #353730;
+  --ink: #f6f6f2; --ink-soft: #c8c9c1; --ink-mute: #9b9c93; --ink-faint: #6d6e64;
+  --signal: #deff9a; --signal-soft: #a4bd6f; --critical: #e0635e; --verified: #b4e08a; --unread: #5ea0ff;
+
+  /* Celeste aliases onto the site tokens above; shared across themes since they
+     only reference site tokens, which are redefined per theme below. */
+  --card: var(--surface);
+  --fg: var(--ink);
+  --muted: var(--ink-mute);
+  --line: var(--hairline);
+  --line-strong: var(--hairline-strong);
+  --accent: var(--signal);
+  --accent-ink: #0d0e0b; /* night: signal is a pale lime, text on it must be dark */
+  --danger: var(--critical);
+  --add: color-mix(in srgb, var(--verified) 22%, transparent);
+  --del: color-mix(in srgb, var(--critical) 22%, transparent);
+  --toastbg: var(--ink);
+  --toastfg: var(--bg);
+}
+
+:root[data-theme="day"] {
+  color-scheme: light;
+  --bg: #f2f4f6; --bg-elev: #fff; --surface: #fff; --hairline: #e2e6ea; --hairline-strong: #ccd2da;
+  --ink: #16191d; --ink-soft: #3d444c; --ink-mute: #6b727b; --ink-faint: #9aa1aa;
+  --signal: #ad552b; --signal-soft: #863f18; --critical: #c23b2e; --verified: #2e7d32; --unread: #2f7cf6;
+
+  --accent-ink: #ffffff;
+}
+
+* { box-sizing: border-box; }
+html { font-family: var(--font-geist), ui-sans-serif, system-ui, -apple-system, sans-serif; }
+body { margin: 0; color: var(--fg); background: var(--bg); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+a:hover { color: var(--signal-soft); }
+
+.shell { min-height: 100vh; }
+main { max-width: 720px; margin: 0 auto; padding: 24px 16px 40px; }
+@media (min-width: 900px) {
+  .shell { padding-left: 220px; }
+  main { padding: 40px 16px 40px; }
+}
+
+.page-header-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+/* The Add inbox card opens under the heading at full width, not as a
+   sliver beside it (stress audit, 2026-09-11). */
+.page-header-row .row { flex-wrap: wrap; }
+.page-header-row .row:has(.add-inbox) { flex: 1 1 100%; }
+.page-header-row .add-inbox { flex: 1 1 100%; }
+/* One inbox per row on the Inboxes page, a hairline between, its controls
+   in a row of their own under the address (desktop audit, 2026-09-11). */
+.inbox-account { padding: 14px 0; border-top: 1px solid var(--line); }
+.inbox-account:first-child { padding-top: 0; border-top: 0; }
+.inbox-account:last-child { padding-bottom: 0; }
+.inbox-account .row { margin-top: 10px; }
+
+.meta { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; flex-wrap: wrap; }
+.meta svg { flex: none; width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+/* A brand mark is a solid shape: filled with the line's ink, never stroked (operator, 2026-09-11). */
+.meta svg.glyph-fill { fill: currentColor; stroke: none; }
+h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 8px; line-height: 1.25; }
+.reason { display: flex; align-items: baseline; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--fg); margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.reason > span:last-child { flex: 1; }
+/* The drafter's "nothing to answer" note, in the action row where the button was, with the way past it at its end. */
+.draft-declined { flex: 1 1 100%; margin: 0; align-items: center; }
+.draft-declined > span:not(.celeste) { flex: 1; }
+.draft-declined .btn { flex: 0 0 auto; }
+.celeste { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; }
+.celeste svg { width: 12px; height: 12px; fill: currentColor; flex-shrink: 0; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+
+.thread { display: flex; flex-direction: column; gap: 18px; }
+.bubble-row { display: flex; align-items: flex-end; gap: 10px; max-width: min(85%, 860px); min-width: 0; }
+.bubble-row.them { align-self: flex-start; }
+.bubble-row.me { align-self: flex-end; flex-direction: row-reverse; }
+.avatar { width: 30px; height: 30px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: 0.02em; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.bubble-col { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.bubble-row.me .bubble-col { align-items: flex-end; }
+.bubble-who { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding: 0 6px; font-size: 12.5px; color: var(--muted); }
+.bubble-row.me .bubble-who { justify-content: flex-end; }
+.bubble-who b { color: var(--fg); font-size: 13.5px; font-weight: 600; }
+.msg-addr { color: var(--muted); }
+.msg-to { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+.bubble { padding: 12px 16px; border-radius: 18px; background: color-mix(in srgb, var(--fg) 5%, transparent); border: 1px solid var(--line); min-width: 0; max-width: 100%; }
+.bubble-row.them .bubble { border-bottom-left-radius: 6px; }
+.bubble-row.me .bubble { border-bottom-right-radius: 6px; background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.body { white-space: pre-wrap; font-size: 15px; line-height: 1.55; max-width: 68ch; overflow-wrap: anywhere; word-break: break-word; }
+.who-right { display: flex; align-items: center; gap: 8px; }
+.toggle-format { background: none; border: none; padding: 0; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.toggle-format:hover { color: var(--fg); }
+.toggle-format:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* A sender's HTML body, sanitized server-side (see packages/core/src/text/sanitize.ts)
+   and rendered as-is. Only the type family is pinned to the app's own; sizes,
+   weights, and colors a sender set (an invoice's bold centered heading, a
+   filled button, a grey footer block) are left alone, including backgrounds.
+   The container just keeps whatever the sender laid out from overflowing the
+   thread column. */
+.msg-html { overflow-x: auto; max-width: 100%; word-break: break-word; font-size: 15px; line-height: 1.5; font-family: inherit; border-radius: 10px; }
+.msg-html [hidden] { display: none; }
+.msg-html img { max-width: 100%; height: auto; }
+.msg-html table { max-width: 100%; border-collapse: collapse; }
+/* Mail stored before the cell rule above was fixed carries width:100% on cells; a cell must never claim the row. */
+.msg-html td, .msg-html th { width: auto !important; }
+/* A sender's fixed heights are for their own rendering; here a wrapper that
+   says it is 0px tall, or shorter than its text, lets the mail spill over
+   whatever comes under it (seen live, 2026-09-11). Empty cells keep theirs:
+   those are the spacers. */
+.msg-html div:not(:empty), .msg-html p, .msg-html td:not(:empty), .msg-html table { height: auto !important; max-height: none !important; }
+.msg-html a { color: var(--accent); }
+/* Inside a block the sender painted (white invoice tables), the app accent can sit on white; use the block's ink. */
+.msg-html :is([style*="background"], [bgcolor]) a { color: inherit; text-decoration: underline; }
+.msg-html blockquote { border-left: 2px solid var(--line); margin: 0; padding-left: 10px; color: var(--muted); }
+/* Night: senders colour text for white mail (#000 quoted headers, #bdbdbd footers), unreadable on a dark
+   bubble. Drop those colours in favour of the app's ink, except inside any block that paints its own
+   background (a white invoice table keeps its dark text) and on links, which stay accent. */
+/* HTML mail at night sits on its own paper (stress audit, 2026-09-11). It
+   was forced to the theme's ink unless the sender had set a colour inline,
+   and a sender who colours text through classes (stripped at store time)
+   left ink-on-white: a LinkedIn notice read as a blank white box. Mail is
+   written for a light page; it gets one, the way the mail clients do. */
+[data-theme="night"] .msg-html { background: #f6f6f2; color: #16191d; padding: 12px 14px; }
+[data-theme="night"] .msg-html a { color: #ad552b; }
+/* Attachment chips: one per kept attachment, under the sender line. The chip
+   body previews an image or PDF in place; the glyph on the right is a real
+   download link, so the browser saves the file instead of navigating. */
+.att-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+/* An attachment is a tile, not a whisper: a kind badge, the name in bold,
+   the size, and the download glyph, on a card of its own (operator,
+   2026-09-10: "make the attachment look more obvious"). */
+.att-chip { display: inline-flex; align-items: center; gap: 10px; padding: 8px 10px 8px 8px; font-size: 13px; background: var(--card); border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: 10px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06); }
+.att-chip:hover { border-color: var(--accent); }
+.att-chip.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--card)); }
+.att-kind { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 30px; padding: 0 6px; border-radius: 6px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; flex-shrink: 0; }
+.att-chip .att-name { font-weight: 600; color: var(--fg); }
+.att-chip .att-open, .att-chip .att-dl { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-decoration: none; cursor: pointer; }
+.att-chip .att-dl { padding: 4px; border-radius: 999px; }
+.att-chip svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.att-name { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-size { opacity: 0.7; }
+
+/* Files going out with a draft (spec 8, 2026-09-10): the same chips the
+   thread view uses, with a way to add one and a way to take one off. */
+.draft-atts { margin: 6px 0 0; }
+.att-add { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font: inherit; }
+.att-add svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+/* A drop target: the card and the Ask panel both take a file this way, and
+   both say what would happen to it before the operator lets go. A panel with
+   no draft open says so instead, and takes nothing. */
+.draft-drop { position: relative; }
+.drop-veil { position: absolute; inset: 8px; z-index: 30; display: flex; align-items: flex-start; justify-content: center; text-align: center; padding: 16px; border: 2px dashed var(--accent); border-radius: 14px; background: color-mix(in srgb, var(--card) 88%, transparent); color: var(--fg); font-size: 14px; font-weight: 500; pointer-events: none; }
+/* A card taller than the window would otherwise put its label somewhere the
+   operator is not looking; this keeps the words under the pointer. */
+.drop-veil span { position: sticky; top: 40vh; }
+.drop-veil.refuses { border-color: var(--line-strong); color: var(--muted); }
+
+.att-preview { margin-top: 8px; }
+.att-preview img { max-width: 100%; height: auto; border-radius: 8px; }
+.att-preview iframe { width: 100%; height: 480px; border: 1px solid var(--line); border-radius: 8px; }
+@media (min-width: 900px) {
+  .att-preview iframe { height: 640px; }
+}
+
+.oneline { color: var(--muted); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oneline b { color: var(--fg); font-weight: 500; }
+
+label { display: block; color: var(--muted); font-size: 12px; margin: 14px 0 4px; letter-spacing: 0.01em; }
+.field { display: block; width: 100%; font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 14px; min-height: 40px; }
+.field:disabled { color: var(--muted); }
+textarea.field { min-height: 11rem; font-size: 15px; resize: vertical; }
+.draft { white-space: pre-wrap; padding: 6px 0; font-size: 15px; cursor: text; }
+/* What the last revision changed: words that came in on a soft accent, words
+   that went struck and faded (operator, 2026-09-11). */
+.rev-ins { background: color-mix(in srgb, var(--accent) 18%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.rev-del { color: var(--muted); text-decoration: line-through; opacity: 0.7; }
+/* A struck word and the word that replaced it keep a breath between them. */
+.rev-del + .rev-ins { margin-left: 0.3em; }
+
+.row { display: flex; gap: 8px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+/* Undo on the draft's own line: a word, not a button, beside "revised, 5 changes". */
+.link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.link-btn:hover { opacity: 0.8; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.quiet { border-color: transparent; color: var(--muted); background: transparent; }
+.btn.icon-only { margin-left: auto; padding: 0 8px; }
+.btn.icon-only svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.btn:disabled { opacity: 0.5; cursor: default; }
+/* Every button answers the pointer (operator, 2026-09-10: "sometimes there
+   are no hovering effects"): a plain one lifts its border, a primary one
+   darkens, a quiet one takes a tint. Pressing nudges it down a pixel. */
+.btn { transition: background-color 120ms, border-color 120ms, color 120ms, box-shadow 120ms, transform 60ms; }
+/* A link dressed as a button is a button: no underline (stress audit, 2026-09-11). */
+a.btn { text-decoration: none; }
+.btn:hover:not(:disabled) { border-color: var(--line-strong); background: color-mix(in srgb, var(--fg) 5%, var(--card)); }
+.btn.primary:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 86%, black); border-color: color-mix(in srgb, var(--accent) 86%, black); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
+.btn.quiet:hover:not(:disabled) { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); border-color: transparent; }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; line-height: 18px; background: none; }
+.btn.primary kbd { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 40%, transparent); background: none; }
+
+/* The send preview (spec 8, 2026-09-10): the mail as the recipient will open
+   it, over the page. Its panel is widened where the dialog is styled. */
+.mail-preview { border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-top: 12px; background: var(--bg-elev); font-size: 15px; }
+/* The header block: labels down the left, values beside them, as a mail client shows them. */
+.mail-head { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; margin: 0 0 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.mail-head dt { color: var(--muted); font-size: 12px; align-self: baseline; }
+.mail-head dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.mail-head .mail-subject { font-size: 15px; font-weight: 600; }
+.mail-body { white-space: pre-wrap; line-height: 1.55; margin-bottom: 14px; }
+.mail-body a { color: var(--accent); }
+/* What Celeste first wrote, folded away: at this point the question is whether the mail is right. */
+.preview-changes { margin-top: 14px; }
+.preview-actions { justify-content: flex-end; }
+
+.diff { white-space: pre-wrap; font-size: 15px; margin-top: 10px; }
+.diff div { padding: 0 4px; border-radius: 3px; }
+.diff .add { background: var(--add); }
+.diff .del { background: var(--del); text-decoration: line-through; color: var(--muted); }
+
+.error { color: var(--danger); font-size: 13px; margin-top: 8px; }
+/* Why Send is held back, beside the button while editing (stress audit, 2026-09-11). */
+.send-block { color: var(--muted); font-size: 13px; align-self: center; }
+
+.toasts { position: fixed; left: 16px; right: 16px; bottom: 92px; display: flex; flex-direction: column; gap: 8px; z-index: 20; }
+.toast { background: var(--toastbg); color: var(--toastfg); border-radius: 10px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22); font-size: 14px; }
+/* A delete of many under way (2026-09-13): the words, and a bar filling beneath them. */
+.toast.working { flex-direction: column; align-items: stretch; gap: 8px; }
+.toast-progress { display: block; height: 4px; border-radius: 999px; background: color-mix(in srgb, var(--toastfg) 18%, transparent); overflow: hidden; }
+.toast-progress-bar { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--toastfg); transform-origin: left; transition: transform 240ms ease; }
+/* Under way, with nothing true to fill yet. Progress lands one chunk at a
+   time and mail goes ten at a time, so a delete of ten or fewer reports once,
+   at the end: the bar spent the whole delete at zero and read as a delete
+   that never started (operator, 2026-09-18). It sweeps instead. */
+.toast-progress-bar.waiting { width: 34%; transform: none; transition: none; animation: toast-progress-sweep 1.15s ease-in-out infinite; }
+@keyframes toast-progress-sweep { from { transform: translateX(-105%); } to { transform: translateX(300%); } }
+@media (prefers-reduced-motion: reduce) {
+  .toast-progress-bar.waiting { width: 100%; animation: none; opacity: 0.4; }
+}
+/* The mail has gone. Quieter than the countdown beside it and with nothing
+   to press: it is telling the operator, not asking them (spec 8, 2026-09-10). */
+/* A toast that has happened can be flicked away (2026-09-15); the page does not scroll under the finger. */
+.toast.swipeable { position: relative; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }
+/* One click closes it; the drag does the same (2026-09-15). */
+.toast-x { flex: none; width: 26px; height: 26px; margin: -4px -6px -4px 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 8px; background: none; color: inherit; opacity: 0.6; cursor: pointer; }
+.toast-x:hover { opacity: 1; background: color-mix(in srgb, var(--toastfg) 14%, transparent); }
+.toast-x:focus-visible { outline: 2px solid var(--toastfg); outline-offset: 1px; }
+.toast-x svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+.toast.working .toast-x { position: absolute; top: 8px; right: 8px; margin: 0; }
+.toast.done { background: color-mix(in srgb, var(--toastbg) 88%, var(--accent)); justify-content: flex-start; }
+.toast .undo { height: 36px; padding: 0 12px; border: 1px solid color-mix(in srgb, var(--toastfg) 35%, transparent); border-radius: 8px; display: flex; align-items: center; font: inherit; font-weight: 500; background: transparent; color: inherit; cursor: pointer; }
+@media (min-width: 900px) {
+  .toasts { left: 50%; right: auto; transform: translateX(-50%); width: min(480px, calc(100% - 32px)); bottom: 24px; }
+}
+
+.empty-wrap { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: calc(100vh - 140px); gap: 18px; text-align: center; }
+.empty-title { font-size: 17px; font-weight: 500; }
+.empty-wrap .card { width: 100%; text-align: left; }
+
+.picker-row { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 4px; text-decoration: none; color: var(--fg); border-top: 1px solid var(--line); }
+.picker-row:first-child { border-top: 0; }
+.picker-row.disabled { color: var(--muted); }
+.picker-glyph { width: 22px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.picker-glyph svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.picker-text { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.picker-name { font-size: 14px; font-weight: 500; }
+.picker-desc { font-size: 12px; color: var(--muted); }
+
+.topbar { max-width: 720px; margin: 0 auto; padding: 16px 16px 0; }
+.topbar-row { display: flex; justify-content: flex-end; }
+.topbar-banner { margin-top: 8px; text-align: right; }
+.refresh-btn svg { width: 18px; height: 18px; }
+.sync-status { display: inline-flex; align-items: center; gap: 4px; }
+.sync-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.spin { display: inline-flex; animation: spin 0.9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (min-width: 900px) {
+  .topbar { padding: 24px 16px 0; }
+}
+
+/* Folder tree (spec 10a): a labelled 220px sidebar on desktop, the same
+   content in a drawer behind the phone top bar's menu button. */
+.side, .drawer { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; border-right: 1px solid var(--line); background: var(--card); flex-direction: column; padding: 14px 10px; z-index: 10; }
+/* No scrolling here: the tree is nine rows, and clipping would cut off the
+   switcher's panel, which is wider than the column on purpose. */
+.side { display: none; }
+.side a, .side button, .drawer a, .drawer button { border-radius: 8px; color: var(--muted); text-decoration: none; transition: background-color 120ms, color 120ms; }
+.side button, .drawer button { border: none; background: none; font: inherit; cursor: pointer; }
+
+.tree { display: flex; flex-direction: column; }
+.tree a, .side-bottom a, .side-bottom button {
+  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; font-size: 13.5px; width: 100%; text-align: left;
+}
+.tree a.child { padding-left: 30px; }
+.tree a:hover, .side-bottom a:hover, .side-bottom button:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.tree a.on, .side-bottom a.on { background: var(--bg); color: var(--fg); font-weight: 500; }
+.tree svg, .side-bottom svg { width: 14px; height: 14px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-count { margin-left: auto; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+.tree a.on .tree-count { color: var(--fg); }
+/* Pushes the Inboxes link and the theme toggle to the bottom of the column. */
+.tree-spacer { flex: 1; min-height: 12px; }
+.side-bottom { display: flex; flex-direction: column; padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* A thread hidden from the sorting lists, as it reads in Inbox and Messages (2026-09-15). */
+.hidden-tag { font-size: 11px; padding: 1px 6px; border-radius: 999px; color: var(--muted); background: color-mix(in srgb, var(--fg) 7%, transparent); }
+
+/* Notifications on this phone (2026-09-14). */
+.notify-hint { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; padding: 0 8px; font-size: 12.5px; color: var(--muted); }
+.notify-hint svg { width: 14px; height: 14px; margin-top: 2px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.notify-hint.error { color: var(--critical); }
+
+/* The lock a phone meets first (2026-09-14). */
+.unlock { min-height: 100dvh; display: grid; place-items: center; padding: 24px 16px; background: var(--bg); }
+.unlock-card { width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 12px; }
+.unlock-card h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.unlock-card .meta { margin: 0 0 4px; }
+.unlock-form { display: flex; flex-direction: column; gap: 10px; }
+.unlock-form .field { height: 48px; font-size: 16px; }
+.unlock-form .btn { height: 48px; justify-content: center; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* Mail or Messages (2026-09-14): a two-way switch at the top of the column. */
+.side-toggle { position: relative; isolation: isolate; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; margin-block: 4px 12px; border-radius: 10px; background: color-mix(in srgb, var(--fg) 6%, transparent); }
+/* One pill under both words, which slides, stretches and settles when the
+   side changes (2026-09-15). Its resting place is set here; the flight is
+   drawn by SideToggle with the Web Animations API. */
+.side-toggle-thumb { position: absolute; z-index: 0; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 8px) / 2); border-radius: 8px; background: var(--card); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.08); transform: translateX(0); transform-origin: center; will-change: transform; pointer-events: none; }
+.side-toggle[data-side="messages"] .side-toggle-thumb { transform: translateX(calc(100% + 2px)); }
+.side-toggle a { z-index: 1; -webkit-tap-highlight-color: transparent; transition: color 220ms ease-out; }
+.side-toggle-label { display: inline-block; transition: transform 140ms ease-out; }
+.side-toggle a:active .side-toggle-label { transform: scale(0.93); }
+@media (prefers-reduced-motion: reduce) {
+  .side-toggle a, .side-toggle-label { transition: none; }
+}
+.side .side-toggle a, .drawer .side-toggle a { position: relative; display: flex; align-items: center; justify-content: center; height: 32px; min-width: 0; padding: 0 6px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+.side .side-toggle a:hover, .drawer .side-toggle a:hover { color: var(--fg); }
+.side .side-toggle a.on, .drawer .side-toggle a.on { color: var(--fg); font-weight: 500; }
+.side-toggle svg { width: 14px; height: 14px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.side-toggle-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+/* On the corner, not in the row: the word always fits the 220px column. */
+.side-toggle-count { position: absolute; top: -5px; right: -3px; font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 2px var(--card); }
+.side-toggle a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* The phone's top bar (2026-09-14): the same switch, centred between the menu and Ask. */
+.switchbar .side-toggle { flex: 1 1 auto; max-width: 260px; margin: 0 auto; }
+.switchbar .side-toggle a { position: relative; display: flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; font-size: 14px; color: var(--muted); text-decoration: none; }
+.switchbar .side-toggle a.on { color: var(--fg); font-weight: 500; }
+
+.drawer { display: flex; width: 280px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28); z-index: 21; overflow-y: auto; }
+.drawer-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 20; }
+.menu-btn { width: 44px; height: 44px; flex-shrink: 0; border: none; background: none; padding: 0; border-radius: 10px; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 120ms, color 120ms; }
+.menu-btn:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.menu-btn svg { width: 20px; height: 20px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+@media (min-width: 900px) {
+  .side { display: flex; }
+  .drawer, .drawer-overlay { display: none; }
+}
+
+/* Inbox switcher (spec 10a): one control, top left, saying which inbox every
+   surface shows. Top of the rail on desktop, a slim top bar on phones. */
+.switchbar { position: fixed; top: 0; left: 0; right: 0; height: 48px; padding: 0 6px; background: var(--card); border-bottom: 1px solid var(--line); display: flex; align-items: center; z-index: 11; }
+@media (min-width: 900px) {
+  .switchbar { display: none; }
+}
+/* Room for the bar: every page's main starts below it at phone widths. */
+@media (max-width: 899px) {
+  main, main.inbox-page { padding-top: calc(56px + env(safe-area-inset-top)); }
+  /* Opened from the home screen the page runs under the status bar (2026-09-14). */
+  .switchbar { height: calc(48px + env(safe-area-inset-top)); padding-top: env(safe-area-inset-top); }
+  /* The menu opens under the top bar, not over it, so Mail / Messages up
+     there stays in reach with the menu open (2026-09-15: the menu lost its
+     own switch). */
+  .drawer { top: calc(48px + env(safe-area-inset-top)); padding-top: 10px; padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+  .drawer-overlay { top: calc(48px + env(safe-area-inset-top)); }
+  .ask-panel { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+}
+
+.switcher { position: relative; }
+.side .switcher, .drawer .switcher { width: 100%; height: auto; display: block; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.switcher-btn { position: relative; width: 100%; height: 44px; border: none; background: none; padding: 0 8px 0 0; border-radius: 10px; color: var(--muted); display: flex; align-items: center; gap: 8px; cursor: pointer; transition: background-color 120ms, color 120ms; }
+.switcher-btn-label { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The chevron sits at the end of the labelled button, not under the monogram. */
+.switcher-btn .switcher-chev { position: static; margin-left: auto; }
+.switcher-btn:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.switcher-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switcher-btn svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.switcher-btn .avatar { width: 28px; height: 28px; font-size: 13px; margin-left: 8px; flex-shrink: 0; }
+.switcher-btn > svg:first-child { margin-left: 11px; flex-shrink: 0; }
+.switcher-btn .switcher-chev { width: 12px; height: 12px; stroke-width: 2.2; margin-left: auto; }
+
+.switcher-panel { position: absolute; top: 48px; left: 0; z-index: 30; width: 260px; padding: 6px; background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18); display: flex; flex-direction: column; }
+/* The sidebar lays its children out as tree rows; the panel is not one. */
+.side .switcher-panel, .drawer .switcher-panel { width: 260px; height: auto; display: flex; color: var(--fg); }
+@media (min-width: 900px) {
+  .switcher-panel, .side .switcher-panel { top: 48px; left: 0; }
+}
+.switcher-row, .side .switcher-panel a, .side .switcher-panel button { width: 100%; height: auto; min-height: 40px; padding: 4px 10px; border: none; border-radius: 8px; background: none; color: var(--fg); font: inherit; text-align: left; text-decoration: none; display: flex; align-items: center; justify-content: flex-start; gap: 10px; cursor: pointer; transition: background-color 120ms; }
+.switcher-row:hover, .side .switcher-panel a:hover, .side .switcher-panel button:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); color: var(--fg); }
+.switcher-row[aria-checked="true"] { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.switcher-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.switcher-glyph { width: 18px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--muted); }
+.switcher-panel svg, .side .switcher-panel svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.switcher-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--verified); flex-shrink: 0; margin: 0 5px; }
+.switcher-dot.warn { background: var(--critical); }
+.switcher-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.switcher-label { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switcher-sub { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.switcher-row.add .switcher-label { color: var(--muted); }
+
+/* Theme toggle rendered in the Inboxes page header for phone widths; the
+   sidebar carries its own copy at >=900px, so this one hides there. */
+.theme-toggle-mobile { margin-left: auto; }
+.theme-toggle-mobile svg { width: 18px; height: 18px; }
+@media (min-width: 900px) {
+  .theme-toggle-mobile { display: none; }
+}
+
+/* Focus rings: obvious keyboard focus on interactive chips, buttons, and rows. */
+.chip:focus-visible, .att-open:focus-visible, .att-dl:focus-visible, .btn:focus-visible, .inbox-row:focus-visible, .menu-btn:focus-visible, .side a:focus-visible, .side button:focus-visible, .drawer a:focus-visible, .drawer button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Inbox: two-pane list + thread on desktop, one column on phone. */
+main.inbox-page { max-width: none; margin: 0; padding: 0; }
+
+/* Content header (spec 10a, 10d): one header across the whole content area,
+   above both panes, holding every control the view has. Two rows, and the
+   order is the hierarchy — what you are looking at, then how. */
+.content-head { background: var(--card); border-bottom: 1px solid var(--line); }
+.head-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 16px; min-height: 48px; }
+/* The first row never wraps: the project strip scrolls instead, so Edit and
+   refresh keep their places whatever the operator has named their projects. */
+.head-row.first { flex-wrap: nowrap; padding-bottom: 0; }
+/* A header of one row keeps its own foot, having no row below to give it one. */
+.head-row.first.only { padding-bottom: 10px; }
+/* The second row is the quieter one: smaller controls, tighter to the first. */
+/* The window and the money side, in the header's first row beside the title (2026-09-15). */
+/* The filters keep their line: the spacer beside them must not squeeze them
+   into two (2026-09-15 audit). */
+/* The filters keep their line, and scroll when the window (or the Ask panel)
+   leaves them too little room, rather than being cut off with no way to
+   reach them (2026-09-15 audit). Their panels paint at the end of the page,
+   so the fade at the edge cannot swallow them. */
+.head-filters { display: flex; align-items: center; flex: 0 1 auto; flex-wrap: nowrap; gap: 8px; min-width: 0; overflow-x: auto; scrollbar-width: none; -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); }
+.head-filters::-webkit-scrollbar { display: none; }
+/* The projects, under the window that counts them (2026-09-15). */
+.head-row.projects { flex-wrap: nowrap; padding-top: 4px; padding-bottom: 0; min-height: 40px; }
+/* Under All inboxes each inbox's projects fold behind a pill (spec 10d), and
+   the rows the operator opens sit under the first row, above the window. Each
+   scrolls sideways on its own, exactly as the single-inbox strip does. */
+.head-row.project-row { flex-wrap: nowrap; padding-top: 2px; padding-bottom: 0; min-height: 34px; }
+/* An inbox's name labels its row: the switcher's word for it, not shouted. */
+.head-label.inbox { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 600; color: var(--fg); opacity: 0.75; }
+/* The pills take the width the strip would have, and wrap rather than push
+   the refresh control off the end — which is what a phone gets too. */
+.pill-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.inbox-pill { display: inline-flex; align-items: center; gap: 5px; height: 26px; font-size: 12.5px; }
+.inbox-pill.on { color: var(--fg); border-color: var(--accent); }
+/* What the row holds, when the pill is not already saying what is on. */
+.pill-count { font-size: 11px; font-variant-numeric: tabular-nums; opacity: 0.7; }
+.inbox-pill .chevron {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 120ms;
+}
+.inbox-pill.on .chevron { transform: rotate(180deg); }
+.head-title { font-size: 15px; font-weight: 600; }
+.head-sub, .head-hint { font-size: 13px; color: var(--muted); }
+/* "Inbox › Unopened": the folder, then the list inside it. */
+.head-row.first > .head-sub::before { content: "› "; }
+.head-row.first > .head-sub { color: color-mix(in srgb, var(--fg) 75%, var(--muted)); font-weight: 500; }
+/* The folder and its row stay one line (operator, 2026-09-14: "Safe to
+   delete" broke into three words stacked when the Ask panel narrowed the
+   header); the project pills beside them give way instead. */
+.head-row.first > .head-title, .head-row.first > .head-sub { white-space: nowrap; flex-shrink: 0; }
+/* Pushes the refresh control to the far right of the first row. */
+.head-spacer { flex: 1 1 auto; }
+/* Between one group of controls and the next. */
+.head-div { width: 1px; align-self: stretch; min-height: 18px; margin: 0 2px; background: var(--line); }
+.head-row .chip { display: inline-flex; align-items: center; height: 26px; }
+.head-filters .chip { font-size: 12.5px; }
+/* A named group: the label and its control stay together on a wrap. */
+.head-group { display: inline-flex; align-items: center; gap: 6px; }
+/* The small round × a row, a file chip and a History row carry. It was born
+   on the Showing row and outlived it (2026-09-15). */
+.applied-clear { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 999px; color: var(--muted); border: 0; background: none; padding: 0; cursor: pointer; font: inherit; }
+.applied-clear:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 12%, transparent); }
+.applied-clear svg { width: 11px; height: 11px; stroke: currentColor; fill: none; stroke-width: 2.2; stroke-linecap: round; }
+
+.head-label { font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); flex-shrink: 0; }
+
+/* One visual grammar per axis (spec 10a). Projects are what the mail is
+   about, so they are tabs: an underline, no border, no track. The window and
+   the money side are how it is narrowed, so they stay on their tracks. The
+   two are not mistakable for each other, which is the whole point. */
+.tab-strip { display: flex; align-items: center; gap: 2px; flex: 1 1 auto; min-width: 0; overflow-x: auto; scrollbar-width: thin; white-space: nowrap; }
+.tab {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: color 120ms, border-color 120ms;
+}
+.tab:hover { color: var(--fg); }
+.tab.on { color: var(--fg); border-bottom-color: var(--accent); font-weight: 500; }
+/* Applied but empty: still the tab that is on, just quiet about it. */
+.tab.dim { opacity: 0.55; }
+.tab.dim:hover { opacity: 1; }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* A segmented control: one choice out of a fixed few, on its own track, so
+   Important/All and the time window each read as one control and not as
+   loose chips among the rest. */
+.seg { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 999px; background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.seg .chip { border-color: transparent; }
+.seg .chip:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); border-color: transparent; }
+.seg .chip.on:hover { background: var(--signal-soft); border-color: var(--signal-soft); }
+
+/* An editor the Edit chip opens, in place under the header's rows. */
+/* The editors open inside the fixed header, so they scroll on their own
+   rather than being cut off by the viewport-locked page. */
+/* The header's editors open over the page, not inside it (spec 10a): a panel
+   wedged into a fixed header pushed the list down and took the header's
+   height with it. Nothing moves when this opens. */
+.dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.dialog-panel {
+  width: min(720px, calc(100vw - 32px));
+  position: relative;
+  max-height: 80vh;
+  overflow-y: auto;
+  padding: 18px 16px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+}
+/* A mail read at editor width does not read like a mail. */
+.dialog-panel.send-preview { width: min(760px, calc(100vw - 32px)); }
+.dialog-panel:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dialog-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; padding-right: 36px; }
+/* The editor inside brought its own frame when it was part of the header. */
+.dialog-panel .cat-editor { padding: 0; border-bottom: 0; }
+
+/* Phone: a sheet from the bottom, which is where a thumb is. */
+@media (max-width: 599px) {
+  .dialog-scrim { align-items: flex-end; padding: 0; }
+  .dialog-panel, .dialog-panel.send-preview { width: 100%; max-height: 88vh; border-radius: 14px 14px 0 0; border-bottom: 0; }
+}
+
+.inbox-grid { display: block; }
+
+.chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+  text-decoration: none;
+  color: var(--muted);
+  background: transparent;
+  white-space: nowrap;
+  transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+button.chip { font: inherit; cursor: pointer; }
+button.chip:disabled { cursor: default; color: var(--muted); }
+/* Progress of an on-demand backfill, in place under the chip rows. */
+.backfill-status { padding: 0 16px 12px; }
+/* Category tag on inbox rows and reason lines. */
+.tag { font-size: 11px; font-weight: 500; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.inbox-sender .tag { margin-left: 8px; }
+/* Project pill: quieter than the category tag, since a project is where a
+   message lives rather than how urgent it is. */
+.tag.project { border: 1px solid var(--line); color: var(--muted); background: none; }
+/* New: arrived since the operator last looked at this list (2026-09-11). */
+.inbox-row .meta .tag.new { padding: 0 6px; line-height: 16px; }
+/* Money pill: its own axis, so its own colour. The accent is spoken for by
+   importance, and the word says which way the money goes. */
+.tag.money { color: var(--verified); background: color-mix(in srgb, var(--verified) 16%, transparent); }
+
+/* "Move to project…" popover on a thread, anchored to its button. */
+.move-project { position: relative; display: inline-flex; }
+.move-project > .btn { display: inline-flex; align-items: center; gap: 6px; }
+.move-project > .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.move-project .switcher-panel { top: auto; bottom: 44px; left: 0; }
+.switcher-hairline { height: 1px; margin: 6px 4px; background: var(--line); }
+.switcher-new { display: flex; align-items: center; gap: 6px; padding: 4px; }
+.switcher-new .field { min-height: 34px; }
+.switcher-panel .error { padding: 0 10px 6px; }
+.chip.edit { display: inline-flex; align-items: center; gap: 5px; }
+.chip.edit svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Sub-category editor, opened in place under the chip rows by the Edit chip. */
+.cat-editor { padding: 0 16px 14px; border-bottom: 1px solid var(--line); }
+.cat-editor .row { margin-top: 12px; }
+/* One row of an editor: a grip, a name, a description under them, and the one
+   button. Order is priority, so a row is dragged rather than nudged by a pair
+   of arrows that were two more buttons than the operator wanted. */
+.cat-row { display: grid; grid-template-columns: auto 1fr auto auto; grid-template-areas: "grip name count remove" "desc desc desc desc"; gap: 6px 6px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.row-grip { grid-area: grip; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 28px; color: var(--muted); cursor: grab; border-radius: 6px; }
+.row-grip:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.row-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.row-grip svg { width: 16px; height: 16px; fill: currentColor; stroke: none; }
+.cat-row.dragging { opacity: 0.5; cursor: grabbing; }
+/* Where it would land, drawn on the row the pointer is over. */
+.cat-row.drop-above { box-shadow: inset 0 2px 0 var(--accent); }
+.cat-row.drop-below { box-shadow: inset 0 -2px 0 var(--accent); }
+.row-count { grid-area: count; font-size: 11.5px; color: var(--muted); }
+.cat-row:first-of-type { border-top: 0; padding-top: 0; }
+.cat-row .field { min-height: 36px; }
+.cat-row .field:nth-of-type(1) { grid-area: name; font-weight: 500; }
+.cat-row .field:nth-of-type(2) { grid-area: desc; font-size: 13px; color: var(--muted); }
+.cat-row .field:nth-of-type(2):focus { color: var(--fg); }
+.cat-row .btn.icon-only { grid-area: remove; margin-left: 0; flex-shrink: 0; }
+.chip:hover { border-color: var(--line-strong); color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+/* Nothing falls under it in this view. Still there, still clickable, just
+   quiet: the row keeps its order so the eye keeps finding the same chip in
+   the same place. */
+.chip.dim { opacity: 0.55; }
+.chip.dim:hover { opacity: 1; }
+/* Empty and not offered: clicking would show an empty list. Kept in place so
+   the row does not reshuffle, but it does not pretend to be a way forward. */
+.chip.disabled { opacity: 0.55; cursor: default; }
+.chip.disabled:hover { opacity: 0.55; color: var(--muted); background: transparent; border-color: transparent; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.chip.on:hover { background: var(--signal-soft); border-color: var(--signal-soft); }
+
+/* A thread is one entry in the list (spec 10a): its newest message, then a
+   line saying how much more it holds, then the rest indented behind a rule
+   when the operator opens it. Collapsed is the resting state, because a long
+   exchange is one thing to deal with, not six. */
+/* The operator's other addresses, one per line with a way to take it off. */
+.alias-row { align-items: center; gap: 8px; margin-top: 6px; }
+.alias-address { font-size: 13.5px; }
+
+/* A reply carries the mail it answers, so a long exchange renders the same
+   words once per message and the panel grows with the square of the thread.
+   A reply is shown as what its sender typed; the original is one click away. */
+.quoted-toggle {
+  margin-top: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.quoted-toggle:hover { color: var(--fg); }
+.quoted-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.thread-group { border-bottom: 1px solid var(--line); }
+.thread-group .inbox-row { border-bottom: 0; }
+.thread-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 16px 10px 34px;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.thread-toggle:hover { color: var(--fg); }
+.thread-toggle svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 120ms; }
+.thread-toggle svg.open { transform: rotate(90deg); }
+.thread-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+/* The rule is what says these belong to the row above rather than beside it. */
+.thread-older { margin-left: 22px; border-left: 2px solid var(--line); }
+/* Indented under their thread, and the gutter travels with them. */
+.thread-older .inbox-row { padding-left: 26px; }
+
+/* A row on the Safe-to-delete view: the link, and an x beside it rather than
+   inside it, so pressing the x never opens the thread it deletes. */
+.inbox-row-item { position: relative; display: flex; align-items: stretch; }
+.inbox-row-item > .inbox-row { flex: 1 1 auto; min-width: 0; }
+/* Mid-height at the right, clear of the time above and the snippet's ellipsis below, on its own ground so it never sits on top of a word. */
+.inbox-row-del { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); width: 22px; height: 22px; opacity: 0; transition: opacity 120ms; background: var(--card); border-radius: 6px; box-shadow: 0 0 0 3px var(--card); }
+.inbox-row-item:hover .inbox-row-del, .inbox-row-del:focus-visible { opacity: 1; }
+.inbox-row-del svg { width: 13px; height: 13px; }
+/* A chat's second control: Hide sits left of Delete (operator, 2026-09-11). */
+.inbox-row-hide { right: 38px; }
+/* Restore on a Deleted items row shows without a hover: it is the one thing that list is for (2026-09-15). */
+.inbox-row-item.restorable > .inbox-row { padding-right: 44px; }
+.inbox-row-restore { opacity: 0.7; }
+.inbox-row-restore:hover { opacity: 1; color: var(--fg); }
+.inbox-row-item:hover .inbox-row-hide { opacity: 1; }
+/* The thread's Delete and Hide carry their icons. */
+.thread-actions .btn svg, .draft-actions .btn svg { width: 14px; height: 14px; margin-right: 5px; stroke: currentColor; fill: none; }
+/* A deleted row slides out to the right and folds shut (operator, 2026-09-11). */
+.inbox-row-item.going { animation: row-out 360ms cubic-bezier(0.4, 0, 0.2, 1) forwards; pointer-events: none; overflow: hidden; }
+/* Back from Cmd-Z: in from the right, the slide-out in reverse (operator, 2026-09-11). */
+.inbox-row-item.arriving { animation: row-in 360ms cubic-bezier(0.2, 0.7, 0.3, 1); }
+@keyframes row-in {
+  0% { opacity: 0; transform: translateX(48px) scale(0.98); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes row-out {
+  0% { max-height: 96px; }
+  40% { opacity: 0; transform: translateX(48px) scale(0.98); max-height: 96px; }
+  100% { opacity: 0; transform: translateX(48px) scale(0.98); max-height: 0; }
+}
+/* No hover on a touch screen, so the x is simply always there. */
+@media (hover: none) {
+  .inbox-row-del { opacity: 0.6; }
+}
+
+.inbox-row { position: relative; display: block; padding: 12px 16px 12px 28px; border-bottom: 1px solid var(--line); border-left: 2px solid transparent; text-decoration: none; color: inherit; min-height: 44px; transition: background-color 120ms, border-color 120ms; }
+.inbox-row:not(.selected):hover { background: color-mix(in srgb, var(--fg) 4%, transparent); }
+.inbox-row.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); border-left-color: var(--accent); }
+.inbox-sender { display: flex; align-items: center; margin-top: 4px; font-weight: 500; }
+/* Something in this thread has arrived since the operator last opened it. The
+   gutter is the same width on every row, so the dot appearing never moves the
+   text under it. */
+.inbox-row.unread::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--unread);
+}
+.inbox-row.unread .inbox-sender { font-weight: 600; }
+/* A subject with no space in it (a file name, a token) wraps rather than
+   pushing the row past the screen (phone stress audit, 2026-09-11: a 360px
+   list scrolled sideways by 23px). */
+.inbox-subject { font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+.inbox-empty { padding: 12px 16px 24px; color: var(--muted); }
+/* The rows past the first page wait behind this (operator, 2026-09-11). */
+.inbox-more { display: block; padding: 14px 16px 18px; color: var(--muted); font-size: 13px; text-decoration: none; }
+.inbox-more:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 4%, transparent); }
+
+.inbox-detail { padding: 24px 16px 40px; }
+/* The thread sweeps off the screen once it is deleted (operator, 2026-09-11):
+   a small lift, then a slide down and away, shrinking and fading. */
+.inbox-detail.deleting { animation: thread-out 360ms cubic-bezier(0.55, 0, 0.9, 0.4) forwards; pointer-events: none; }
+/* Back from Cmd-Z: the sweep in reverse, up from below and settling (operator, 2026-09-11). */
+.inbox-detail.returning { animation: thread-in 420ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+@keyframes thread-in {
+  0% { transform: translateY(60vh) scale(0.8) rotate(-3deg); opacity: 0; }
+  70% { transform: translateY(-6px) scale(1.005); opacity: 1; }
+  100% { transform: none; opacity: 1; }
+}
+/* Marked handled (operator, 2026-09-11: Shift): a lift and a flash of the
+   done colour, then off to the right, the way a thing filed goes. */
+.inbox-detail.handling { animation: thread-handled 360ms cubic-bezier(0.55, 0, 0.9, 0.4) forwards; pointer-events: none; }
+@keyframes thread-handled {
+  20% { transform: translateY(-6px) scale(1.01); opacity: 1; box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--verified) 18%, transparent); }
+  100% { transform: translateX(60vw) scale(0.8) rotate(2deg); opacity: 0; box-shadow: inset 0 0 0 100vmax color-mix(in srgb, var(--verified) 18%, transparent); }
+}
+@keyframes thread-out {
+  20% { transform: translateY(-8px) scale(1.01); opacity: 1; }
+  100% { transform: translateY(70vh) scale(0.72) rotate(-4deg); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .inbox-detail.deleting, .inbox-detail.handling, .inbox-row-item.going { animation: none; opacity: 0; }
+  .inbox-detail.returning, .inbox-row-item.arriving { animation: none; }
+}
+.inbox-detail.placeholder { display: none; align-items: center; justify-content: center; color: var(--muted); text-align: center; }
+.inbox-detail h1 { font-size: 20px; }
+.thread-card { padding: 20px; margin-top: 16px; }
+/* The way up a long chat (2026-09-11): one quiet control above the newest page. */
+.thread-earlier { align-self: center; margin-bottom: 8px; }
+/* Mail / Messages tapped, its page on the way (2026-09-15): the list and
+   the thread dim at once, so the tap is answered before the page lands. */
+.inbox-grid, main > .empty-wrap { transition: opacity 120ms ease-out; }
+html[data-switching] .inbox-grid, html[data-switching] main > .empty-wrap { opacity: 0.45; pointer-events: none; }
+
+/* Groups in the projects editor (2026-09-15). */
+.group-editor { display: flex; flex-direction: column; gap: 8px; padding: 10px 0 14px; margin-bottom: 8px; border-bottom: 1px solid var(--line); }
+.group-editor-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.group-editor-title { font-size: 13px; font-weight: 600; }
+.group-editor-row { display: flex; align-items: center; gap: 8px; }
+.group-editor-row .field { flex: 1 1 auto; min-width: 0; }
+.group-editor-row .meta { flex: none; }
+.group-editor > .btn { align-self: flex-start; }
+/* A project's group sits beside its name, in its own column. */
+.cat-row:has(> .group-select) { grid-template-columns: auto 1fr minmax(120px, 170px) auto auto; grid-template-areas: "grip name group count remove" "desc desc desc desc desc"; }
+.cat-row .field.group-select { grid-area: group; min-width: 0; font-weight: 400; font-size: 13px; }
+
+/* The row of a group's projects, under the bar while the group is on
+   (operator, 2026-09-15: "when I click on admin, I still want to see the
+   sub-projects"). */
+/* One height, filled or empty, so nothing below it moves (2026-09-15). */
+.head-row.group-row { flex-wrap: nowrap; padding-top: 0; padding-bottom: 0; gap: 8px; height: 38px; min-height: 38px; align-items: center; overflow: hidden; }
+.head-row.group-row > .head-label.group { flex-shrink: 0; color: var(--fg); font-weight: 600; text-transform: none; letter-spacing: 0; }
+.head-row.group-row > .tab-strip { flex: 1 1 auto; min-width: 0; }
+
+/* The phone's project picker and its sheet (operator, 2026-09-15). Hidden
+   on desktop, where the strip and pills have the room. */
+.project-picker { display: none; }
+.sheet-veil { position: fixed; inset: 0; z-index: 40; background: rgba(0, 0, 0, 0.45); display: flex; align-items: flex-end; justify-content: center; }
+.sheet { position: relative; width: 100%; max-width: 560px; max-height: 78vh; display: flex; flex-direction: column; background: var(--card); color: var(--fg); border-radius: 16px 16px 0 0; border: 1px solid var(--line); border-bottom: 0; box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.25); padding-bottom: env(safe-area-inset-bottom); }
+.sheet-head { position: relative; display: flex; align-items: center; min-height: 52px; padding: 0 56px 0 20px; border-bottom: 1px solid var(--line); }
+.sheet-head .close-x { top: 10px; right: 10px; }
+.sheet-head .close-x svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+.sheet-title { font-size: 15px; font-weight: 600; }
+.sheet-body { overflow-y: auto; padding: 6px 8px 12px; overscroll-behavior: contain; }
+.sheet-group { padding-top: 4px; margin-top: 4px; border-top: 1px solid var(--line); }
+.sheet-inbox { display: flex; align-items: center; gap: 4px; }
+.sheet-inbox > .sheet-row { flex: 1 1 auto; min-width: 0; }
+.sheet-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 10px; color: var(--fg); text-decoration: none; font-size: 15px; }
+.sheet-row.top { font-weight: 600; }
+.sheet-row.child { padding-left: 26px; color: color-mix(in srgb, var(--fg) 88%, var(--muted)); }
+.sheet-row.dim { opacity: 0.55; }
+.sheet-row.on { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--fg); }
+.sheet-row:active { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.sheet-name { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; line-height: 1.3; padding: 10px 0; }
+.sheet-count { flex: none; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sheet-row.edit { color: var(--muted); gap: 8px; }
+/* A group in the sheet, and its projects a step further in (2026-09-15). */
+.sheet-row.child.group { font-weight: 600; gap: 8px; }
+.sheet-row.grandchild { padding-left: 50px; font-size: 14.5px; color: color-mix(in srgb, var(--fg) 80%, var(--muted)); }
+.sheet-row svg, .sheet-edit svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+/* Folding an inbox or a group in the sheet (2026-09-15): an arrow ahead of
+   its name, turned down while open; the name itself still picks. */
+.sheet-line { display: flex; align-items: center; }
+.sheet-line > .sheet-row { flex: 1 1 auto; min-width: 0; }
+.sheet-fold { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 44px; margin-right: -6px; border: 0; border-radius: 10px; background: none; color: var(--muted); cursor: pointer; }
+.sheet-fold.nested { margin-left: 14px; }
+.sheet-fold svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform 160ms ease-out; }
+.sheet-fold.open svg { transform: rotate(90deg); }
+.sheet-fold:active { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.sheet-line > .sheet-row.child.group { padding-left: 8px; }
+/* A project in no group lines up with the groups' folders; a group's own
+   projects line up with its name. */
+.sheet-line > .sheet-row.child:not(.group) { padding-left: 52px; }
+.sheet-project-group > .sheet-row.grandchild { padding-left: 75px; }
+.sheet-inbox > .sheet-row.top { padding-left: 8px; }
+@media (prefers-reduced-motion: reduce) { .sheet-fold svg { transition: none; } }
+.sheet-empty { padding: 10px 12px 12px; font-size: 13.5px; line-height: 1.4; }
+.sheet-edit { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 10px; color: var(--muted); }
+
+/* The header's filters as dropdown chips (operator, 2026-09-15: "I like top
+   header to feel more like a filter"): each says what it is and what is on,
+   and opens its choices under itself. */
+.filter-menu { position: relative; display: inline-flex; }
+/* Fixed slots, so a longer name never shifts the chips beside it (operator,
+   2026-09-15): each keeps its width and cuts its value short instead. */
+.filter-chip { flex: none; width: 168px; justify-content: flex-start; }
+.filter-chip.period-chip { width: 124px; }
+.filter-chip.project-picker { width: 230px; }
+.filter-chip .switcher-chev, .filter-chip > svg:last-child { margin-left: auto; }
+.filter-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 8px 0 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--card); color: var(--fg); font: inherit; font-size: 13px; cursor: pointer; }
+.filter-chip:hover { border-color: var(--fg); }
+.filter-chip[aria-expanded="true"] { border-color: var(--accent); }
+.filter-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.filter-chip-label { flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.filter-chip-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.filter-chip svg { flex: none; width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
+.filter-panel { top: 38px; width: 220px; }
+/* The inbox switcher, first of the header's filters (2026-09-15). */
+.head-filters .switcher { display: inline-flex; }
+.head-filters .switcher-btn { height: 30px; padding: 0 8px 0 10px; color: var(--fg); }
+.head-filters .switcher-btn:hover { background: var(--card); }
+.head-filters .switcher-btn .switcher-chev { margin-left: 0; width: 13px; height: 13px; }
+.head-filters .switcher-panel { top: 38px; }
+.filter-panel .switcher-row.on { background: color-mix(in srgb, var(--accent) 16%, transparent); font-weight: 500; }
+/* The project panel is the phone's sheet on a phone, and a panel here. */
+@media (min-width: 900px) {
+  /* Placed under its chip by the picker; the veil is only the box it sits in. */
+  .sheet-veil.anchored { inset: auto; z-index: 30; background: none; display: block; }
+  .sheet-veil.anchored .sheet { position: static; width: 320px; max-width: none; max-height: 70vh; border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22); padding-bottom: 0; }
+  .sheet-veil.anchored .sheet-head { min-height: 40px; padding: 0 44px 0 14px; }
+  .sheet-veil.anchored .sheet-head .close-x { top: 6px; right: 6px; }
+  .sheet-veil.anchored .sheet-row { min-height: 36px; font-size: 14px; }
+  .sheet-veil.anchored .sheet-name { padding: 6px 0; }
+}
+
+/* "Mark all opened": the words on desktop, a double tick and the count on a phone (2026-09-15). */
+.mark-all-icon, .mark-all-short { display: none; }
+.mark-all-icon { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* "Scroll to bottom" on a long thread (operator, 2026-09-15): pinned to the
+   foot of the pane while the end is below it, a pill over the mail. */
+.scroll-end { position: sticky; bottom: 20px; height: 0; display: flex; justify-content: center; z-index: 11; pointer-events: none; }
+.scroll-end-btn { pointer-events: auto; transform: translateY(-100%); display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--card); color: var(--fg); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22); white-space: nowrap; }
+.scroll-end-btn:hover { background: color-mix(in srgb, var(--fg) 6%, var(--card)); }
+.scroll-end-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.scroll-end-btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.thread-end { display: block; height: 0; }
+.thread-actions { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+/* The thread's pending draft, under the mail it answers (spec 10a,
+   2026-09-10): the reply is composed where it is read. It is set in rather
+   than boxed again, so the card reads as the continuation of the thread above
+   it and not as a second window over it. */
+.reply-card { margin-top: 16px; border-left: 2px solid var(--accent); padding-left: 14px; }
+.reply-lead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.reply-card .card { padding: 14px; }
+@media (min-width: 900px) {
+  .reply-card { margin-top: 20px; padding-left: 18px; }
+  .reply-card .card { padding: 20px; }
+}
+.inbox-back { display: inline-flex; align-items: center; color: var(--muted); text-decoration: none; font-size: 13px; margin-bottom: 12px; }
+
+.inbox-list.with-detail { display: none; }
+/* A pane the page filled on the operator's behalf rather than one they asked
+   for: on a phone it would sit under the list it was chosen from, so it waits
+   for a tap. The Drafts page is the one that does this (spec 10a). */
+.inbox-detail.implicit { display: none; }
+@media (max-width: 899px) { .bubble-row { max-width: 94%; } .bubble-row.them .avatar { display: none; } }
+
+@media (min-width: 900px) {
+  main.inbox-page { padding: 0; }
+  /* The header takes what it needs and the panes fill the rest of the screen. */
+  /* The header stays put; the list and the thread scroll on their own. */
+  main.inbox-page { display: flex; flex-direction: column; height: 100vh; min-height: 0; overflow: hidden; }
+  .inbox-header { flex: 0 0 auto; }
+  .inbox-grid { display: flex; align-items: stretch; flex: 1 1 auto; min-height: 0; overflow: hidden; }
+  .inbox-list { width: clamp(400px, 26vw, 480px); flex-shrink: 0; border-right: 1px solid var(--line); background: var(--card); overflow-y: auto; min-height: 0; }
+  .inbox-list.with-detail { display: block; }
+  .inbox-detail.implicit { display: block; }
+  .inbox-detail { flex: 1; padding: 40px 48px; overflow-y: auto; min-height: 0; }
+  .inbox-detail.placeholder { display: flex; }
+  .inbox-detail h1 { font-size: 24px; }
+  /* The thread column grows with the window and sits centred in its pane,
+     so a wide screen splits the spare room evenly instead of leaving it all
+     on the right (operator, 2026-09-09). */
+  .inbox-detail > * { max-width: 1080px; margin-left: auto; margin-right: auto; }
+  .thread-card { padding: 28px; margin-top: 20px; }
+  .inbox-back { display: none; }
+}
+
+/* Ask Celeste (spec 10c): a panel on the right that stays open across
+   folders and threads, holding one running conversation. Wide screens make
+   room for it; narrower ones let it lie over the app behind a scrim. */
+.ask-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--ask-width, 380px), 100%); display: flex; flex-direction: column; background: var(--card); border-left: 1px solid var(--line); z-index: 22; }
+/* The left edge, as a handle: a strip wide enough to grab, showing a line
+   only when it is about to be used. Below 1200px the panel lies over the app
+   rather than beside it, so there is nothing to resize. */
+.ask-grip { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; cursor: col-resize; touch-action: none; z-index: 1; }
+.ask-grip::after { content: ""; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px; background: transparent; transition: background-color 120ms; }
+.ask-grip:hover::after, .ask-grip:focus-visible::after { background: var(--accent); }
+.ask-grip:focus-visible { outline: none; }
+.ask-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+/* The panel's name, and under it the conversation it is on: a thread and its
+   counterpart, or General. Long subjects ellipsise rather than push the
+   buttons off the edge. */
+.ask-heading { display: flex; flex-direction: column; min-width: 0; }
+.ask-title { font-size: 14px; font-weight: 600; }
+.ask-subtitle { font-size: 11.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* History, New and close, kept together so only the group takes the free space. */
+.ask-head-actions { margin-left: auto; display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.ask-close { margin-left: auto; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.ask-close:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.ask-close[aria-pressed="true"] { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.ask-back { margin-left: 0; }
+.ask-close svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+.ask-head-actions svg { width: 15px; height: 15px; stroke-linejoin: round; }
+/* History: the list of past conversations, in place of the turns. */
+.ask-history-head { display: flex; align-items: center; gap: 4px; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.ask-history-head svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.ask-history-title { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.ask-history-list { gap: 2px; padding: 8px; }
+.ask-history-item { display: flex; align-items: center; gap: 4px; }
+.ask-history-item .ask-history-row { flex: 1 1 auto; min-width: 0; }
+.ask-history-del { flex-shrink: 0; opacity: 0.6; }
+.ask-history-item:hover .ask-history-del { opacity: 1; }
+.ask-history-confirm { flex-shrink: 0; color: var(--danger, #b3261e); }
+.ask-history-row { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: none; color: inherit; text-align: left; cursor: pointer; }
+.ask-history-row:hover { border-color: var(--line); background: color-mix(in srgb, var(--fg) 4%, transparent); }
+.ask-history-name { font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask-history-meta { font-size: 11.5px; color: var(--muted); }
+/* What Celeste is looking at, and the way to stop her looking at it. */
+/* General or the thread on screen: two tabs, one tap (2026-09-14). */
+.ask-tabs { display: flex; gap: 4px; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.ask-tab { display: inline-flex; align-items: center; gap: 6px; min-width: 0; height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid transparent; background: none; color: var(--muted); font: inherit; font-size: 12.5px; cursor: pointer; }
+.ask-tab:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 5%, transparent); }
+.ask-tab.on { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); border-color: var(--line); font-weight: 500; }
+.ask-tab.on:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+.ask-tab svg { width: 13px; height: 13px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linejoin: round; }
+.ask-tab-label { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ask-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ask-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.ask-empty { margin: 0; font-size: 13px; color: var(--muted); }
+.ask-turn { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 100%; }
+.ask-turn.mine { align-items: flex-end; }
+.ask-bubble { padding: 10px 12px; border-radius: 14px; border: 1px solid var(--line); background: color-mix(in srgb, var(--fg) 5%, transparent); font-size: 14px; line-height: 1.55; white-space: pre-wrap; max-width: 94%; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+.ask-turn.mine .ask-bubble { border-bottom-right-radius: 4px; background: color-mix(in srgb, var(--accent) 14%, transparent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+/* Celeste writes light markdown, rendered from escaped text (see lib/chat.ts):
+   her paragraphs and lists are blocks, so this side does not hold newlines. */
+.celeste-turn .ask-bubble { border-bottom-left-radius: 4px; white-space: normal; }
+.ask-bubble p { margin: 0 0 8px; }
+.ask-bubble ul, .ask-bubble ol { margin: 0 0 8px; padding-left: 20px; }
+.ask-bubble li { margin: 3px 0; }
+.ask-bubble > :last-child { margin-bottom: 0; }
+.ask-bubble strong { font-weight: 600; }
+/* The number in the sentence, and the chip it belongs to. */
+.ask-ref { font-size: 10px; line-height: 0; vertical-align: super; margin-left: 2px; }
+.ask-ref a { color: var(--accent); text-decoration: none; }
+.ask-cite:target { border-color: var(--accent); color: var(--fg); }
+.ask-thinking { color: var(--muted); }
+/* A question the app asked for the operator after they dropped a file: still
+   their bubble, said more quietly, because they did not type it. */
+.ask-auto { color: var(--muted); font-style: italic; background: color-mix(in srgb, var(--fg) 4%, transparent); border-color: var(--line); }
+/* The messages an answer stands on, one chip each, straight to the thread. */
+.ask-cites { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; }
+.ask-cite { font-size: 11.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.ask-cite:hover { color: var(--fg); border-color: var(--line-strong); }
+/* A proposal is a button. Until it is clicked, nothing has happened. */
+.ask-actions { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.ask-action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ask-action { height: 32px; padding: 0 10px; font-size: 13px; border-color: var(--line); color: var(--fg); text-decoration: none; }
+.ask-note { font-size: 12px; color: var(--muted); }
+/* The threads a bulk proposal covers: one button above, and the list of what
+   it would touch under it, each one still a link the operator can check. */
+.ask-threads { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.ask-done { font-size: 12.5px; color: var(--muted); }
+.ask-compose { display: flex; align-items: flex-end; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); flex-shrink: 0; }
+/* One line that grows as the question does, never a tall empty box
+   (operator, 2026-09-11). Pill-shaped, like the arrow beside it. */
+textarea.field.ask-input { resize: none; font-size: 14px; min-height: 40px; height: 40px; max-height: 160px; padding: 9px 14px; border-radius: 20px; line-height: 20px; overflow-y: auto; }
+.ask-send { width: 40px; height: 40px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 50%; background: var(--accent); color: var(--accent-ink, #fff); cursor: pointer; padding: 0; }
+.ask-send svg { width: 18px; height: 18px; }
+.ask-send:hover:not(:disabled) { filter: brightness(1.08); }
+.ask-send:disabled { opacity: 0.35; cursor: default; }
+
+/* The place to type a text into a chat (2026-09-11): the Ask panel's pill,
+   under the newest bubble, with a hairline above so it reads as the chat's
+   own edge rather than one more bubble. */
+.text-composer { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.text-composer-row { display: flex; align-items: flex-end; gap: 8px; }
+.text-composer-row .ask-input { flex: 1 1 auto; min-width: 0; }
+.text-composer .error { margin-top: 8px; }
+.ask-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 21; }
+/* The sidebar row that opens it, above Inboxes. */
+.side-bottom .ask-glyph { fill: currentColor; stroke: none; }
+.ask-kbd { margin-left: auto; }
+.side-bottom .ask-row.on, .drawer .side-bottom .ask-row.on { background: var(--bg); color: var(--fg); font-weight: 500; }
+
+@media (max-width: 1199px) {
+  .ask-grip { display: none; }
+}
+/* Between the phone and a wide desktop there is room for the list or the
+   thread, not both: at 1000px the thread had 230px (stress audit,
+   2026-09-11). The thread wins, and "← Inbox" is the way back. */
+@media (min-width: 900px) and (max-width: 1199px) {
+  .inbox-list.with-detail { display: none; }
+}
+
+@media (min-width: 1200px) {
+  /* Room made rather than taken: the app narrows, the panel does not cover
+     it, and it narrows by exactly what the operator dragged the edge to. */
+  .shell[data-ask="open"] main.inbox-page { padding-right: var(--ask-width, 380px); }
+  /* With the panel open, a window under 1600px has no room for three
+     panes: the thread keeps the width and the list steps aside (desktop
+     audit, 2026-09-11: the thread had shrunk to a strip). */
+  @media (max-width: 1599px) {
+    .shell[data-ask="open"] .inbox-list.with-detail { display: none; }
+    /* The inbox pills wrapped into three rows beside the panel; they scroll
+       sideways instead, the way the project tabs do (stress audit, 2026-09-11). */
+    .shell[data-ask="open"] .pill-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .shell[data-ask="open"] .pill-row::-webkit-scrollbar { display: none; }
+    .shell[data-ask="open"] .pill-row .inbox-pill { flex-shrink: 0; }
+  }
+  /* The narrow pages (queue, inboxes) are a 720px column centred on the
+     window; with the panel open they centre on what is left of it, rather
+     than keeping the window's centre and losing their width to the panel. */
+  .shell[data-ask="open"] main:not(.inbox-page) {
+    margin-right: var(--ask-width, 380px);
+    margin-left: max(0px, calc((100% - var(--ask-width, 380px) - 720px) / 2));
+  }
+  .ask-scrim { display: none; }
+}
+
+/* The × in the top-right corner of a dialog, panel or form: the only way to cancel. */
+.close-x { position: absolute; top: 10px; right: 10px; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.close-x:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.close-x:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.close-x svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+.add-inbox { position: relative; padding-right: 48px; }
+
+/* A tracking link is one 200-character word; it wraps rather than pushing the bubble out of its column. */
+.msg-html { overflow-wrap: anywhere; word-break: break-word; }
+.msg-html a { overflow-wrap: anywhere; }
+
+/* Links in plain-text mail: the label is the link, underlined so it reads as one. */
+.body a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+
+/* The + in the chat bar: a file for the open draft, or for Celeste herself
+   when there is none. Only dead while the conversation is still loading. */
+.ask-attach { width: 40px; height: 40px; flex-shrink: 0; }
+.ask-attach:disabled { opacity: 0.4; cursor: default; background: none; }
+.ask-attach svg { width: 16px; height: 16px; }
+
+/* The files given to the conversation, sitting on the composer's top edge: the
+   chips are the draft's, and the row scrolls rather than pushing the composer
+   down when the operator has handed over several (spec 10c, 2026-09-10). */
+.ask-files { flex-shrink: 0; max-height: 40vh; overflow-y: auto; padding: 10px 14px 0; }
+.ask-files .att-row { margin-bottom: 0; }
+.ask-files .att-preview { margin-bottom: 10px; }
+.ask-files .att-preview iframe { height: 320px; }
+.ask-files .att-name { max-width: 140px; }
+.ask-file-attach { height: 22px; padding: 0 8px; font-size: 11.5px; border-color: var(--line); }
+
+/* "3 files" ahead of the chips in the send preview, where they read as part of the mail. */
+.att-count { color: var(--muted); font-size: 12px; align-self: center; }
+.undo:hover { text-decoration: underline; color: var(--accent-ink, #fff); }
+.att-chip .att-dl:hover { background: color-mix(in srgb, var(--fg) 10%, transparent); color: var(--fg); }
+
+/* The Usage page (spec 13, 2026-09-11): what the models were asked, what
+   they answered and what it cost. Numbers are tabular everywhere here, so a
+   column of them reads as a column. */
+.usage-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 16px; }
+@media (min-width: 640px) { .usage-tiles { grid-template-columns: repeat(4, 1fr); } }
+.usage-tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.usage-tile .tile-label { font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.usage-tile .tile-value { margin-top: 4px; font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.usage-tile .tile-note { margin-top: 4px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.usage-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.usage-table th { text-align: right; font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); padding: 0 0 6px; }
+.usage-table th:first-child, .usage-table td:first-child { text-align: left; }
+.usage-table td { text-align: right; padding: 6px 0; border-top: 1px solid var(--line); }
+.usage-table td:first-child { color: var(--fg); }
+.usage-tag { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 11px; color: var(--muted); background: color-mix(in srgb, var(--fg) 7%, transparent); }
+/* One bar per day, oldest on the left. CSS only: a chart library for eight
+   rectangles would be a dependency to keep, not a picture to read. */
+.usage-bars { display: flex; align-items: flex-end; gap: 3px; height: 120px; margin-top: 12px; overflow-x: auto; }
+.usage-bar { flex: 1 1 auto; min-width: 6px; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+.usage-bar .bar-fill { background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; }
+.usage-bar.empty .bar-fill { background: var(--line); height: 2px; }
+.usage-days { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+.usage-note { margin-top: 12px; font-size: 12px; color: var(--muted); }
+/* A conversation's name in the usage table: one line, cut where the column ends. */
+.usage-table td.usage-chat-title { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* What the open conversation has cost, under its name in the panel head. */
+.ask-spent { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ===== Phone: Ask Celeste as a sheet, and delete by touch (2026-09-11) =====
+   The panel kept its desktop width at 430px and covered most of the screen
+   with the page peeking out beside it. On a phone it is the whole screen,
+   with the × top right, and there is nothing to resize. */
+@media (max-width: 899px) {
+  .ask-panel { left: 0; right: 0; width: 100%; border-left: 0; }
+  /* A swipe in the conversation scrolls the conversation, and stops at its
+     ends rather than passing on to the page behind (2026-09-15). */
+  .ask-scroll { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
+  .ask-grip { display: none; }
+  .shell[data-ask="open"] main, .shell[data-ask="open"] main.inbox-page { padding-right: 0; }
+}
+/* The spark in the phone top bar. */
+.ask-topbtn { margin-left: auto; width: 44px; height: 44px; flex-shrink: 0; border: none; background: none; padding: 0; border-radius: 10px; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 120ms, color 120ms; }
+/* Lime, the night theme's signal colour, in both themes (operator, 2026-09-15):
+   a lime disc with the dark star on it, so it reads on a light top bar too. */
+.ask-topbtn { color: #0d0e0b; }
+.ask-topbtn::before { content: ""; position: absolute; width: 34px; height: 34px; border-radius: 999px; background: #deff9a; transition: filter 120ms; }
+.ask-topbtn { position: relative; }
+.ask-topbtn:hover::before, .ask-topbtn.on::before { filter: brightness(0.92); }
+.ask-topbtn svg { position: relative; width: 18px; height: 18px; fill: currentColor; stroke: none; }
+.ask-topbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Delete by touch: the × is always there and big enough for a thumb, and a
+   swipe to the left takes the row with the finger. */
+@media (hover: none) {
+  .inbox-row-del { opacity: 0.6; width: 32px; height: 32px; right: 8px; }
+  .inbox-row-del svg { width: 15px; height: 15px; }
+  .inbox-row-item { touch-action: pan-y; }
+  /* Always showing, the × needs its own column: the subject and snippet
+     stop short of it instead of running underneath (operator, 2026-09-11:
+     "the x buttons are overlying"). */
+  .inbox-row-item > .inbox-row { padding-right: 52px; }
+  .inbox-row-item.hideable > .inbox-row { padding-right: 90px; }
+  /* The eye sits left of the bin: the rule above moved every row button to
+     the same edge, so Hide covered Delete (operator, 2026-09-15). */
+  .inbox-row-hide { right: 46px; }
+}
+.inbox-row-item.swiping { transition: none; background: var(--card); }
+.inbox-row-item.swiping::after { content: "Delete"; position: absolute; left: 100%; top: 0; bottom: 0; width: 100vw; display: flex; align-items: center; padding-left: 18px; color: #fff; font-size: 13px; font-weight: 500; background: var(--danger, #c23b2e); }
+.inbox-row-item.swiping .inbox-row-del { display: none; }
+
+/* "Add to Alex" on a thread (spec 10e): the same button and panel family as
+   Move to project, with a small form in it instead of a list of rows. The
+   panel opens upwards, because the action row sits at the foot of the pane. */
+.add-alex { position: relative; display: inline-flex; }
+.add-alex > .btn { display: inline-flex; align-items: center; gap: 6px; }
+.add-alex > .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+/* It sits at the right end of the action row, so it opens leftwards: anchored
+   left it ran off the edge of the pane. */
+.alex-panel { top: auto; bottom: 44px; left: auto; right: 0; width: 300px; max-width: calc(100vw - 32px); gap: 8px; padding: 10px; }
+.alex-kinds { display: flex; gap: 6px; }
+.alex-kinds .chip { flex: 1 1 0; justify-content: center; }
+.alex-field { display: flex; flex-direction: column; gap: 3px; }
+.alex-field .field { min-height: 34px; }
+.alex-check { display: flex; align-items: center; gap: 6px; }
+/* Every attempt, kept on the thread: what went, when, and whether it landed. */
+.alex-items { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.alex-items li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.alex-item-kind { text-transform: uppercase; font-size: 10.5px; letter-spacing: 0.04em; }
+.alex-item-title { font-weight: 500; }
+.alex-items li.failed .alex-item-error { color: var(--critical); }
+/* Alex's free times for the chosen day, as chips that fill the field
+   (operator, 2026-09-16). They are suggestions: the field still takes any
+   time typed, since an actionable at 8pm is not a meeting Alex would offer. */
+.alex-free { display: flex; flex-direction: column; gap: 5px; }
+.alex-slots { display: flex; flex-wrap: wrap; gap: 4px; max-height: 92px; overflow-y: auto; }
+.alex-slots .chip { height: 26px; padding: 0 9px; font-size: 12px; font-variant-numeric: tabular-nums; }
+/* Why a WhatsApp group has no reply box: the app never says which group is
+   open, so Celeste will not send into one it cannot identify (2026-09-16). */
+.group-no-reply { margin: 14px 2px 2px; max-width: 62ch; }
+
+/* The stats page (2026-09-17): a mirror of how the operator messages. Charts
+   are bars of two parts — what they wrote, and what arrived — so the shape of
+   a day reads without a legend being needed twice. */
+/* Wider than the 720px `main` default: a day has twenty-four bars in it, and
+   the correspondents table has four columns. The page scrolls with the
+   document rather than in its own box, so the header scrolls away with it. */
+main.stats-page { max-width: 1040px; margin: 0 auto; padding: 0 22px 60px; }
+.range-row { display: flex; gap: 6px; flex-shrink: 0; }
+.range-row .chip { text-decoration: none; }
+.stat-empty { margin-top: 28px; }
+
+.stat-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-block: 18px; }
+.stat-figures > div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 15px 17px; }
+.stat-figures b { display: block; font-size: 27px; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat-figures span { font-size: 13px; color: var(--muted); }
+
+.stat-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 17px 19px; margin-bottom: 12px; }
+.stat-card h2 { font-size: 15px; margin: 0 0 14px; letter-spacing: -0.01em; }
+.stat-note { font-size: 12.5px; color: var(--muted); margin: 12px 0 0; max-width: 78ch; }
+
+.bars { display: flex; align-items: flex-end; gap: 3px; height: 132px; }
+.bar-col { flex: 1 1 0; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 100%; min-width: 0; }
+/* The whole bar is what the operator sent; the part drawn over it is what
+   arrived, so the two read as one column rather than two to compare. */
+.bar { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; display: flex; flex-direction: column; justify-content: flex-start; overflow: hidden; }
+.bar-recv { display: block; width: 100%; background: var(--line-strong); }
+.bar-key { font-size: 10.5px; color: var(--muted); margin-top: 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.stat-legend { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+.key-sent, .key-recv { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.key-sent { background: var(--accent); }
+.key-recv { background: var(--line-strong); }
+
+.reply-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.reply-cell { display: flex; flex-direction: column; gap: 2px; }
+.reply-src { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); font-weight: 650; }
+.reply-cell b { font-size: 24px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.reply-cell .meta { font-size: 12.5px; }
+
+.split-bar { height: 13px; border-radius: 999px; background: var(--line-strong); overflow: hidden; }
+.split-chats { display: block; height: 100%; background: var(--accent); }
+.split-keys { display: flex; gap: 20px; margin-top: 9px; font-size: 13px; color: var(--muted); }
+.split-keys b { color: var(--fg); font-variant-numeric: tabular-nums; }
+
+.stat-card.wide { overflow-x: auto; }
+.stat-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.stat-table th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 650; padding: 0 10px 8px 0; }
+.stat-table td { padding: 7px 10px 7px 0; border-top: 1px solid var(--line); vertical-align: middle; }
+.stat-table .num { text-align: right; font-variant-numeric: tabular-nums; position: relative; white-space: nowrap; }
+.who { display: block; font-weight: 550; }
+.who-sub { display: block; font-size: 11.5px; color: var(--muted); }
+.mini-bar { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 15px; background: var(--accent-soft, rgba(125, 170, 60, 0.18)); border-radius: 3px; z-index: 0; }
+.never { color: var(--muted); font-style: italic; }
+.where-group { font-size: 12.5px; color: var(--muted); }
+.where-direct { font-size: 12.5px; }
+/* Who out-waits whom. The mark sits where the two waits balance, so the eye
+   compares positions down the column instead of parsing pairs of numbers. */
+.lean { display: flex; align-items: center; gap: 8px; }
+.lean-side { font-size: 12.5px; font-variant-numeric: tabular-nums; width: 34px; text-align: right; }
+.lean-side.them { text-align: left; color: var(--muted); }
+.lean-track { position: relative; width: 62px; height: 4px; border-radius: 2px; background: var(--line); flex: none; }
+.lean-mark { position: absolute; top: 50%; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; background: var(--fg); }
+.lean-head span { opacity: 0.45; padding: 0 2px; }
+.lean-none { color: var(--muted); }
+.trend-up, .trend-down, .trend-flat, .trend-new { font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.trend-down { color: var(--muted); }
+.trend-flat, .trend-new { color: var(--muted); }
+.stat-note { margin: -4px 0 12px; font-size: 13px; color: var(--muted); }
+
+/* The range chips answer the press at once: the pressed chip lights before
+   the server has said anything, which is what was missing when they were
+   links and a click looked like nothing at all. */
+.chips { display: flex; gap: 6px; }
+.chips-busy .chip { cursor: progress; }
+
+/* Whether the page can still reach Celeste (operator, 2026-09-17). A dot
+   rather than a banner: online is the ordinary case and should take no room,
+   while offline has to be impossible to miss, because everything else on the
+   screen carries on looking perfectly current while it is. */
+.conn { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--accent); }
+.conn-unknown { background: var(--line); }
+.conn-off { background: var(--danger, #e0504f); animation: conn-blink 1.6s ease-in-out infinite; }
+.sync-label.is-off { color: var(--danger, #e0504f); }
+@keyframes conn-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conn-off { animation: none; }
+}
+
+/* The type, set large, with a letter the runs disagreed about drawn faintly:
+   the wobble should be visible before any of the words are read. */
+.mbti-row { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
+.mbti-set { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-bottom: 14px; }
+.mbti-input { width: 110px; font: inherit; font-size: 26px; font-weight: 600; letter-spacing: 0.1em; text-align: center; text-transform: uppercase; padding: 4px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg); }
+.mbti { display: flex; gap: 8px; }
+.mbti-letter { font-size: 44px; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+.mbti-letter.solid { color: var(--fg); }
+.mbti-letter.soft { color: var(--muted); opacity: 0.55; }
+.mbti-warn { font-size: 13px; color: var(--muted); margin: 0 0 18px; max-width: 62ch; line-height: 1.5; }
+.axis-list { display: grid; gap: 18px; margin-bottom: 16px; }
+.axis-head { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; }
+.axis-letter { font-size: 19px; font-weight: 650; min-width: 18px; }
+.axis-name { font-size: 14px; font-weight: 550; }
+.axis-vs { font-weight: 400; color: var(--muted); }
+.axis-firm { font-size: 12px; margin-left: auto; }
+.v-for { color: var(--accent); }
+.v-mixed { color: var(--muted); }
+.v-against { color: var(--muted); font-style: italic; }
+/* What argues against the claim is set apart, not hidden: a verdict that only
+   ever quotes what agrees with it is not evidence, it is flattery. */
+.ev-head { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 9px 0 4px; }
+.axis-ev.against { border-left-color: color-mix(in srgb, var(--muted) 55%, transparent); }
+.axis-ev.against .ev-quote { color: var(--muted); }
+.axis-why { font-size: 13.5px; margin: 5px 0 8px; line-height: 1.5; max-width: 72ch; }
+.axis-ev { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; border-left: 2px solid var(--line); padding-left: 12px; }
+.axis-ev li { display: flex; gap: 10px; font-size: 13px; align-items: baseline; }
+.ev-when { color: var(--muted); font-size: 11.5px; white-space: nowrap; min-width: 58px; }
+.ev-quote { line-height: 1.45; }
+@media (max-width: 560px) {
+  .axis-firm { margin-left: 0; width: 100%; }
+  .axis-ev li { flex-direction: column; gap: 1px; }
+}
+
+/* How much of an inbox lands in a project. A bar rather than a bare
+   percentage, so one badly sorted inbox is visible down the column. */
+.fill { display: flex; align-items: center; gap: 9px; }
+.fill-track { position: relative; width: 84px; height: 5px; border-radius: 3px; background: var(--line); flex: none; overflow: hidden; }
+.fill-done { position: absolute; inset: 0 auto 0 0; background: var(--accent); border-radius: 3px; }
+.fill-num { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--muted); }
+.stat-foot { max-width: 68ch; }
+/* A heading that follows a block of figures or a table needs air above it. */
+.tone-h3.spaced { margin-top: 26px; }
+/* The domain, quieter than the name but there, since four of these inboxes
+   share a name and differ only here. */
+.where-group .at { opacity: 0.65; }
+
+/* The tone reading: a month per cell, tinted by warmth and standing as tall
+   as its energy, so eighty months fit in one glance and a run of guarded ones
+   shows as a band rather than as eighty rows of prose. */
+.tone-strip { display: flex; align-items: flex-end; gap: 2px; height: 90px; margin: 4px 0 8px; }
+/* Capped, so six months read as six months rather than as six slabs; a full
+   archive of eighty shrinks to fit on its own. */
+.tone-cell { flex: 1 1 0; min-width: 3px; max-width: 26px; border-radius: 2px 2px 0 0; }
+.w-guarded { background: color-mix(in srgb, var(--muted) 45%, transparent); }
+.w-neutral { background: color-mix(in srgb, var(--fg) 30%, transparent); }
+.w-warm { background: var(--accent-soft, rgba(125, 170, 60, 0.55)); }
+.tone-legend { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin: 0 0 14px; }
+.tone-legend .key { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.tone-legend .key:not(:first-child) { margin-left: 10px; }
+.tone-legend .key-note { margin-left: auto; font-style: italic; }
+.tone-latest { font-size: 14px; margin: 0 0 16px; line-height: 1.5; }
+.tone-h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin: 0 0 8px; }
+.tone-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 10px; }
+.tone-list li { display: grid; grid-template-columns: 92px 1fr; gap: 2px 12px; }
+.tone-month { grid-row: span 2; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tone-what { font-size: 13.5px; }
+.tone-why { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.tone-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.tone-progress { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.tone-empty { font-size: 13.5px; color: var(--muted); margin: 0 0 14px; }
+.tone-error { font-size: 13px; color: var(--danger, #d05); margin: 10px 0 0; }
+.tone-caveat { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin: 14px 0 0; max-width: 62ch; }
+@media (max-width: 560px) {
+  .tone-list li { grid-template-columns: 1fr; }
+  .tone-month { grid-row: auto; }
+}
+
+/* How the operator conducts themselves: counts, set as figures rather than
+   charts, because each is one number and a bar of one is not a chart. */
+.habit-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 15px 18px; }
+.habit { display: flex; flex-direction: column; gap: 1px; }
+.habit b { font-size: 25px; letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.habit b .vs { font-size: 16px; color: var(--muted); font-weight: 500; }
+.habit > span { font-size: 13.5px; }
+.habit .meta { font-size: 12px; }

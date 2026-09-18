@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Celeste on LinkedIn</title>
+<!--
+  Source for assets/linkedin.png: the image for the post about the stats
+  page. 1080x1350, which is 4:5, the tallest LinkedIn shows in the feed
+  without cropping, so it takes the most room on a phone.
+
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+    --screenshot=website/assets/linkedin.png --window-size=1080,1350 \
+    website/assets/linkedin-source.html
+
+  Type is sized for a thumb, not a laptop: the smallest thing on it is 24px
+  at 1080 wide, which survives the feed's downscale.
+
+  No invented statistics. A post about the author's own mailbox that showed
+  made-up numbers as his own would be a lie, so the panels name what is
+  measured and let the post carry the one real result, the type.
+-->
+<style>
+  :root {
+    --bg: #fafaf7; --card: #fff; --stroke: #e6e5df;
+    --ink: #14150f; --ink-2: #5c5f52; --ink-3: #8a8d7e;
+    --accent: #4d7c0f; --accent-soft: #eef7dc; --lime: #d9f99d;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { width: 1080px; height: 1350px; padding: 60px 60px 48px; display: flex; flex-direction: column; }
+
+  .brand { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 650; letter-spacing: -.01em; }
+  .brand svg { width: 34px; height: 34px; }
+
+  h1 {
+    font-size: 68px; line-height: 1.07; letter-spacing: -.03em; font-weight: 680;
+    margin: 42px 0 0; max-width: 16ch;
+  }
+  h1 em { font-style: normal; color: var(--accent); }
+  .sub { font-size: 30px; line-height: 1.38; color: var(--ink-2); margin-top: 22px; max-width: 33ch; }
+
+  /* The one real result, given the room it earns. */
+  .verdict {
+    margin-top: 42px; background: #14150f; color: #fff; border-radius: 28px; padding: 34px 40px 36px;
+  }
+  .verdict .k { font-size: 24px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: #d9f99d; }
+  .verdict .t { font-size: 130px; line-height: 1; letter-spacing: -.04em; font-weight: 700; margin: 12px 0 18px; }
+  .verdict .q { font-size: 26px; line-height: 1.45; opacity: .86; }
+
+  /* What it reads, named rather than numbered. */
+  .reads { margin-top: 34px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .r { background: var(--card); border: 1px solid var(--stroke); border-radius: 20px; padding: 26px 22px; }
+  .r .ico { width: 46px; height: 46px; border-radius: 13px; background: var(--accent-soft); display: grid; place-items: center; margin-bottom: 16px; }
+  .r .ico svg { width: 24px; height: 24px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .r b { display: block; font-size: 27px; font-weight: 650; letter-spacing: -.01em; }
+  .r span { display: block; font-size: 23px; color: var(--ink-3); line-height: 1.35; margin-top: 8px; }
+
+  /* One line saying what the thing actually is, so the picture stands up on
+     its own when somebody scrolls past the words. */
+  .pitch { font-size: 29px; line-height: 1.4; color: var(--ink-2); margin-top: 34px; max-width: 36ch; }
+  .pitch b { color: var(--ink); font-weight: 650; }
+  .foot { margin-top: auto; display: flex; align-items: center; gap: 16px; padding-top: 30px; border-top: 1px solid var(--stroke); }
+  .foot .url { font-size: 27px; font-weight: 600; }
+  .foot .tag { margin-left: auto; font-size: 25px; color: var(--ink-3); }
+  .foot svg { width: 30px; height: 30px; }
+</style>
+</head>
+<body>
+
+<div class="brand">
+  <svg viewBox="0 0 28 28" aria-hidden="true"><path d="M14 2 L17 11 L26 14 L17 17 L14 26 L11 17 L2 14 L11 11 Z" fill="#4d7c0f"/></svg>
+  Celeste
+</div>
+
+<h1>Spotify Wrapped, but for <em>your messages</em></h1>
+<div class="sub">My mail and messages agent read how I write, then told me what it found.</div>
+
+<div class="verdict">
+  <div class="k">Tested, not guessed</div>
+  <div class="t">INTJ</div>
+  <div class="q">Every axis cites a message it was drawn from, and each citation is checked against the message it quotes.</div>
+</div>
+
+<div class="reads">
+  <div class="r">
+    <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 7v5l3 2"/><circle cx="12" cy="12" r="9"/></svg></div>
+    <b>When you write</b>
+    <span>Every hour, every weekday</span>
+  </div>
+  <div class="r">
+    <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg></div>
+    <b>How fast you answer</b>
+    <span>The middle wait, per source</span>
+  </div>
+  <div class="r">
+    <div class="ico"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg></div>
+    <b>Who out-waits whom</b>
+    <span>And which threads go quiet</span>
+  </div>
+</div>
+
+<div class="pitch">An all-in-one mail and messages system, <b>governed by an agent</b>. Free and open source.</div>
+
+<div class="foot">
+  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+  <span class="url">github.com/hunterZh37/messaging-agent</span>
+  <span class="tag">Runs on your Mac</span>
+</div>
+
+</body>
+</html>

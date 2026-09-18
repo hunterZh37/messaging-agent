@@ -1,0 +1,1 @@
+ALTER TABLE `messages` ADD `mentions_operator` integer DEFAULT false NOT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE `threads` ADD `hidden_at` integer;

@@ -1,0 +1,1 @@
+ALTER TABLE `sorts` ADD `finance` text DEFAULT 'none' NOT NULL;

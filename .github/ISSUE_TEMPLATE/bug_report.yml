@@ -1,0 +1,90 @@
+name: Bug report
+description: Something behaves differently from how it reads
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Before you paste anything:** this is a mail agent, so logs and screenshots
+        here tend to contain real messages, real addresses and sometimes tokens.
+        Redact them. An issue is public forever, and a key pasted into one is burned
+        even after the edit.
+
+        A security problem goes through a
+        [private advisory](https://github.com/hunterZh37/messaging-agent/security/advisories/new)
+        instead, never here.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, and what it did instead of what you expected.
+      placeholder: |
+        I hid a thread, and it was still in the Inbox list afterwards.
+        I expected it to leave every list until the sender wrote again.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part
+      options:
+        - Syncing mail (IMAP, Gmail, Outlook)
+        - Sorting (important, needs a reply, safe to delete)
+        - Projects and filing
+        - Drafting and sending a reply
+        - Chats (iMessage, WhatsApp)
+        - Ask Celeste
+        - Scheduling agent (Add to Alex, MCP)
+        - The web app itself
+        - Setup, install, or the background service
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The release, or the commit you are on — `git rev-parse --short HEAD`.
+      placeholder: v0.1.0, or 5b7d730
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: macOS and Node
+      description: "`sw_vers -productVersion` and `node -v`."
+      placeholder: macOS 15.3, Node 22.14.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to reproduce it
+      description: >
+        Numbered steps if you can. If it depends on a particular message, describe
+        its shape rather than pasting it: who it was from, whether it had
+        attachments, how long the thread was.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Anything in the logs
+      description: >
+        `~/messaging-agent/logs/server.log`, or the browser console. **Redact
+        addresses, message text and anything key-shaped before pasting.**
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I have removed real addresses, message contents and credentials from everything above.
+          required: true
+        - label: This is not a security vulnerability (those go through a private advisory).
+          required: true

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/hunterZh37/messaging-agent/security/advisories/new
+    about: Report it privately. Never in a public issue — see SECURITY.md.
+  - name: Setting it up
+    url: https://github.com/hunterZh37/messaging-agent#getting-started
+    about: The README covers the OAuth client, the passcode, Full Disk Access and running it as a service.

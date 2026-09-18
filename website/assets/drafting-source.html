@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Drafting</title>
+<link rel="stylesheet" href="diagram.css">
+<!-- Renders assets/drafting.png at 1440x380. See website/README.md. -->
+<style>
+  body { width: 1440px; height: 380px; }
+  .voice { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.7; color: var(--ink-2); }
+  .voice b { color: var(--ink); font-weight: 600; }
+  .draft { border-left: 3px solid var(--lime); padding-left: 13px; font-size: 14px; line-height: 1.6; }
+  .row { display: flex; align-items: center; gap: 9px; margin-top: 15px; }
+  .gate { margin-left: auto; font-size: 12.5px; color: var(--ink-3); }
+  .cancel { font-size: 12.5px; color: var(--warn); }
+</style><script>if(location.search.includes("dark"))document.documentElement.dataset.theme="dark";</script>
+</head>
+<body>
+<svg class="wires" viewBox="0 0 1440 380" width="1440" height="380">
+  <defs><marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#b9bcae"/></marker>
+  <marker id="o" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#d97706"/></marker></defs>
+  <path class="w" d="M406 225 L 504 225" marker-end="url(#a)"/>
+  <path class="w hot" d="M986 225 L 1084 225" marker-end="url(#o)"/>
+</svg>
+
+<div class="overline" style="left:40px; top:44px;">Your voice, written down once</div>
+<div class="card pad" style="left:40px; top:84px; width:360px;">
+  <div class="t" style="margin-bottom:9px">voice.md</div>
+  <div class="voice">
+    <b>Short.</b> Two or three lines.<br>
+    <b>No</b> "I hope this finds you well".<br>
+    <b>Sign off</b> with just my first name.<br>
+    <b>Never</b> promise a date I have not agreed.
+  </div>
+</div>
+<div class="note" style="left:40px; top:290px; width:360px;">
+  A plain file you edit. It is the only instruction the drafter gets about how you sound.
+</div>
+
+<div class="overline" style="left:504px; top:44px;">A reply, offered</div>
+<div class="card pad" style="left:504px; top:84px; width:482px;">
+  <div class="t" style="margin-bottom:11px">Re: Contract for Sept</div>
+  <div class="draft">Hi Dana, both are on the way, signed W&#8209;9 and the contract, before Friday.<br><br>Hunter</div>
+  <div class="row">
+    <span class="btn">Send</span>
+    <span class="btn ghost">Edit</span>
+    <span class="btn ghost">Say what to change</span>
+  </div>
+</div>
+<div class="note" style="left:504px; top:300px; width:482px;">
+  Ask for a revision in words and it rewrites. What Celeste first wrote is kept, so the confirm screen can show everything that changed since.
+</div>
+
+<div class="overline" style="left:1084px; top:44px;">Nothing sends by itself</div>
+<div class="card pad" style="left:1084px; top:84px; width:316px;">
+  <div class="t">You press Send</div>
+  <div class="d" style="margin-top:6px">Then six seconds on screen with a Cancel, before anything leaves.</div>
+  <div class="cancel" style="margin-top:12px">Sending in 6&hellip;&nbsp;&nbsp;Cancel</div>
+</div>
+<div class="note" style="left:1084px; top:240px; width:316px;">
+  There is no setting that turns this off. It is the one promise the whole app is built around.
+</div>
+</body></html>

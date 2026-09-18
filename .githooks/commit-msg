@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Refuse a commit message carrying a real address or phone number.
+# Enable per clone: git config core.hooksPath .githooks
+#
+# The same rules the test suite runs over tracked files, applied to the one
+# surface the test cannot see. The three commits this repository had to squash
+# away were all messages, not code: a contact's name, a real number, and two of
+# the author's own messages quoted to explain a feature.
+
+root=$(git rev-parse --show-toplevel) || exit 0
+rules="$root/tools/no-real-people.mjs"
+[ -f "$rules" ] || exit 0
+
+if ! node "$rules" "$1"; then
+  echo ""
+  echo "Commit refused. Nothing has been committed; the message is kept in"
+  echo "$(git rev-parse --git-dir)/COMMIT_EDITMSG"
+  exit 1
+fi

@@ -1,0 +1,22 @@
+node_modules/
+.next/
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-*
+dist/
+*.tsbuildinfo
+.DS_Store
+docs/diagrams/*.visual-check.*
+docs/design/mockups/*.html
+!docs/design/mockups/*.dc.html
+.superpowers/
+.claude/worktrees/
+.impeccable/
+
+# Belt and braces: never a key, a cert or a credentials dump, whatever it is called.
+*.pem
+*.key
+*.p12
+*credentials*.json

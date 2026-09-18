@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&display=swap');
+    :root { --bg:#f6f6f4; --card:#ffffff; --fg:#151618; --muted:#6c6e72; --line:#e4e4e0; --accent:#2f5fc7; --danger:#b3261e; --add:#e6f4ea; --del:#fbe8e6; --toastbg:#151618; --toastfg:#f6f6f4; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif; color: var(--fg); background: var(--bg); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+    a { color: var(--accent); } a:hover { color: #23489a; }
+    .meta { display:flex; gap:8px; align-items:center; color:var(--muted); font-size:13px; flex-wrap:wrap; }
+    .meta svg { width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; }
+    h1 { font-size:18px; font-weight:600; letter-spacing:-0.01em; margin:6px 0 0; line-height:1.3; }
+    .reason { font-size:14px; color:var(--fg); margin:8px 0 14px; padding-left:10px; border-left:2px solid var(--line); }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; }
+    .msg { padding:10px 0; border-top:1px solid var(--line); }
+    .msg:first-child { border-top:0; padding-top:0; }
+    .who { display:flex; justify-content:space-between; gap:12px; color:var(--muted); font-size:13px; }
+    .who b { color:var(--fg); font-weight:500; }
+    .body { white-space:pre-wrap; margin-top:6px; font-size:15px; }
+    .oneline { color:var(--muted); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .oneline b { color:var(--fg); font-weight:500; }
+    label { display:block; color:var(--muted); font-size:12px; margin:14px 0 4px; letter-spacing:0.01em; }
+    .field { border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:14px; min-height:40px; }
+    .draft { white-space:pre-wrap; padding:6px 0; font-size:15px; }
+    .row { display:flex; gap:8px; align-items:center; margin-top:16px; flex-wrap:wrap; }
+    .btn { display:inline-flex; align-items:center; gap:8px; height:44px; padding:0 16px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--fg); font-size:14px; font-weight:500; }
+    .btn.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    .btn.quiet { border-color:transparent; color:var(--muted); background:transparent; }
+    kbd { font-family:inherit; font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 5px; line-height:18px; }
+    .btn.primary kbd { color:#fff; border-color:rgba(255,255,255,0.4); }
+    .nav { position:absolute; left:0; right:0; bottom:0; height:76px; background:var(--card); border-top:1px solid var(--line); display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); padding:8px 8px 18px; }
+    .nav div { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; font-size:11px; color:var(--muted); border-radius:8px; }
+    .nav div.on { color:var(--fg); font-weight:500; }
+    .nav svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+    .badge { position:relative; }
+    .badge span { position:absolute; top:-6px; right:-10px; background:var(--accent); color:#fff; font-size:10px; font-weight:600; border-radius:999px; min-width:16px; height:16px; padding:0 4px; display:flex; align-items:center; justify-content:center; }
+    .confirm { border:1px solid var(--accent); border-radius:12px; padding:14px; margin-top:16px; }
+    .diff { white-space:pre-wrap; font-size:15px; margin-top:10px; }
+    .diff div { padding:0 4px; border-radius:3px; }
+    .diff .add { background:var(--add); }
+    .diff .del { background:var(--del); text-decoration:line-through; color:var(--muted); }
+    .toast { position:absolute; left:16px; right:16px; bottom:92px; background:var(--toastbg); color:var(--toastfg); border-radius:10px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:12px; box-shadow:0 10px 28px rgba(0,0,0,0.22); font-size:14px; }
+    .toast .undo { height:36px; padding:0 12px; border:1px solid rgba(255,255,255,0.35); border-radius:8px; display:flex; align-items:center; font-weight:500; }
+    .side { width:64px; border-right:1px solid var(--line); background:var(--card); display:flex; flex-direction:column; align-items:center; padding:20px 0; gap:6px; }
+    .side div { width:44px; height:44px; border-radius:10px; display:flex; align-items:center; justify-content:center; color:var(--muted); }
+    .side div.on { background:var(--bg); color:var(--fg); }
+    .side svg { width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+
+  </style>
+</helmet>
+<div style="position:relative; width:390px; height:844px; background:var(--bg); overflow:hidden;">
+  <div style="padding:56px 16px 100px; height:100%; overflow:hidden;">
+
+    <div class="meta"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg><span>hunter@gmail</span><span>·</span><span>Maya Chen</span><span>·</span><span>9:14 AM</span><span style="border:1px solid var(--line); border-radius:999px; padding:1px 9px; color:var(--fg); font-size:12px; background:var(--card);">Consulting</span><span style="margin-left:auto">7 in queue</span></div>
+    <h1>Northwind pilot: ready to sign</h1>
+    <div class="reason">Client confirms a deal and asks for a Thursday meeting.</div>
+
+    <div class="card">
+      <div class="msg"><div class="oneline"><b>Maya Chen</b> · Hunter, we are ready to sign. Two asks before Friday…</div></div>
+      <label>Reply · edited</label>
+      <div class="confirm">
+        <div class="meta">To: maya@northwind.co, priya@northwind.co</div>
+        <div class="diff">
+<div>Maya, great news.</div>
+<div> </div>
+<div>1. Yes, the pilot runs on staging only. Nothing touches production until you sign off.</div>
+<div class="del">2. PDF attached tomorrow morning.</div>
+<div class="add">2. PDF coming by end of day today.</div>
+<div> </div>
+<div class="del">Thursday 2:00 PM works. I will send the invite.</div>
+<div class="add">Thursday 2:00 PM works. Invite on the way.</div>
+<div> </div>
+<div>Hunter</div>
+        </div>
+        <div class="meta" style="margin-top:12px; font-weight:500; color:var(--fg);">Also add to Alex</div>
+        <div class="meta" style="margin-top:4px; display:block;">To-do · Send SOW PDF to Maya · Today</div>
+        <div class="meta" style="display:block;">Event · Northwind walkthrough · Thu 2:00 PM</div>
+        <div class="row">
+          <div class="btn primary">Confirm<kbd>enter</kbd></div>
+          <div class="btn quiet">Back<kbd>esc</kbd></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+<div class="nav"><div class="on"><div class="badge"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span>7</span></div><span>Queue</span></div><div><svg viewBox="0 0 24 24"><path d="M3 12l3-7h12l3 7v7H3z"/><path d="M3 12h5l2 3h4l2-3h5"/></svg><span>Inbox</span></div><div><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span>Ask</span></div><div><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg><span>Triage</span></div></div>
+</div>
+</x-dc>
+</body>
+</html>

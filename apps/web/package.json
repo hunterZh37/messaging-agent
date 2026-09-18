@@ -1,0 +1,30 @@
+{
+  "name": "@messaging-agent/web",
+  "version": "0.0.1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3100 -H 127.0.0.1",
+    "build": "next build",
+    "start": "next start -p 3100 -H 127.0.0.1",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@messaging-agent/core": "workspace:*",
+    "drizzle-orm": "^0.45.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "web-push": "3.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/web-push": "^3.6.4",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Projects</title>
+<link rel="stylesheet" href="diagram.css">
+<!-- Renders assets/projects.png at 1440x330. See website/README.md. -->
+<style>
+  body { width: 1440px; height: 330px; }
+  .desc { font-size: 14px; line-height: 1.55; color: var(--ink-2); border-left: 3px solid var(--lime); padding-left: 12px; margin-top: 10px; }
+  .proj { width: 400px; }
+  .bar { height: 7px; border-radius: 4px; background: var(--accent-soft); margin-top: 11px; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+  .foot { font-size: 12.5px; color: var(--ink-3); margin-top: 7px; }
+</style><script>if(location.search.includes("dark"))document.documentElement.dataset.theme="dark";</script>
+</head>
+<body>
+<svg class="wires" viewBox="0 0 1440 330" width="1440" height="330">
+  <defs><marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#b9bcae"/></marker></defs>
+  <path class="w" d="M446 210 L 544 210" marker-end="url(#a)"/>
+  <path class="w" d="M950 210 L 1048 210" marker-end="url(#a)"/>
+</svg>
+
+<div class="overline" style="left:40px; top:44px;">You write one sentence</div>
+<div class="card pad proj" style="left:40px; top:84px;">
+  <div class="t">Kitchen renovation</div>
+  <div class="desc">Anything about the builder, the quotes, the council permit, and delivery dates for the units.</div>
+</div>
+<div class="note" style="left:40px; top:250px; width:400px;">
+  No rules, no filters, no folders to maintain. A sentence is the whole configuration.
+</div>
+
+<div class="overline" style="left:544px; top:44px;">Celeste matches what arrives</div>
+<div class="card pad" style="left:544px; top:84px; width:406px;">
+  <div class="msg"><span class="who">Tomas</span><span class="subj">Revised quote, cabinets and worktop</span><span class="tag">Matched</span></div>
+  <div class="msg"><span class="who">Council</span><span class="subj">Permit decision for the extension</span><span class="tag">Matched</span></div>
+  <div class="msg"><span class="who">Bank</span><span class="subj">Your statement is ready</span><span class="tag grey">Elsewhere</span></div>
+</div>
+<div class="note" style="left:544px; top:246px; width:406px;">
+  Matched on meaning, not keywords. The embedding runs on your Mac and costs nothing.
+</div>
+
+<div class="overline" style="left:1048px; top:44px;">What the project holds</div>
+<div class="card pad" style="left:1048px; top:84px; width:352px;">
+  <div class="t">68 messages</div>
+  <div class="bar"><span style="width:71%"></span></div>
+  <div class="foot">71% filed by hand, the rest by the sorter</div>
+  <div class="d" style="margin-top:13px">Projects can be grouped, and every one of them belongs to a single inbox.</div>
+</div>
+</body></html>

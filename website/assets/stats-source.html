@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Celeste stats</title>
+<!--
+  Source for assets/stats-light.png and assets/stats-dark.png: what the stats
+  page says back to you about your own messaging. Rendered, not drawn:
+
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+    --screenshot=website/assets/stats-light.png --window-size=1600,470 \
+    website/assets/stats-source.html
+
+  Dark is rendered from a copy with data-theme="dark" hardcoded on <html>,
+  because headless Chrome does not run the ?dark script before capturing.
+
+  Every panel here is a panel that exists: the hour bars, the median reply
+  cells, the lean track in "How each one goes", the month readings and the
+  tested type. The numbers are invented but the shapes are not, and the
+  caveats under each are the ones the page actually prints, because a
+  dashboard picture that overclaims is worse than no picture.
+
+  Names are fixtures. The people in the real page are real.
+-->
+<style>
+  :root {
+    --bg: #fafaf7; --card: #fff; --stroke: #e6e5df;
+    --ink: #14150f; --ink-2: #5c5f52; --ink-3: #8a8d7e;
+    --accent: #4d7c0f; --accent-soft: #eef7dc; --lime: #d9f99d;
+    --bar: #c7d9a4; --bar-2: #e9ece2;
+    --panel-bg: #14150f; --panel-fg: #ffffff; --panel-edge: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  html[data-theme="dark"] {
+    --bg: #0e1011; --card: #16191a; --stroke: #2b3031;
+    --ink: #e9ece7; --ink-2: #a6ada6; --ink-3: #7b827c;
+    --accent: #b7d977; --accent-soft: #1f2a14; --lime: #4a6626;
+    --bar: #5c7a2e; --bar-2: #23282a;
+    --panel-bg: #05070a; --panel-fg: #e9ece7; --panel-edge: #2b3031;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { width: 1600px; height: 470px; position: relative; overflow: hidden; }
+
+  .overline { position: absolute; font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+  .card {
+    position: absolute; background: var(--card); border: 1px solid var(--stroke); border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(20,21,15,.05), 0 8px 20px rgba(20,21,15,.04); padding: 15px 17px; height: 252px;
+  }
+  .note { position: absolute; font-size: 12px; color: var(--ink-3); line-height: 1.45; }
+
+  /* Panel one: the day, as bars per hour. */
+  .bars { display: flex; align-items: flex-end; gap: 3px; height: 108px; margin-top: 4px; }
+  .bcol { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%; }
+  .b { background: var(--bar); border-radius: 3px 3px 0 0; }
+  .b i { display: block; background: var(--bar-2); border-radius: 3px 3px 0 0; }
+  .ticks { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 6px; }
+  .peak { position: absolute; font-size: 12px; font-weight: 600; color: var(--accent); }
+  .legend { font-size: 11.5px; color: var(--ink-3); margin-top: 9px; display: flex; align-items: center; gap: 6px; }
+  .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  /* Panel two: the middle wait, per source. */
+  .cells { display: flex; gap: 12px; margin-top: 4px; }
+  .cell { flex: 1; border: 1px solid var(--stroke); border-radius: 11px; padding: 11px 12px; }
+  .cell .s { font-size: 12px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .07em; font-weight: 650; }
+  .cell b { display: block; font-size: 26px; letter-spacing: -.02em; margin: 3px 0 2px; font-weight: 660; }
+  .cell .m { font-size: 11.5px; color: var(--ink-3); line-height: 1.4; }
+  /* The two habit figures read better as sentences than as two more boxes,
+     which is also the only way the panel fits its card. */
+  .lines { margin-top: 13px; font-size: 13px; color: var(--ink-2); line-height: 1.75; }
+  .lines b { font-size: 15px; color: var(--ink); font-weight: 660; }
+
+  /* Panel three: who out-waits whom. */
+  .rowh { display: flex; font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; font-weight: 650; margin-top: 6px; }
+  .row { display: flex; align-items: center; padding: 8px 0; border-top: 1px solid var(--stroke); font-size: 13.5px; }
+  .c-who { width: 96px; flex: none; font-weight: 600; }
+  .c-lean { flex: 1; display: flex; align-items: center; gap: 7px; }
+  .c-w { width: 78px; flex: none; text-align: right; color: var(--ink-2); font-size: 13px; }
+  .c-t { width: 54px; flex: none; text-align: right; font-size: 12.5px; font-weight: 600; }
+  .side { font-size: 12px; color: var(--ink-3); width: 26px; }
+  .side.r { text-align: right; }
+  .track { flex: 1; height: 5px; border-radius: 99px; background: var(--bar-2); position: relative; }
+  .mark { position: absolute; top: -3px; width: 11px; height: 11px; border-radius: 50%; background: var(--accent); transform: translateX(-50%); }
+  .down { color: #b45309; } .up { color: var(--accent); } .flat { color: var(--ink-3); }
+
+  /* Panel four: your own writing, read back. */
+  .months { display: flex; gap: 6px; margin-top: 6px; }
+  .mo { flex: 1; border: 1px solid var(--stroke); border-radius: 9px; padding: 7px 8px; }
+  .mo .k { font-size: 11px; color: var(--ink-3); }
+  .mo .v { font-size: 12.5px; margin-top: 2px; line-height: 1.3; }
+  .type { background: var(--panel-bg); color: var(--panel-fg); border: 1px solid var(--panel-edge); border-radius: 11px; padding: 11px 13px; margin-top: 11px; }
+  .type .h { font-size: 12px; opacity: .72; letter-spacing: .06em; text-transform: uppercase; font-weight: 650; }
+  .type .t { font-size: 22px; font-weight: 660; letter-spacing: -.01em; margin: 2px 0 6px; }
+  .type .q { font-size: 12.5px; opacity: .84; line-height: 1.45; }
+  .type .q b { color: #d9f99d; font-weight: 600; }
+
+  .t-h { font-size: 15.5px; font-weight: 650; }
+  .t-s { font-size: 12.5px; color: var(--ink-3); margin-top: 1px; }
+</style>
+<script>if(location.search.includes("dark"))document.documentElement.dataset.theme="dark";</script>
+</head>
+<body>
+
+<div class="overline" style="left:40px; top:26px;">When you write</div>
+<div class="card" style="left:40px; top:56px; width:360px;">
+  <div class="t-h">Your day</div>
+  <div class="t-s">Every hour, yours and theirs</div>
+  <div class="bars">
+    <div class="bcol"><div class="b" style="height:8.6%"><i style="height:40.0%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:5.2%"><i style="height:33.3%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:3.4%"><i style="height:50.0%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:3.4%"><i style="height:50.0%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:3.4%"><i style="height:50.0%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:5.2%"><i style="height:66.7%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:10.3%"><i style="height:66.7%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:25.9%"><i style="height:60.0%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:55.2%"><i style="height:56.2%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:82.8%"><i style="height:54.2%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:96.6%"><i style="height:53.6%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:89.7%"><i style="height:53.8%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:77.6%"><i style="height:55.6%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:86.2%"><i style="height:54.0%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:98.3%"><i style="height:52.6%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:91.4%"><i style="height:52.8%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:79.3%"><i style="height:52.2%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:67.2%"><i style="height:51.3%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:60.3%"><i style="height:51.4%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:69.0%"><i style="height:47.5%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:86.2%"><i style="height:44.0%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:100.0%"><i style="height:41.4%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:100.0%"><i style="height:34.5%"></i></div></div>
+    <div class="bcol"><div class="b" style="height:56.9%"><i style="height:33.3%"></i></div></div>
+  </div>
+  <div class="ticks"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>
+  <div class="legend"><span class="sw" style="background:var(--bar)"></span> yours <span class="sw" style="background:var(--bar-2)"></span> theirs</div>
+</div>
+<div class="peak" style="left:40px; top:320px;">You write most at 22:00</div>
+<div class="note" style="left:40px; top:342px; width:360px;">
+  and 214 of your messages went out between midnight and 5am, which is 6% of them
+</div>
+
+<div class="overline" style="left:432px; top:26px;">How fast you answer</div>
+<div class="card" style="left:432px; top:56px; width:330px;">
+  <div class="t-h">The middle wait</div>
+  <div class="t-s">Not the average, which one holiday would own</div>
+  <div class="cells">
+    <div class="cell">
+      <span class="s">Chats</span>
+      <b>31 min</b>
+      <span class="m">three in four inside 2.4 hours<br>1,840 answered</span>
+    </div>
+    <div class="cell">
+      <span class="s">Mail</span>
+      <b>3.9 hrs</b>
+      <span class="m">three in four inside 1.6 days<br>612 answered</span>
+    </div>
+  </div>
+  <div class="lines">
+    <div><b>38%</b> of conversations you opened</div>
+    <div><b>16%</b> of threads end with you</div>
+  </div>
+</div>
+<div class="note" style="left:432px; top:342px; width:330px;">
+  what you never answered is not counted here. That is a silence, not a long wait
+</div>
+
+<div class="overline" style="left:794px; top:26px;">How each one goes</div>
+<div class="card" style="left:794px; top:56px; width:400px;">
+  <div class="t-h">Who out&#8209;waits whom</div>
+  <div class="t-s">The dot sits over whoever is slower</div>
+  <div class="rowh">
+    <span class="c-who">Who</span><span style="flex:1">You &middot; them</span><span class="c-w">Words</span><span class="c-t">90d</span>
+  </div>
+  <div class="row">
+    <span class="c-who">Dana</span>
+    <span class="c-lean"><span class="side">4m</span><span class="track"><span class="mark" style="left:78%"></span></span><span class="side r">2h</span></span>
+    <span class="c-w">18 / 44</span><span class="c-t up">+31%</span>
+  </div>
+  <div class="row">
+    <span class="c-who">Priya</span>
+    <span class="c-lean"><span class="side">6h</span><span class="track"><span class="mark" style="left:22%"></span></span><span class="side r">21m</span></span>
+    <span class="c-w">52 / 30</span><span class="c-t flat">+4%</span>
+  </div>
+  <div class="row">
+    <span class="c-who">Ada</span>
+    <span class="c-lean"><span class="side">2d</span><span class="track"><span class="mark" style="left:14%"></span></span><span class="side r">9m</span></span>
+    <span class="c-w">11 / 27</span><span class="c-t down">&minus;62%</span>
+  </div>
+  <div class="row">
+    <span class="c-who">Mum</span>
+    <span class="c-lean"><span class="side">40m</span><span class="track"><span class="mark" style="left:52%"></span></span><span class="side r">35m</span></span>
+    <span class="c-w">24 / 26</span><span class="c-t flat">&minus;8%</span>
+  </div>
+</div>
+<div class="note" style="left:794px; top:342px; width:400px;">
+  Ada waits two days on you and is down 62%. Counts only. The page names nobody&rsquo;s
+  character, only the traffic between you
+</div>
+
+<div class="overline" style="left:1226px; top:26px;">How your own writing reads</div>
+<div class="card" style="left:1226px; top:56px; width:334px;">
+  <div class="t-h">Month by month</div>
+  <div class="t-s">Read on a local model, for nothing</div>
+  <div class="months">
+    <div class="mo"><div class="k">Jul</div><div class="v">brisk, plain</div></div>
+    <div class="mo"><div class="k">Aug</div><div class="v">warmer, longer</div></div>
+    <div class="mo"><div class="k">Sep</div><div class="v">clipped, terse</div></div>
+  </div>
+  <div class="type">
+    <div class="h">Tested, not guessed</div>
+    <div class="t">INTJ</div>
+    <div class="q">Five runs over 150 messages. Every axis cites one: <b>&ldquo;Either way works. Pick one and I will build round it.&rdquo;</b></div>
+  </div>
+</div>
+<div class="note" style="left:1226px; top:342px; width:334px;">
+  every citation is checked against the message it claims to quote before it is shown
+</div>
+
+<div class="note" style="left:40px; top:412px; width:1520px; font-size:13px;">
+  <b style="color:var(--ink-2)">Counts, not conclusions.</b>
+  Every figure on the page can be checked against the database underneath it, and none of it leaves your Mac.
+  Four ranges: 90 days, 12 months, this year, everything.
+</div>
+
+
+</body>
+</html>

@@ -1,0 +1,1 @@
+ALTER TABLE `chat_messages` ADD `context_draft_id` text;

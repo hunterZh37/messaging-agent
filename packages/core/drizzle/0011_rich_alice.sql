@@ -1,0 +1,1 @@
+ALTER TABLE `embedding_state` ADD `text_hash` text;

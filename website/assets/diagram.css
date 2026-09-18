@@ -1,0 +1,57 @@
+/*
+ * Shared by every feature picture in this folder, so eight diagrams cannot
+ * drift into eight different looks. The palette is the landing page's own.
+ */
+:root {
+  --bg: #fafaf7; --card: #fff; --stroke: #e6e5df;
+  --ink: #14150f; --ink-2: #5c5f52; --ink-3: #8a8d7e;
+  --accent: #4d7c0f; --accent-soft: #eef7dc; --lime: #d9f99d;
+  --warn: #9a3412; --warn-soft: #fdf1e7;
+  /* A panel that inverts against the page: quotes, code, anything meant to
+     read as "the machine talking". Tokens rather than literals, because in
+     dark mode it cannot simply be --ink, which is light there. */
+  --panel-bg: #14150f; --panel-fg: #ffffff; --panel-edge: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+}
+/*
+ * Dark. Rendered by loading any of these sources with ?dark, which is how
+ * both PNGs come out of one file. Only the tokens change.
+ */
+html[data-theme="dark"] {
+  --bg: #0e1011; --card: #16191a; --stroke: #2b3031;
+  --ink: #e9ece7; --ink-2: #a6ada6; --ink-3: #7b827c;
+  --accent: #b7d977; --accent-soft: #1f2a14; --lime: #4a6626;
+  --warn: #f0a882; --warn-soft: #2d1a11;
+  --panel-bg: #05070a; --panel-fg: #e9ece7; --panel-edge: #2b3031;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { position: relative; overflow: hidden; }
+
+.overline { position: absolute; font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+.card {
+  position: absolute; background: var(--card); border: 1px solid var(--stroke); border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(20,21,15,.05), 0 8px 20px rgba(20,21,15,.04);
+}
+.pad { padding: 15px 17px; }
+.t { font-size: 16px; font-weight: 650; }
+.d { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+.note { position: absolute; font-size: 12.5px; color: var(--ink-3); line-height: 1.5; }
+
+/* One message, as it sits in a list. */
+.msg { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--stroke); }
+.msg:first-of-type { border-top: 0; }
+.who { font-size: 14px; font-weight: 600; width: 96px; flex: none; }
+.subj { font-size: 13.5px; color: var(--ink-2); flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+.tag { font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; flex: none; }
+.tag.grey { background: #f1f2ed; color: var(--ink-3); }
+.tag.warn { background: var(--warn-soft); color: var(--warn); }
+
+.btn { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; font-weight: 600; color: var(--bg); background: var(--ink); padding: 8px 15px; border-radius: 999px; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--stroke); }
+
+svg.wires { position: absolute; inset: 0; }
+.w { fill: none; stroke: var(--ink-3); stroke-width: 2.2; }
+.w.hot { stroke: #d97706; stroke-width: 2.4; }

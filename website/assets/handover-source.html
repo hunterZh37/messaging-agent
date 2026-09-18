@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Celeste handover to the scheduling agent</title>
+<!--
+  Source for assets/handover.png: how a mail becomes an actionable in another
+  agent. Rendered, not drawn:
+
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+    --screenshot=website/assets/handover.png --window-size=1600,530 \
+    website/assets/handover-source.html
+
+  The other agent is named only as the Scheduling Agent; it is
+  github.com/hunterZh37/agentic-scheduling.
+
+  Every name in it is real: the tools are create_actionable and create_event,
+  the free times come from get_availability, and the call is JSON-RPC over
+  Streamable HTTP. A diagram that invented its own vocabulary would be worse
+  than none, because somebody would go looking for the words.
+
+  The privacy line is exact, and was wrong on the first pass. AddToAlex
+  prefills the title from the subject, so a subject line does go over the
+  wire. What never goes is the body.
+-->
+<style>
+  :root {
+    --bg: #fafaf7; --card: #fff; --stroke: #e6e5df;
+    --ink: #14150f; --ink-2: #5c5f52; --ink-3: #8a8d7e;
+    --accent: #4d7c0f; --accent-soft: #eef7dc; --lime: #d9f99d;
+    --panel-bg: #14150f; --panel-fg: #ffffff; --panel-edge: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  /* Dark, rendered from the same file with ?dark. */
+  html[data-theme="dark"] {
+    --bg: #0e1011; --card: #16191a; --stroke: #2b3031;
+    --ink: #e9ece7; --ink-2: #a6ada6; --ink-3: #7b827c;
+    --accent: #b7d977; --accent-soft: #1f2a14; --lime: #4a6626;
+    --panel-bg: #05070a; --panel-fg: #e9ece7; --panel-edge: #2b3031;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { width: 1600px; height: 530px; position: relative; overflow: hidden; }
+
+  .overline { position: absolute; font-size: 13px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+  .step-no {
+    position: absolute; width: 26px; height: 26px; border-radius: 50%; background: var(--lime);
+    color: #1f2d0a; font-size: 14px; font-weight: 700; display: grid; place-items: center;
+  }
+  .card {
+    position: absolute; background: var(--card); border: 1px solid var(--stroke); border-radius: 14px;
+    box-shadow: 0 1px 2px rgba(20,21,15,.05), 0 8px 20px rgba(20,21,15,.04);
+  }
+  .pane { width: 330px; padding: 15px 17px; }
+  .t { font-size: 16px; font-weight: 650; margin-bottom: 7px; }
+  .d { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+
+  /* The mail, as it sits in the thread. */
+  .mailhead { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+  .from { font-size: 14.5px; font-weight: 650; }
+  .when { font-size: 12.5px; color: var(--ink-3); margin-left: auto; }
+  .subj { font-size: 14px; margin-bottom: 9px; }
+  .body { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+  .pill { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
+
+  /* The gate: a small form the operator actually fills in. */
+  .field { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+  .lab { font-size: 12px; color: var(--ink-3); width: 44px; flex: none; }
+  .val { font-size: 13.5px; border: 1px solid var(--stroke); border-radius: 8px; padding: 5px 9px; flex: 1; background: #fcfcfa; }
+  .chips { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--stroke); color: var(--ink-2); background: #fff; }
+  .chip.on { background: var(--accent-soft); border-color: var(--lime); color: var(--accent); font-weight: 600; }
+  .btn { margin-top: 12px; display: inline-block; font-size: 13.5px; font-weight: 600; color: var(--bg); background: var(--ink); padding: 7px 14px; border-radius: 999px; }
+
+  /* The wire itself, written out. */
+  .code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; line-height: 1.65;
+    background: var(--panel-bg); color: var(--panel-fg); border: 1px solid var(--panel-edge);
+  }
+  .code .k { color: #d9f99d; }
+  .code .s { color: #fcd9a8; }
+
+  .done .t { display: flex; align-items: center; gap: 9px; }
+  .tick { width: 21px; height: 21px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; flex: none; }
+  .fail { border-color: #e7d3c9; }
+  .fail .t { color: #9a3412; }
+
+  .note { position: absolute; font-size: 12.5px; color: var(--ink-3); }
+  svg.wires { position: absolute; inset: 0; width: 1600px; height: 530px; }
+  .w { fill: none; stroke: #b9bcae; stroke-width: 2.2; }
+  .w.hot { stroke: #d97706; stroke-width: 2.4; }
+</style>
+<script>if(location.search.includes("dark"))document.documentElement.dataset.theme="dark";</script>
+</head>
+<body>
+
+<svg class="wires" viewBox="0 0 1600 530">
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="currentColor" class="w"/></marker>
+    <marker id="o" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#d97706"/></marker>
+  </defs>
+  <path class="w" d="M378 250 L 418 250" marker-end="url(#a)"/>
+  <path class="w hot" d="M770 250 L 810 250" marker-end="url(#o)"/>
+  <path class="w hot" d="M1162 250 L 1202 250" marker-end="url(#o)"/>
+  <!-- free times coming back the other way, along the foot of the row -->
+  <path class="w" d="M1290 452 L 600 452" marker-end="url(#a)" stroke-dasharray="5 5"/>
+</svg>
+
+<div class="overline" style="left:40px; top:26px;">The mail</div>
+<div class="step-no" style="left:40px; top:56px;">1</div>
+<div class="card pane" style="left:40px; top:100px;">
+  <div class="mailhead"><span class="from">Sam Okafor</span><span class="when">09:14</span></div>
+  <div class="subj">Could we move to Tuesday?</div>
+  <div class="body">Something has come up on Monday. Any chance we could do Tuesday afternoon instead?</div>
+  <div style="margin-top:11px"><span class="pill">Needs a reply</span></div>
+</div>
+<div class="note" style="left:40px; top:300px;">sorted as it landed, like everything else</div>
+
+<div class="overline" style="left:418px; top:26px;">You decide, and only you</div>
+<div class="step-no" style="left:418px; top:56px;">2</div>
+<div class="card pane" style="left:418px; top:100px;">
+  <div class="t">Add to Scheduling Agent</div>
+  <div class="d">Nothing is sent until you press this.</div>
+  <div class="field"><span class="lab">Kind</span><span class="val"><b>Actionable</b> &nbsp;/&nbsp; <span style="color:#8a8d7e">Event</span></span></div>
+  <div class="field"><span class="lab">Title</span><span class="val">Reply to Sam about Tuesday</span></div>
+  <div class="field"><span class="lab">When</span><span class="val">Tue 22 Sep</span></div>
+  <div class="chips">
+    <span class="chip">09:00</span><span class="chip on">14:00</span><span class="chip">16:30</span>
+    <span class="chip" style="border:0;color:#8a8d7e">free, per the agent</span>
+  </div>
+  <div class="btn">Add to Scheduling Agent</div>
+  <div style="font-size:12px;color:#8a8d7e;margin-top:9px">the title starts as the subject line, and is yours to change</div>
+</div>
+
+<div class="overline" style="left:810px; top:26px;">One call, over MCP</div>
+<div class="step-no" style="left:810px; top:56px;">3</div>
+<div class="card pane code" style="left:810px; top:100px;">
+  <div>{ <span class="k">"jsonrpc"</span>: <span class="s">"2.0"</span>, <span class="k">"id"</span>: 1,</div>
+  <div>&nbsp;&nbsp;<span class="k">"method"</span>: <span class="s">"tools/call"</span>,</div>
+  <div>&nbsp;&nbsp;<span class="k">"params"</span>: {</div>
+  <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">"name"</span>: <span class="s">"create_actionable"</span>,</div>
+  <div>&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">"arguments"</span>: {</div>
+  <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">"title"</span>: <span class="s">"Reply to Sam…"</span>,</div>
+  <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="k">"dayISO"</span>: <span class="s">"2026-09-22"</span></div>
+  <div>&nbsp;&nbsp;&nbsp;&nbsp;} } }</div>
+</div>
+<div class="note" style="left:810px; top:330px; width:330px;">HTTPS, bearer token &middot; the title and the date go over, the message body never does</div>
+
+<div class="overline" style="left:1202px; top:26px;">The scheduling agent</div>
+<div class="step-no" style="left:1202px; top:56px;">4</div>
+<div class="card pane done" style="left:1202px; top:100px;">
+  <div class="t">
+    <span class="tick"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+    Actionable created
+  </div>
+  <div class="d">The Scheduling Agent files it and hands back an id. Celeste keeps that id on the thread, so the mail and the actionable stay joined up.</div>
+</div>
+
+<div class="card pane fail" style="left:1202px; top:288px;">
+  <div class="t">Or it did not</div>
+  <div class="d">A refusal is kept beside the thread with what the agent said, and a Retry. Nothing is invented and nothing is lost.</div>
+</div>
+
+<div class="note" style="left:600px; top:468px; width:700px;">
+  the free times in step 2 came from the agent first, over the same wire,
+  <b style="color:#5c5f52">get_availability</b>, which needs no token
+</div>
+
+</body>
+</html>

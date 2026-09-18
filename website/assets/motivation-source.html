@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Motivation</title>
+<link rel="stylesheet" href="diagram.css">
+<!-- Renders assets/motivation-light.png and -dark.png at 1440x370. -->
+<style>
+  body { width: 1440px; height: 370px; }
+  .tiles { position: absolute; left: 40px; top: 82px; width: 520px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .tile { background: var(--card); border: 1px solid var(--stroke); border-radius: 10px; padding: 8px 9px; box-shadow: 0 1px 2px rgba(20,21,15,.04); }
+  .tile .n { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .c { font-size: 17px; font-weight: 680; letter-spacing: -.02em; }
+  .tile.hot .c { color: var(--warn); }
+
+  .big { position: absolute; left: 40px; top: 262px; display: flex; align-items: baseline; gap: 12px; }
+  .big b { font-size: 58px; font-weight: 700; letter-spacing: -.035em; line-height: 1; }
+  .big span { font-size: 14px; color: var(--ink-2); }
+
+  .panel { position: absolute; width: 268px; }
+  .plabel { font-size: 13px; font-weight: 650; margin-bottom: 11px; }
+  /* Days a reply has been owed, drawn rather than described. */
+  .wait { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+  .wtrack { flex: 1; height: 9px; border-radius: 5px; background: var(--stroke); overflow: hidden; }
+  .wtrack span { display: block; height: 100%; background: var(--warn); border-radius: 5px; }
+  .wnum { font-size: 12px; color: var(--warn); font-weight: 650; width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  .pair { display: flex; align-items: center; gap: 13px; }
+  .stat { text-align: center; }
+  .stat b { display: block; font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+  .stat i { font-style: normal; font-size: 11.5px; color: var(--ink-3); }
+  .vs { font-size: 12px; color: var(--ink-3); }
+
+  .bub { border-radius: 12px; padding: 9px 11px; font-size: 12px; max-width: 128px; line-height: 1.35; }
+  .bub.a { background: var(--accent-soft); color: var(--accent); }
+  .bub.b { background: var(--stroke); color: var(--ink-2); }
+  .app { font-size: 10px; color: var(--ink-3); margin-top: 4px; }
+  .close { position: absolute; left: 40px; top: 318px; font-size: 14px; color: var(--ink-2); width: 900px; }
+</style>
+<script>if(location.search.includes("dark"))document.documentElement.dataset.theme="dark";</script>
+</head>
+<body>
+<svg class="wires" viewBox="0 0 1440 370" width="1440" height="370">
+  <defs><marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="currentColor" class="w"/></marker></defs>
+  <path class="w" d="M584 200 L 646 200" marker-end="url(#a)"/>
+  <path class="w" stroke-dasharray="4 4" d="M1268 176 L 1268 202"/>
+</svg>
+
+<div class="overline" style="left:40px; top:42px;">Where it arrives</div>
+<div class="tiles">
+  <div class="tile"><div class="n">Gmail, work</div><div class="c">38</div></div>
+  <div class="tile"><div class="n">Gmail, company</div><div class="c">12</div></div>
+  <div class="tile hot"><div class="n">Gmail, clients</div><div class="c">64</div></div>
+  <div class="tile"><div class="n">Gmail, personal</div><div class="c">7</div></div>
+  <div class="tile"><div class="n">Gmail, school</div><div class="c">21</div></div>
+  <div class="tile"><div class="n">Gmail, old</div><div class="c">3</div></div>
+  <div class="tile"><div class="n">Outlook</div><div class="c">19</div></div>
+  <div class="tile"><div class="n">Fastmail</div><div class="c">5</div></div>
+  <div class="tile hot"><div class="n">WhatsApp</div><div class="c">46</div></div>
+  <div class="tile"><div class="n">Messages</div><div class="c">28</div></div>
+  <div class="tile"><div class="n">Slack</div><div class="c">31</div></div>
+  <div class="tile"><div class="n">&hellip;</div><div class="c">&nbsp;</div></div>
+</div>
+<div class="big"><b>274</b><span>unread, across twelve places</span></div>
+
+<div class="overline" style="left:646px; top:42px;">What that costs</div>
+
+<div class="panel" style="left:646px; top:82px;">
+  <div class="plabel">Replies somebody is waiting for</div>
+  <div class="wait"><span class="wtrack"><span style="width:55%"></span></span><span class="wnum">6d</span></div>
+  <div class="wait"><span class="wtrack"><span style="width:36%"></span></span><span class="wnum">4d</span></div>
+  <div class="wait"><span class="wtrack"><span style="width:100%"></span></span><span class="wnum">11d</span></div>
+</div>
+
+<div class="panel" style="left:958px; top:82px;">
+  <div class="plabel">Read is not the same as answered</div>
+  <div class="pair">
+    <span class="stat"><b>218</b><i>opened</i></span>
+    <span class="vs">&rarr;</span>
+    <span class="stat"><b style="color:var(--accent)">31</b><i>answered</i></span>
+  </div>
+</div>
+
+<div class="panel" style="left:1254px; top:82px; width:150px;">
+  <div class="plabel">One thread, two apps</div>
+  <div class="bub a">Can we move to Tuesday?<div class="app" style="color:var(--accent)">mail, 09:14</div></div>
+  <div class="bub b" style="margin-top:26px">Did you see my email?<div class="app">WhatsApp, 16:40</div></div>
+</div>
+
+<div class="close">Each app works. There is simply too much of it, in too many places, and the ones that matter do not arrive on top.</div>
+</body></html>

@@ -1,0 +1,1 @@
+ALTER TABLE `sorts` ADD `disposable` integer DEFAULT false NOT NULL;

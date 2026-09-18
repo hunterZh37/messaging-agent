@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Sorting</title>
+<link rel="stylesheet" href="diagram.css">
+<!-- Renders assets/sorting.png at 1440x430. See website/README.md. -->
+<style>
+  body { width: 1440px; height: 430px; }
+  .in { left: 40px; top: 84px; width: 470px; }
+  .out { left: 620px; width: 360px; }
+  .why { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
+  .folder { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--stroke); }
+  .folder:first-of-type { border-top: 0; }
+  .fname { font-size: 14px; font-weight: 600; flex: 1; }
+  .fn { font-size: 13.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+</style><script>if(location.search.includes("dark"))document.documentElement.dataset.theme="dark";</script>
+</head>
+<body>
+<svg class="wires" viewBox="0 0 1440 430" width="1440" height="430">
+  <defs><marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto"><polygon points="0 0, 9 3.5, 0 7" fill="#b9bcae"/></marker></defs>
+  <path class="w" d="M516 230 L 614 230" marker-end="url(#a)"/>
+  <path class="w" d="M986 200 C 1030 200, 1030 160, 1074 150" marker-end="url(#a)"/>
+</svg>
+
+<div class="overline" style="left:40px; top:44px;">What arrived</div>
+<div class="card pad in">
+  <div class="msg"><span class="who">Dana</span><span class="subj">Contract for Sept, needs signing</span></div>
+  <div class="msg"><span class="who">Northwind</span><span class="subj">Invoice 4471 is due Monday</span></div>
+  <div class="msg"><span class="who">Sam</span><span class="subj">can you do Tuesday instead?</span></div>
+  <div class="msg"><span class="who">Newsletter</span><span class="subj">This week in robotics</span></div>
+  <div class="msg"><span class="who">No-reply</span><span class="subj">Your receipt from Northwind</span></div>
+  <div class="msg"><span class="who">Priya</span><span class="subj">Re: grant portal documents</span></div>
+</div>
+
+<div class="overline" style="left:620px; top:44px;">A verdict on each, with its reason</div>
+<div class="card pad out" style="top:84px;">
+  <div class="t">Needs a reply</div>
+  <div class="why">Dana is waiting on a signature. Sam asked a question.</div>
+</div>
+<div class="card pad out" style="top:184px;">
+  <div class="t">Important, no reply needed</div>
+  <div class="why">Northwind has a date on it. Priya is for the record.</div>
+</div>
+<div class="card pad out" style="top:284px;">
+  <div class="t">Safe to delete</div>
+  <div class="why">A newsletter and a receipt. Nothing is deleted for you.</div>
+</div>
+
+<div class="overline" style="left:1074px; top:44px;">Where they land</div>
+<div class="card pad" style="left:1074px; top:84px; width:326px;">
+  <div class="folder"><span class="fname">Need to reply</span><span class="fn">2</span></div>
+  <div class="folder"><span class="fname">Unopened</span><span class="fn">4</span></div>
+  <div class="folder"><span class="fname">Safe to delete</span><span class="fn">2</span></div>
+  <div class="folder"><span class="fname">Waiting for reply</span><span class="fn">19</span></div>
+</div>
+<div class="note" style="left:1074px; top:262px; width:326px;">
+  The sorter can run on a local model through Ollama, in which case this costs nothing.
+</div>
+<div class="note" style="left:620px; top:356px; width:360px;">
+  Every verdict carries the sentence behind it, so a wrong one is arguable rather than mysterious.
+</div>
+</body></html>

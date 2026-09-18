@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Re-render docs/diagrams/system-architecture.html whenever the archify JSON changes.
+# Enable per clone: git config core.hooksPath .githooks
+# Spec: docs/superpowers/specs/2026-09-06-archify-agent-design.md
+
+[ -n "$ARCHIFY_HOOK" ] && exit 0
+cd "$(git rev-parse --show-toplevel)" || exit 0
+json=docs/diagrams/system-architecture.json
+html=docs/diagrams/system-architecture.html
+git diff-tree --no-commit-id --name-only -r HEAD | grep -qx "$json" || exit 0
+
+archify=~/.claude/skills/archify/bin/archify.mjs
+[ -f "$archify" ] || { echo "archify hook: $archify not found, HTML not re-rendered" >&2; exit 0; }
+sha=$(git rev-parse --short HEAD)
+gitdir=$(git rev-parse --git-dir)
+log="$gitdir/archify.log"
+
+if node "$archify" deliver architecture "$json" "$html" --quality showcase --json > "$gitdir/archify.last-output" 2>&1; then
+  if git diff --quiet -- "$html"; then
+    echo "$(date '+%FT%T') $sha rendered, html unchanged" >> "$log"
+  else
+    ARCHIFY_HOOK=1 git commit -q -o -m "diagram: render $sha" -- "$html" \
+      && echo "$(date '+%FT%T') $sha rendered, committed $(git rev-parse --short HEAD)" >> "$log"
+  fi
+else
+  echo "archify hook: deliver failed for $sha, see $gitdir/archify.last-output" >&2
+  echo "$(date '+%FT%T') $sha deliver-failed" >> "$log"
+fi
+exit 0

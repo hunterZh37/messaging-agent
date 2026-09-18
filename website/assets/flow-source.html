@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Celeste flow diagram</title>
+<!--
+  Source for assets/flow.png: every source in one place, sorted by an agent.
+  Rendered, not drawn, so the wording can be fixed without an illustrator:
+
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+    --screenshot=website/assets/flow.png --window-size=1600,700 \
+    website/assets/flow-source.html
+
+  Palette is the landing page's, so the two never drift apart.
+-->
+<style>
+  :root {
+    --bg: #fafaf7;
+    --card: #ffffff;
+    --stroke: #e6e5df;
+    --ink: #14150f;
+    --ink-2: #5c5f52;
+    --ink-3: #8a8d7e;
+    --accent: #4d7c0f;
+    --accent-soft: #eef7dc;
+    --lime: #d9f99d;
+    --amber: #b45309;
+    --panel-bg: #14150f; --panel-fg: #ffffff; --panel-edge: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  /* Dark, rendered from the same file with ?dark. */
+  html[data-theme="dark"] {
+    --bg: #0e1011; --card: #16191a; --stroke: #2b3031;
+    --ink: #e9ece7; --ink-2: #a6ada6; --ink-3: #7b827c;
+    --accent: #b7d977; --accent-soft: #1f2a14; --lime: #4a6626;
+    --panel-bg: #05070a; --panel-fg: #e9ece7; --panel-edge: #2b3031;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { width: 1600px; height: 700px; position: relative; overflow: hidden; }
+
+  .overline {
+    position: absolute; font-size: 14px; font-weight: 700; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--ink-2);
+  }
+  .card {
+    position: absolute; background: var(--card); border: 1px solid var(--stroke);
+    border-radius: 14px; box-shadow: 0 1px 2px rgba(20,21,15,.05), 0 8px 20px rgba(20,21,15,.04);
+  }
+
+  /* A source: its name, where it comes from, and a few rows standing in for mail. */
+  .src { width: 360px; padding: 16px 18px 18px; }
+  .src .top { display: flex; align-items: center; gap: 9px; margin-bottom: 13px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .src .name { font-size: 17px; font-weight: 650; }
+  .src .from { margin-left: auto; font-size: 13.5px; color: var(--ink-3); }
+  .rows { display: grid; gap: 7px; }
+  .row { height: 11px; border-radius: 4px; background: #eef0ea; }
+  .row.on { opacity: 1; }
+
+  /* The one platform. */
+  .hub { left: 606px; top: 58px; width: 452px; padding: 20px 22px 18px; }
+  .hub .head { display: flex; align-items: center; gap: 13px; margin-bottom: 18px; }
+  .spark {
+    width: 46px; height: 46px; border-radius: 50%; flex: none; background: var(--accent-soft);
+    border: 1.5px solid var(--lime); display: grid; place-items: center; color: var(--accent);
+  }
+  .hub h1 { font-size: 21px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  .hub .sub { font-size: 14px; color: var(--ink-2); margin-top: 2px; }
+
+  .msg { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--stroke); }
+  .msg:first-of-type { border-top: 0; }
+  .who { font-size: 14px; font-weight: 600; width: 92px; flex: none; }
+  .subj { font-size: 13.5px; color: var(--ink-2); flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .tag {
+    font-size: 11.5px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); white-space: nowrap; flex: none;
+  }
+  .tag.grey { background: #f1f2ed; color: var(--ink-3); }
+  .foot { font-size: 14px; color: var(--ink-2); text-align: center; margin-top: 16px; }
+
+  /* Outcomes. */
+  .out { width: 430px; padding: 15px 18px; }
+  .out .t { font-size: 16.5px; font-weight: 650; margin-bottom: 4px; display: flex; align-items: center; gap: 9px; }
+  .out .d { font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
+  .tick { width: 22px; height: 22px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; flex: none; }
+  .quote { background: var(--panel-bg); color: var(--panel-fg); border: 1px solid var(--panel-edge); }
+  .quote .q { font-size: 17px; line-height: 1.4; font-weight: 500; }
+  .note { position: absolute; font-size: 13px; color: var(--ink-3); }
+
+  svg.wires { position: absolute; inset: 0; width: 1600px; height: 700px; }
+  .wire { fill: none; stroke: var(--ink-3); stroke-width: 2.2; }
+  .wire.out { stroke: #d97706; stroke-width: 2.4; }
+</style>
+<script>if(location.search.includes("dark"))document.documentElement.dataset.theme="dark";</script>
+</head>
+<body>
+
+<svg class="wires" viewBox="0 0 1600 700">
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="currentColor" class="w"/>
+    </marker>
+    <marker id="o" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+      <polygon points="0 0, 9 3.5, 0 7" fill="#d97706"/>
+    </marker>
+  </defs>
+  <!-- sources into the hub -->
+  <path class="wire" d="M408 146 C 500 146, 500 210, 592 232" marker-end="url(#a)"/>
+  <path class="wire" d="M408 304 C 500 304, 500 296, 592 300" marker-end="url(#a)"/>
+  <path class="wire" d="M408 462 C 500 462, 505 400, 592 372" marker-end="url(#a)"/>
+  <path class="wire" d="M408 620 C 510 620, 520 490, 592 442" marker-end="url(#a)"/>
+  <!-- the hub out to each of the three things it does -->
+  <path class="wire out" d="M1072 240 C 1108 240, 1110 172, 1146 152" marker-end="url(#o)"/>
+  <path class="wire out" d="M1072 350 C 1110 350, 1108 352, 1146 352" marker-end="url(#o)"/>
+  <path class="wire out" d="M1072 470 C 1110 470, 1108 552, 1146 572" marker-end="url(#o)"/>
+</svg>
+
+<div class="overline" style="left:40px; top:24px;">Your messages</div>
+
+<div class="card src" style="left:40px; top:58px;">
+  <div class="top"><span class="dot" style="background:#dc2626"></span><span class="name">Work mail</span><span class="from">Gmail &times; 4</span></div>
+  <div class="rows">
+    <div class="row" style="width:88%"></div><div class="row" style="width:64%"></div><div class="row" style="width:76%"></div>
+  </div>
+</div>
+
+<div class="card src" style="left:40px; top:216px;">
+  <div class="top"><span class="dot" style="background:#2563eb"></span><span class="name">Personal mail</span><span class="from">Outlook</span></div>
+  <div class="rows">
+    <div class="row" style="width:72%"></div><div class="row" style="width:90%"></div><div class="row" style="width:58%"></div>
+  </div>
+</div>
+
+<div class="card src" style="left:40px; top:374px;">
+  <div class="top"><span class="dot" style="background:#16a34a"></span><span class="name">WhatsApp</span><span class="from">this Mac</span></div>
+  <div class="rows">
+    <div class="row" style="width:66%"></div><div class="row" style="width:84%"></div><div class="row" style="width:52%"></div>
+  </div>
+</div>
+
+<div class="card src" style="left:40px; top:532px;">
+  <div class="top"><span class="dot" style="background:#7c3aed"></span><span class="name">Messages</span><span class="from">iMessage &amp; SMS</span></div>
+  <div class="rows">
+    <div class="row" style="width:80%"></div><div class="row" style="width:60%"></div><div class="row" style="width:70%"></div>
+  </div>
+</div>
+
+<div class="overline" style="left:606px; top:24px;">One platform, run by your agent</div>
+
+<div class="card hub">
+  <div class="head">
+    <span class="spark">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/></svg>
+    </span>
+    <span>
+      <h1>Celeste</h1>
+      <div class="sub">every inbox, sorted as it lands</div>
+    </span>
+  </div>
+
+  <div class="msg"><span class="who">Dana</span><span class="subj">Contract for Sept, needs signing</span><span class="tag">Contracts</span></div>
+  <div class="msg"><span class="who">Priya</span><span class="subj">Re: grant portal documents</span><span class="tag">Grants</span></div>
+  <div class="msg"><span class="who">Sam</span><span class="subj">can you do Tuesday instead?</span><span class="tag">Scheduling</span></div>
+  <div class="msg"><span class="who">Northwind</span><span class="subj">Invoice 4471 is due Monday</span><span class="tag">Billing</span></div>
+  <div class="msg"><span class="who">Ada</span><span class="subj">are you around Thursday evening?</span><span class="tag">Friends</span></div>
+  <div class="msg"><span class="who">Legal</span><span class="subj">Formation documents, final set</span><span class="tag">Company</span></div>
+  <div class="msg"><span class="who">Mum</span><span class="subj">did the parcel arrive?</span><span class="tag">Family</span></div>
+  <div class="msg"><span class="who">Newsletter</span><span class="subj">This week in robotics</span><span class="tag grey">Safe to delete</span></div>
+  <div class="msg"><span class="who">No&#8209;reply</span><span class="subj">Your receipt from Northwind</span><span class="tag grey">Safe to delete</span></div>
+
+  <div class="foot">all of it in one list, on your own Mac</div>
+</div>
+
+<div class="overline" style="left:1146px; top:60px;">It reads the patterns</div>
+<div class="card out" style="left:1146px; top:96px;">
+  <div class="t">You answer chats in 31 minutes</div>
+  <div class="d">Mail takes 3.9 hours. You open 14% of conversations and have the last word in 16%.</div>
+</div>
+
+<div class="overline" style="left:1146px; top:264px;">It drafts the reply</div>
+<div class="card out quote" style="left:1146px; top:300px;">
+  <div class="q">&ldquo;Hi Priya, the last two documents are uploaded. Anything else before the deadline?&rdquo;</div>
+</div>
+<div class="note" style="left:1146px; top:418px;">in a voice you wrote down &middot; nothing sends until you press Send</div>
+
+<div class="overline" style="left:1146px; top:484px;">Or it hands the work on</div>
+<div class="card out" style="left:1146px; top:520px;">
+  <div class="t">
+    <span class="tick"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
+    Sent to your Scheduling Agent
+  </div>
+  <div class="d">Sam&rsquo;s thread became an event over MCP. You approved it first.</div>
+</div>
+
+</body>
+</html>

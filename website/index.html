@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Celeste: an agent that reads your mail and never sends without you</title>
+<meta name="description" content="Free, open-source, self-hosted: an agent sorts your mail, files it under your projects, and drafts replies in your voice. Everything stays on your Mac. Nothing is sent until you press send." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://celeste-landing-pi.vercel.app/" />
+<meta property="og:title" content="Celeste" />
+<meta property="og:description" content="All your mail and messages, governed by an agent. Runs locally on your Mac and drafts the reply. Free, open source, and your data stays on your Mac." />
+<meta property="og:image" content="https://celeste-landing-pi.vercel.app/assets/og.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Celeste: an agent that reads your mail and never sends without you. Free and open source." />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Celeste" />
+<meta name="twitter:description" content="All your mail and messages, governed by an agent. Runs locally on your Mac and drafts the reply. Free, open source, and your data stays on your Mac." />
+<meta name="twitter:image" content="https://celeste-landing-pi.vercel.app/assets/og.png" />
+<meta name="theme-color" content="#fafaf7" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 28'%3E%3Cpath d='M14 2 L17 11 L26 14 L17 17 L14 26 L11 17 L2 14 L11 11 Z' fill='%234d7c0f'/%3E%3C/svg%3E" />
+<style>
+  :root {
+    --bg: #fafaf7;
+    --card: #ffffff;
+    --stroke: #e6e5df;
+    --ink: #14150f;
+    --ink-2: #5c5f52;
+    --ink-3: #8a8d7e;
+    --accent: #4d7c0f;
+    --accent-soft: #eef7dc;
+    --lime: #d9f99d;
+    --radius: 16px;
+    --maxw: 1060px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding-inline: 22px; }
+  a { color: var(--accent); }
+  svg { display: block; }
+
+  .skip { position: absolute; left: -9999px; }
+  .skip:focus { left: 12px; top: 12px; background: var(--card); padding: 10px 14px; border-radius: 10px; z-index: 50; }
+
+  header { border-bottom: 1px solid var(--stroke); background: rgba(250,250,247,.9); backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 20; }
+  .nav { display: flex; align-items: center; gap: 18px; height: 62px; }
+  .brand { display: inline-flex; align-items: center; gap: 9px; font-weight: 650; letter-spacing: -.01em; font-size: 17px; text-decoration: none; color: var(--ink); }
+  .nav-links { margin-left: auto; display: flex; gap: 20px; align-items: center; font-size: 14.5px; }
+  .nav-links a { color: var(--ink-2); text-decoration: none; }
+  .nav-links a:hover { color: var(--ink); }
+  /* The button in the nav is a button, not a nav link. `.nav-links a` is one
+     point more specific than `.btn`, so it was painting the label --ink-2 on
+     an --ink pill: about 2.9:1, under the 4.5:1 floor. Hover was worse, since
+     it set --ink, which is the pill's own colour (2026-09-17: hard to see). */
+  .nav-links a.btn, .nav-links a.btn:hover { color: #fff; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--ink); color: #fff; text-decoration: none; padding: 9px 15px; border-radius: 999px; font-size: 14.5px; font-weight: 550; }
+  .btn:hover { background: #2b2d22; }
+  .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--stroke); }
+  .btn.ghost:hover { border-color: var(--ink-2); background: #fff; }
+
+  .hero { padding-block: 70px 22px; }
+  h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.08; letter-spacing: -.028em; font-weight: 680; margin: 0 0 16px; max-width: 19ch; }
+  h1 em { font-style: normal; color: var(--accent); }
+  .lede { font-size: clamp(17px, 2vw, 20px); color: var(--ink-2); margin: 0 0 24px; max-width: 46ch; }
+  .cta-row { display: flex; flex-wrap: wrap; gap: 11px; align-items: center; }
+  /* The hero asks for one thing now, so it is the one thing that is big. */
+  .btn-lg { padding: 12px 22px; font-size: 15.5px; }
+
+  .reveal { opacity: 0; transform: translateY(9px); animation: rise .55s cubic-bezier(.22,.85,.32,1) forwards; animation-delay: calc(var(--i,0) * 70ms); }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .reveal { animation: none; opacity: 1; transform: none; } html { scroll-behavior: auto; } }
+
+  /* ---- The pipeline: five glyphs, five words ---- */
+  /* The hero picture, and the five-step strip that says the same thing in a
+     tenth of the space. One or the other: the picture is unreadable on a
+     phone, and the strip is redundant beside it on a laptop. */
+  .hero-shot { display: block; margin-top: 34px; border: 1px solid var(--stroke); border-radius: var(--radius); overflow: hidden; background: var(--card); }
+  .hero-shot img { display: block; width: 100%; height: auto; }
+  .flow { display: none; grid-template-columns: repeat(5, 1fr); gap: 6px; align-items: start; margin-top: 34px; }
+  @media (max-width: 760px) { .hero-shot { display: none; } .flow { display: grid; } }
+  .step { text-align: center; position: relative; }
+  .step .ico { width: 44px; height: 44px; margin: 0 auto 9px; border-radius: 12px; background: var(--card); border: 1px solid var(--stroke); display: grid; place-items: center; }
+  .step .ico svg { width: 21px; height: 21px; stroke: var(--accent); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .step.you .ico { background: var(--lime); border-color: #c7ef6e; }
+  .step.you .ico svg { stroke: #2f4708; }
+  .step b { display: block; font-size: 14px; font-weight: 600; letter-spacing: -.01em; }
+  .step span { font-size: 12.5px; color: var(--ink-3); }
+  .step::after { content: ""; position: absolute; top: 22px; left: calc(50% + 32px); right: calc(-50% + 32px); height: 1px; background: var(--stroke); }
+  .step:last-child::after { display: none; }
+
+  /* ---- Product mocks ---- */
+  .frame { border: 1px solid var(--stroke); border-radius: var(--radius); background: var(--card); overflow: hidden; box-shadow: 0 18px 44px rgba(20,21,15,.07); }
+  .frame-bar { display: flex; align-items: center; gap: 7px; padding: 10px 13px; border-bottom: 1px solid var(--stroke); background: #fcfcfa; }
+  .frame-bar i { width: 10px; height: 10px; border-radius: 999px; background: #e4e3dc; display: block; }
+  .frame-bar span { margin-left: 8px; font-size: 12.5px; color: var(--ink-2); }
+  .row { display: grid; grid-template-columns: 1fr auto; gap: 3px 14px; padding: 12px 16px; border-bottom: 1px solid var(--stroke); align-items: start; }
+  .row:last-child { border-bottom: 0; }
+  .row .from { font-size: 12.5px; color: var(--ink-3); }
+  .row .subj { font-weight: 570; font-size: 14.5px; }
+  .row .meta { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+  .pill { font-size: 11.5px; padding: 3px 9px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; white-space: nowrap; }
+  .pill.grey { background: #f1f1ec; color: var(--ink-2); }
+  .time { font-size: 12px; color: var(--ink-3); }
+
+  .two { display: grid; grid-template-columns: 1.05fr .95fr; gap: 16px; align-items: start; }
+  .draft { padding: 16px; }
+  .draft .lab { font-size: 12px; color: var(--accent); font-weight: 650; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 9px; display: flex; align-items: center; gap: 6px; }
+  .draft .body { font-size: 14px; color: var(--ink-2); border-left: 2px solid var(--lime); padding-left: 12px; margin-bottom: 14px; }
+  .draft .acts { display: flex; gap: 8px; align-items: center; }
+  .k { font-size: 13.5px; font-weight: 600; padding: 7px 14px; border-radius: 999px; }
+  .k.send { background: var(--lime); color: #2f4708; }
+  .k.edit { border: 1px solid var(--stroke); color: var(--ink-2); }
+  .k.note { font-size: 12.5px; color: var(--ink-3); font-weight: 400; margin-left: auto; }
+
+  section { padding-block: 62px 8px; }
+  h2 { font-size: clamp(25px, 3.5vw, 34px); line-height: 1.14; letter-spacing: -.022em; margin: 0 0 26px; max-width: 22ch; font-weight: 660; }
+  h3 { font-size: 16px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 13px; }
+  .card { background: var(--card); border: 1px solid var(--stroke); border-radius: var(--radius); padding: 18px; }
+  .card p { margin: 0; font-size: 14px; color: var(--ink-2); }
+  .card .ico { width: 34px; height: 34px; border-radius: 10px; background: var(--accent-soft); display: grid; place-items: center; margin-bottom: 12px; }
+  .card .ico svg { width: 18px; height: 18px; stroke: var(--accent); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---- What never leaves ---- */
+  .mac { display: grid; grid-template-columns: 1fr auto; gap: 18px; align-items: center; background: var(--card); border: 1px solid var(--stroke); border-radius: var(--radius); padding: 22px; }
+  .box { border: 1.5px dashed #c9cdb8; border-radius: 13px; padding: 15px; background: #fcfdf7; }
+  .box .t { font-size: 12px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+  .box ul { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  .box li { font-size: 13px; font-weight: 550; padding: 5px 11px; border-radius: 999px; background: #fff; border: 1px solid var(--stroke); }
+  .out { text-align: center; min-width: 176px; }
+  .out .arr { display: grid; place-items: center; margin-bottom: 6px; }
+  .out .arr svg { width: 84px; height: 16px; stroke: var(--ink-3); fill: none; stroke-width: 1.6; }
+  .out b { display: block; font-size: 13.5px; }
+  .out span { font-size: 12.5px; color: var(--ink-3); }
+
+  .quote { font-size: clamp(19px, 2.6vw, 25px); line-height: 1.34; letter-spacing: -.017em; max-width: 26ch; margin: 0 0 16px; font-weight: 600; }
+  .sig { font-size: 14px; color: var(--ink-3); }
+  /* The one part of this page nobody else can write. Set narrow and plain, so
+     it reads as somebody talking rather than as copy. */
+  .why-body { margin: 0 0 6px; }
+  .why-body li { font-size: 15px; color: var(--ink); }
+
+  .steps { counter-reset: s; display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; padding: 0; margin: 0; list-style: none; }
+  .steps li { counter-increment: s; background: var(--card); border: 1px solid var(--stroke); border-radius: 12px; padding: 15px 16px 15px 16px; font-size: 14px; }
+  .steps li::before { content: counter(s); display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: var(--lime); color: #2f4708; font-size: 12px; font-weight: 700; margin-bottom: 9px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .92em; background: #f4f4ef; border: 1px solid var(--stroke); padding: 1px 6px; border-radius: 6px; }
+  .caption { font-size: 13.5px; color: var(--ink-3); margin: 16px 0 0; }
+  /* Facts in a column rather than a block: the page is read standing up, and a
+     paragraph of caveats is a paragraph nobody finishes. */
+  .bullets { margin: 16px 0 0; padding: 0; list-style: none; display: grid; gap: 7px; max-width: 64ch; }
+  .bullets li { font-size: 14px; color: var(--ink-2); line-height: 1.5; padding-left: 17px; position: relative; }
+  .bullets li::before { content: ""; position: absolute; left: 3px; top: 9px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); }
+  .bullets.quiet li { font-size: 13.5px; color: var(--ink-3); }
+  .bullets.quiet li::before { background: var(--ink-3); opacity: .55; }
+  /* A diagram fits its column on a laptop. On a phone, fitting means a 1440px
+     picture at 340, where the labels are about three pixels tall, so instead
+     it keeps a legible width and scrolls inside its own frame. That is not the
+     same fault as a page that scrolls sideways: the scrolling is contained,
+     and the whole thing still opens full size when tapped. */
+  .diagram { display: block; margin: 10px 0 0; border: 1px solid var(--stroke); border-radius: 14px; background: #fff; overflow: hidden; }
+  .diagram img { display: block; width: 100%; max-width: 100%; height: auto; }
+  @media (max-width: 760px) {
+    .diagram { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .diagram img { width: 820px; max-width: none; }
+  }
+  .diagram:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  /* Four pictures in a row down the page, each with its own small heading, so
+     a reader skimming sees what the feature is before deciding to look. */
+  .shots { display: grid; grid-template-columns: minmax(0, 1fr); gap: 34px; margin-top: 18px; }
+  .shot h3 { font-size: 17px; margin: 0 0 3px; font-weight: 650; letter-spacing: -.01em; }
+  .shot p { font-size: 13.5px; color: var(--ink-3); margin: 0; }
+  .swipe { display: none; }
+  @media (max-width: 760px) { .swipe { display: block; margin-top: 10px; } }
+  .shot .diagram { margin-top: 12px; }
+
+  footer { margin-top: 56px; border-top: 1px solid var(--stroke); padding: 24px 0 42px; }
+  .foot { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; font-size: 14px; color: var(--ink-3); }
+  .foot a { color: var(--ink-2); }
+  .mit { margin-left: auto; }
+
+  @media (max-width: 860px) { .two { grid-template-columns: 1fr; } .mac { grid-template-columns: 1fr; } .out { min-width: 0; } .out .arr svg { transform: rotate(90deg); } }
+  @media (max-width: 640px) {
+    .hero { padding-block: 44px 18px; }
+    .nav-links a:not(.btn) { display: none; }
+    .flow { grid-template-columns: repeat(2, 1fr); gap: 16px 8px; }
+    .step::after { display: none; }
+    /* The one the whole page is about gets the last row to itself. */
+    .step.you { grid-column: 1 / -1; padding-top: 4px; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#does">Skip to content</a>
+
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#top">
+      <svg width="20" height="20" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 2 L17 11 L26 14 L17 17 L14 26 L11 17 L2 14 L11 11 Z" fill="#4d7c0f"/></svg>
+      Celeste
+    </a>
+    <nav class="nav-links">
+      <a href="#does">Features</a>
+      <a href="#see">Demo</a>
+      <a href="#private">Privacy</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#start">Install</a>
+      <a class="btn" href="https://github.com/hunterZh37/messaging-agent">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero wrap" id="top">
+  <h1 class="reveal" style="--i:1">All your mail and messages, <em>governed by an agent</em></h1>
+  <p class="lede reveal" style="--i:2">Runs locally on your Mac. Sorts it, files it, drafts the reply. Nothing sends until you press send, or create an actionable from it through MCP.</p>
+  <div class="cta-row reveal" style="--i:3">
+    <a class="btn btn-lg" href="https://github.com/hunterZh37/messaging-agent">
+      <svg viewBox="0 0 16 16" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+      GitHub
+    </a>
+  </div>
+
+  <a class="hero-shot reveal" style="--i:4" href="assets/flow-light.png" target="_blank" rel="noopener"
+     aria-label="Open the diagram full size">
+          <img src="assets/flow-light.png" width="1600" height="700" loading="eager" decoding="async"
+      alt="Four sources on the left, Work mail across four Gmail accounts, Personal mail on Outlook, WhatsApp and Messages, all feeding one list in the middle where every message carries the project it was filed under. On the right, the three things that follow: your messaging patterns read back to you, a drafted reply in your own voice, and a thread handed to the Scheduling Agent.">
+  </a>
+
+  <div class="flow reveal" style="--i:5">
+    <div class="step">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m3 8 9 6 9-6"/></svg></div>
+      <b>Syncs</b><span>5 sources</span>
+    </div>
+    <div class="step">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div>
+      <b>Sorts</b><span>local model</span>
+    </div>
+    <div class="step">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+      <b>Files</b><span>your projects</span>
+    </div>
+    <div class="step">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 19h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+      <b>Drafts</b><span>your voice</span>
+    </div>
+    <div class="step you">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4z"/></svg></div>
+      <b>You send</b><span>always</span>
+    </div>
+  </div>
+</section>
+
+<section id="does" class="wrap">
+  <div class="two reveal" style="--i:1">
+    <div class="frame">
+      <div class="frame-bar"><i></i><i></i><i></i><span>Inbox &rsaquo; Need to reply &middot; Today</span></div>
+      <div class="row">
+        <span class="from">work.example.com</span>
+        <span class="subj">Grant reporting, two questions before Friday</span>
+        <span class="meta"><span class="time">9:12</span><span class="pill">Needs a reply</span><span class="pill grey">Clients</span></span>
+      </div>
+      <div class="row">
+        <span class="from">example.com</span>
+        <span class="subj">Invoice 09/13 is due Monday</span>
+        <span class="meta"><span class="time">10:30</span><span class="pill grey">Money</span></span>
+      </div>
+      <div class="row">
+        <span class="from">WhatsApp</span>
+        <span class="subj">Ada Lovelace</span>
+        <span class="meta"><span class="time">10:34</span><span class="pill">Needs a reply</span><span class="pill grey">Personal</span></span>
+      </div>
+      <div class="row">
+        <span class="from">example.com</span>
+        <span class="subj">Your receipt from Northwind</span>
+        <span class="meta"><span class="time">11:02</span><span class="pill grey">Safe to delete</span></span>
+      </div>
+    </div>
+
+    <div class="frame draft">
+      <div class="lab"><svg width="13" height="13" viewBox="0 0 28 28" aria-hidden="true"><path d="M14 2 L17 11 L26 14 L17 17 L14 26 L11 17 L2 14 L11 11 Z" fill="#4d7c0f"/></svg>Celeste draft</div>
+      <div class="body">Hi Dana, both are on the way, signed W&#8209;9 and the certificate, before Friday.<br><br>Hunter</div>
+      <div class="acts">
+        <span class="k send">Send</span>
+        <span class="k edit">Edit</span>
+        <span class="k note">Nothing is sent until you send it.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="wrap">
+  <h2>Features</h2>
+  <div class="grid">
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div>
+      <h3>Sorts</h3>
+      <p>Important? Needs a reply? Safe to delete? Runs free on a local model</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+      <h3>Files</h3>
+      <p>Describe a project in one sentence. Embeddings do the rest, on your Mac</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 19h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></div>
+      <h3>Drafts</h3>
+      <p>In a voice you write down. You edit it, or say what to change</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <h3>Reads chats</h3>
+      <p>iMessage and WhatsApp, in the same triage as mail</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></div>
+      <h3>Answers</h3>
+      <p>Searches every inbox and chat, with citations you can check</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></div>
+      <h3>Schedules</h3>
+      <p>A thread becomes an actionable or an event in your <a href="https://github.com/hunterZh37/agentic-scheduling">Scheduling Agent</a>, over MCP</p>
+    </div>
+    <div class="card">
+      <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div>
+      <h3>Stats</h3>
+      <p>Analyze your messaging behavior</p>
+    </div>
+  </div>
+</section>
+
+<section id="see" class="wrap">
+  <h2>Demo</h2>
+  <p class="caption swipe">On a phone, drag a picture sideways, or tap it to open it full size</p>
+  <div class="shots">
+    <div class="shot">
+      <h3>It sorts, and says why</h3>
+      <p>A verdict on every message, with the sentence behind it</p>
+      <a class="diagram" href="assets/sorting-light.png" target="_blank" rel="noopener" aria-label="Open the sorting diagram full size">
+                  <img src="assets/sorting-light.png" width="1440" height="430" loading="lazy" decoding="async"
+          alt="What arrived on the left, six messages with no verdict. In the middle, three verdicts with the reason behind each: needs a reply because Dana is waiting on a signature, important but no reply needed because the invoice has a date on it, safe to delete for a newsletter and a receipt. On the right, the folder counts they land in.">
+      </a>
+    </div>
+    <div class="shot">
+      <h3>It files, from one sentence</h3>
+      <p>Describe a project in plain words. Matching is on meaning, and runs on your Mac</p>
+      <a class="diagram" href="assets/projects-light.png" target="_blank" rel="noopener" aria-label="Open the projects diagram full size">
+                  <img src="assets/projects-light.png" width="1440" height="330" loading="lazy" decoding="async"
+          alt="On the left, a project called Kitchen renovation described in one sentence. In the middle, three arriving messages, two matched to it and one sent elsewhere. On the right, what the project holds: 68 messages, 71 per cent filed by hand.">
+      </a>
+    </div>
+    <div class="shot">
+      <h3>It drafts, and waits for you</h3>
+      <p>In a voice you wrote down. Six seconds with a Cancel before anything leaves</p>
+      <a class="diagram" href="assets/drafting-light.png" target="_blank" rel="noopener" aria-label="Open the drafting diagram full size">
+                  <img src="assets/drafting-light.png" width="1440" height="380" loading="lazy" decoding="async"
+          alt="On the left, a voice.md file with four plain rules about how you write. In the middle, the reply Celeste offers, with Send, Edit, and Say what to change. On the right, what happens after you press Send: six seconds on screen with a Cancel before anything leaves.">
+      </a>
+    </div>
+    <div class="shot">
+      <h3>It answers, with receipts</h3>
+      <p>One question across every inbox and chat, and the threads it came from</p>
+      <a class="diagram" href="assets/ask-light.png" target="_blank" rel="noopener" aria-label="Open the Ask Celeste diagram full size">
+                  <img src="assets/ask-light.png" width="1440" height="330" loading="lazy" decoding="async"
+          alt="On the left, a question about what was agreed with a landlord over a deposit. On the right, the answer, with four citation chips underneath naming the threads it came from across mail and iMessage.">
+      </a>
+    </div>
+    <div class="shot">
+      <h3>It reads your own habits back</h3>
+      <p>When you write, how fast you answer, who you keep waiting. Counts you can check, not advice</p>
+      <a class="diagram" href="assets/stats-light.png" target="_blank" rel="noopener" aria-label="Open the stats diagram full size">
+                  <img src="assets/stats-light.png" width="1600" height="470" loading="lazy" decoding="async"
+          alt="Four panels. On the left, a bar for every hour of the day, what you sent against what arrived, peaking at 22:00. Then the middle reply wait, 31 minutes on chats and 3.9 hours on mail, with the share of conversations you opened and the threads that end with you. Then four people with a track showing who out-waits whom, how many words each writes, and whether the last 90 days are up or down. On the right, your own writing read back month by month, and a personality type tested over five runs with the message each axis cites.">
+      </a>
+    </div>
+  </div>
+</section>
+
+<section id="handover" class="wrap">
+  <h2>Handover</h2>
+  <a class="diagram" href="assets/handover-light.png" target="_blank" rel="noopener" aria-label="Open the handover diagram full size">
+          <img src="assets/handover-light.png" width="1600" height="530" loading="lazy" decoding="async"
+      alt="Four steps. One: a mail asking to move a meeting, already sorted as needing a reply. Two: the Add to Scheduling Agent form, where you pick actionable or event, edit the title, choose a day and pick from free times fetched from the agent. Three: the JSON-RPC call that goes out, naming the create_actionable tool. Four: the actionable comes back with an id kept on the thread, and beneath it the failure case, where a refusal is kept with what the agent said and a Retry.">
+  </a>
+  <ul class="bullets">
+    <li>Nothing goes until you press the button</li>
+    <li>The title and the date go over. The message body never does</li>
+    <li>If the <a href="https://github.com/hunterZh37/agentic-scheduling">Scheduling Agent</a> refuses, the refusal is kept beside the thread, with a Retry</li>
+  </ul>
+</section>
+
+<section id="private" class="wrap">
+  <h2>Privacy</h2>
+  <div class="mac">
+    <div class="box">
+      <div class="t">Never leaves your Mac</div>
+      <ul>
+        <li>Mail &amp; chats</li><li>Attachments</li><li>Embeddings</li>
+        <li>Search index</li><li>Drafts</li><li>Your voice file</li>
+      </ul>
+    </div>
+    <div class="out">
+      <div class="arr"><svg viewBox="0 0 84 16"><path d="M0 8h72m0 0-7-5.5m7 5.5-7 5.5"/></svg></div>
+      <b>Only the model calls you make</b>
+      <span>Sorting can be local and free</span>
+    </div>
+  </div>
+  <ul class="bullets">
+    <li>Blocked senders are never stored and never reach a model</li>
+    <li>No telemetry, no phone&#8209;home, loopback only</li>
+  </ul>
+</section>
+
+<section id="architecture" class="wrap">
+  <h2>Architecture</h2>
+  <a class="diagram" href="assets/architecture-light.png" target="_blank" rel="noopener" aria-label="Open the architecture diagram full size">
+          <img src="assets/architecture-light.png" width="1492" height="1312" loading="lazy" decoding="async"
+      alt="Mail and chat accounts sync into a single SQLite database on your own Mac. Sorting, drafting, project filing and search all read from that database, using either a local Ollama model or the Claude API. The web app serves your browser on loopback, and your phone over a private Tailscale network.">
+  </a>
+  <ul class="bullets">
+    <li>Everything inside the dashed box is your own machine</li>
+    <li>The only arrows leaving it: your mail providers, the model you chose, your own phone</li>
+    <li>Tap the diagram for full size</li>
+  </ul>
+</section>
+
+<section class="wrap" id="why">
+  <h2>Why</h2>
+  <p class="quote">&ldquo;Nearly ten inboxes, and the ones that mattered were never on top.&rdquo;</p>
+  <ul class="bullets why-body">
+    <li>I get a lot of messages from a lot of places: nearly ten Gmail accounts, WhatsApp, Messages, Slack</li>
+    <li>My clients are spread across all of them, so it was easy to miss something that mattered, or to mean to reply and never get back to it</li>
+    <li>I wanted one place that pulls the sources together, and to check all of them in one go like a todo list</li>
+    <li>One place turned out to be overwhelming on its own. The cut&#8209;down that stuck was <b>projects</b>: I describe a project in a sentence, and messages get filed under the one they match</li>
+    <li>I was already pasting drafts into Claude to catch my grammar before sending, so it seemed worth putting that where the mail already was</li>
+  </ul>
+  <a class="diagram" href="assets/motivation-light.png" target="_blank" rel="noopener" aria-label="Open the diagram full size">
+          <img src="assets/motivation-light.png" width="1440" height="420" loading="lazy" decoding="async" alt="Twelve tiles on the left, one per inbox or chat app, with unread counts, and 274 unread in total across twelve places. On the right, three measures of what that costs: replies owed for six, four and eleven days, shown as bars; 218 messages opened against 31 answered; and one conversation appearing twice, once in mail and once in WhatsApp.">
+  </a>
+  <ul class="bullets quiet">
+    <li>Slack is in that list because it is in my life, not because Celeste reads it. Today: mail over IMAP and Outlook, plus iMessage and WhatsApp</li>
+  </ul>
+  <p class="sig">Hunter Zhang, who built it for himself &middot; <a href="https://github.com/hunterZh37">github.com/hunterZh37</a></p>
+</section>
+
+<section id="start" class="wrap">
+  <h2>Install</h2>
+  <ol class="steps">
+    <li><code>pnpm install</code></li>
+    <li>Copy <code>.env.example</code> to <code>.env</code></li>
+    <li><code>ollama pull nomic-embed-text</code></li>
+    <li><code>pnpm web</code>, then connect an inbox</li>
+  </ol>
+  <p class="caption">macOS, Node&nbsp;22+, pnpm. Background service and phone access are in the <a href="https://github.com/hunterZh37/messaging-agent#readme">README</a></p>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <a href="https://github.com/hunterZh37/messaging-agent">GitHub</a>
+    <a href="https://github.com/hunterZh37/messaging-agent#readme">Docs</a>
+    <a href="https://github.com/hunterZh37/messaging-agent/issues">Issues</a>
+    <span class="mit">MIT licensed. Your mail stays yours.</span>
+  </div>
+</footer>
+</body>
+</html>

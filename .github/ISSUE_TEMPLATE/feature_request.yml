@@ -1,0 +1,38 @@
+name: Idea
+description: Something it should do, or should do differently
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is one person's tool, published as-is. Ideas are welcome and may sit
+        unanswered for a long time. If you need it and I am not moving, the MIT
+        licence means you can build it yourself — and a pull request will always
+        get further than an issue.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is awkward today
+      description: >
+        The situation, not the solution. What were you doing, and where did it
+        get in your way? This is the part that decides whether anything happens.
+      placeholder: |
+        I get about forty newsletters a day. Marking them safe to delete works,
+        but I have to do it a window at a time and I lose track of where I was.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would do about it
+      description: If you have something in mind. Rough is fine.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you tried instead
+      description: >
+        Existing features that nearly worked, and why they did not. A near miss
+        often points at a smaller fix than the one being asked for.

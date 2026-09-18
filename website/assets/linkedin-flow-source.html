@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Celeste flow, portrait</title>
+<!--
+  Source for assets/linkedin-flow.png: the flow diagram, rebuilt tall.
+
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+    --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
+    --screenshot=website/assets/linkedin-flow.png --window-size=1080,1350 \
+    website/assets/linkedin-flow-source.html
+
+  1080x1350 is 4:5, the tallest LinkedIn shows in the feed without cropping.
+
+  This is not the landscape diagram scaled down. That one is 1600 wide across
+  three columns, and a phone feed would render it about 340px across, where
+  the message rows are two pixels tall and the whole thing reads as a smudge.
+  Same story, stacked: four sources, one list, three outcomes, with the flow
+  running top to bottom because that is the direction a phone scrolls.
+
+  Dark, because that is the version that stops a thumb in a feed.
+
+  No invented personal statistics. The landscape diagram carries example reply
+  times, which are fine on a site that frames them as an example, but a post
+  about the author's own mailbox would be read as claiming they are his. The
+  outcome cards say what happens instead.
+-->
+<style>
+  :root {
+    --bg: #0e1011; --card: #16191a; --stroke: #2b3031;
+    --ink: #e9ece7; --ink-2: #a6ada6; --ink-3: #7b827c;
+    --accent: #b7d977; --accent-soft: #1f2a14; --lime: #4a6626;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink); }
+  body { width: 1080px; height: 1350px; padding: 42px 46px 36px; display: flex; flex-direction: column; }
+
+  .brand { display: flex; align-items: center; gap: 13px; }
+  .brand svg { width: 34px; height: 34px; }
+  .brand b { font-size: 31px; font-weight: 650; letter-spacing: -.01em; }
+  .brand span { margin-left: auto; font-size: 23px; color: var(--ink-3); }
+
+  .overline { font-size: 20px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin: 26px 0 12px; }
+
+  /* Four sources, two by two, rather than four down a column. */
+  .srcs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .src { background: var(--card); border: 1px solid var(--stroke); border-radius: 16px; padding: 20px 20px; }
+  .src .top { display: flex; align-items: center; gap: 10px; }
+  .dot { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+  .src .name { font-size: 24px; font-weight: 620; }
+  .src .from { margin-left: auto; font-size: 19px; color: var(--ink-3); }
+  .rows { display: grid; gap: 7px; margin-top: 13px; }
+  .rows i { height: 9px; border-radius: 4px; background: #23282a; display: block; }
+
+  .down { display: grid; place-items: center; height: 58px; }
+  .down svg { width: 26px; height: 26px; stroke: #d97706; fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* The one list. */
+  .hub { background: var(--card); border: 1px solid var(--stroke); border-radius: 20px; padding: 24px 26px 20px; }
+  .hub .head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .spark { width: 48px; height: 48px; border-radius: 50%; flex: none; background: var(--accent-soft); border: 1.5px solid var(--lime); display: grid; place-items: center; color: var(--accent); }
+  .spark svg { width: 25px; height: 25px; }
+  .hub h1 { font-size: 27px; margin: 0; font-weight: 650; letter-spacing: -.01em; }
+  .hub .sub { font-size: 20px; color: var(--ink-3); margin-top: 1px; }
+
+  .msg { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--stroke); }
+  .who { font-size: 22px; font-weight: 620; width: 128px; flex: none; }
+  .subj { font-size: 21px; color: var(--ink-2); flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .tag { font-size: 18px; font-weight: 620; padding: 3px 12px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; flex: none; }
+  .tag.grey { background: #23282a; color: var(--ink-3); }
+  .foot { font-size: 21px; color: var(--ink-3); text-align: center; margin-top: 16px; }
+
+  /* Three outcomes, side by side, each one line. */
+  .outs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .out { background: var(--card); border: 1px solid var(--stroke); border-radius: 16px; padding: 20px 20px 22px; }
+  .out .k { font-size: 17px; letter-spacing: .07em; text-transform: uppercase; font-weight: 700; color: #d97706; }
+  .out b { display: block; font-size: 23px; font-weight: 640; margin-top: 8px; letter-spacing: -.01em; }
+  .out span { display: block; font-size: 19px; color: var(--ink-3); line-height: 1.35; margin-top: 5px; }
+
+  .bar { margin-top: auto; display: flex; align-items: center; gap: 15px; padding-top: 26px; border-top: 1px solid var(--stroke); }
+  .bar svg { width: 28px; height: 28px; }
+  .bar .url { font-size: 24px; font-weight: 620; }
+  .bar .tag2 { margin-left: auto; font-size: 22px; color: var(--ink-3); }
+</style>
+</head>
+<body>
+
+<div class="brand">
+  <svg viewBox="0 0 28 28" aria-hidden="true"><path d="M14 2 L17 11 L26 14 L17 17 L14 26 L11 17 L2 14 L11 11 Z" fill="#b7d977"/></svg>
+  <b>Celeste</b>
+  <span>Runs on your own Mac</span>
+</div>
+
+<div class="overline">Your messages, wherever they land</div>
+<div class="srcs">
+  <div class="src">
+    <div class="top"><span class="dot" style="background:#dc2626"></span><span class="name">Work mail</span><span class="from">Gmail &times; 4</span></div>
+    <div class="rows"><i style="width:88%"></i><i style="width:62%"></i><i style="width:74%"></i></div>
+  </div>
+  <div class="src">
+    <div class="top"><span class="dot" style="background:#2563eb"></span><span class="name">Personal mail</span><span class="from">Outlook</span></div>
+    <div class="rows"><i style="width:72%"></i><i style="width:90%"></i><i style="width:56%"></i></div>
+  </div>
+  <div class="src">
+    <div class="top"><span class="dot" style="background:#16a34a"></span><span class="name">WhatsApp</span><span class="from">this Mac</span></div>
+    <div class="rows"><i style="width:66%"></i><i style="width:84%"></i><i style="width:52%"></i></div>
+  </div>
+  <div class="src">
+    <div class="top"><span class="dot" style="background:#7c3aed"></span><span class="name">Messages</span><span class="from">iMessage &amp; SMS</span></div>
+    <div class="rows"><i style="width:80%"></i><i style="width:58%"></i><i style="width:70%"></i></div>
+  </div>
+</div>
+
+<div class="down"><svg viewBox="0 0 24 24"><path d="M12 4v15M6 13l6 6 6-6"/></svg></div>
+
+<div class="hub">
+  <div class="head">
+    <span class="spark"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/></svg></span>
+    <span>
+      <h1>One list, sorted as it lands</h1>
+      <div class="sub">Filed under the project it belongs to</div>
+    </span>
+  </div>
+  <div class="msg"><span class="who">Dana</span><span class="subj">Contract for Sept, needs signing</span><span class="tag">Contracts</span></div>
+  <div class="msg"><span class="who">Priya</span><span class="subj">Re: grant portal documents</span><span class="tag">Grants</span></div>
+  <div class="msg"><span class="who">Sam</span><span class="subj">can you do Tuesday instead?</span><span class="tag">Scheduling</span></div>
+  <div class="msg"><span class="who">Northwind</span><span class="subj">Invoice 4471 is due Monday</span><span class="tag">Billing</span></div>
+  <div class="msg"><span class="who">Ada</span><span class="subj">are you around Thursday evening?</span><span class="tag">Friends</span></div>
+  <div class="msg"><span class="who">Mum</span><span class="subj">did the parcel arrive?</span><span class="tag">Family</span></div>
+  <div class="msg"><span class="who">Newsletter</span><span class="subj">This week in robotics</span><span class="tag grey">Safe to delete</span></div>
+  <div class="foot">all of it in one place, on your own Mac</div>
+</div>
+
+<div class="down"><svg viewBox="0 0 24 24"><path d="M12 4v15M6 13l6 6 6-6"/></svg></div>
+
+<div class="outs">
+  <div class="out">
+    <div class="k">It reads</div>
+    <b>Your patterns</b>
+    <span>When you write, and who you keep waiting</span>
+  </div>
+  <div class="out">
+    <div class="k">It drafts</div>
+    <b>The reply</b>
+    <span>In your voice. Nothing sends until you press Send</span>
+  </div>
+  <div class="out">
+    <div class="k">Or it hands on</div>
+    <b>The work</b>
+    <span>A thread becomes an event over MCP</span>
+  </div>
+</div>
+
+<div class="bar">
+  <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+  <span class="url">github.com/hunterZh37/messaging-agent</span>
+  <span class="tag2">Free and open source</span>
+</div>
+
+</body>
+</html>

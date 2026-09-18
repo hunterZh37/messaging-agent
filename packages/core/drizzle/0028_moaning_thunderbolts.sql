@@ -1,0 +1,1 @@
+CREATE INDEX `actions_message_kind_idx` ON `actions` (`message_id`,`kind`);

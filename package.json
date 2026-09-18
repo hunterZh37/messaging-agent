@@ -1,0 +1,17 @@
+{
+  "name": "messaging-agent",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "packageManager": "pnpm@9.9.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "db:generate": "pnpm --filter @messaging-agent/core db:generate",
+    "agent": "pnpm --filter @messaging-agent/cli start",
+    "web": "pnpm --filter @messaging-agent/web dev"
+  }
+}

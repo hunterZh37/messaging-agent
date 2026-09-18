@@ -1,0 +1,1198 @@
+{
+ "schema_version": 1,
+ "diagram_type": "architecture",
+ "meta": {
+  "title": "Celeste System Architecture",
+  "quality_profile": "showcase",
+  "viewBox": [
+   1380,
+   1250
+  ],
+  "views": [
+   {
+    "id": "ingest",
+    "label": "Ingest path",
+    "focus": [
+     "imap",
+     "graph",
+     "connectors",
+     "db",
+     "blobs",
+     "messages",
+     "whatsapp"
+    ],
+    "note": "Two IMAP inboxes today, Outlook via Graph; one connectors module, one SQLite store, bytes on disk."
+   },
+   {
+    "id": "sorting",
+    "label": "Sorting, two roles",
+    "focus": [
+     "db",
+     "sorter",
+     "claude",
+     "ollama",
+     "files"
+    ],
+    "note": "Backlog jobs on Haiku; the refresh trickle on local qwen3 with six trusted examples and the distilled rules."
+   },
+   {
+    "id": "assist",
+    "label": "Drafting and asking",
+    "focus": [
+     "db",
+     "drafter",
+     "ask",
+     "projects",
+     "claude"
+    ],
+    "note": "Sonnet drafts, answers with citations, proposes actions and project lists; nothing acts without a click."
+   },
+   {
+    "id": "ui",
+    "label": "The app, and the phone over Tailscale",
+    "focus": [
+     "server",
+     "tree",
+     "list",
+     "thread",
+     "drafts",
+     "askp",
+     "editors",
+     "inboxes",
+     "phone",
+     "lock",
+     "push",
+     "tsserve",
+     "tsctl"
+    ],
+    "note": "Folder tree, two-pane folders, thread actions, Ask panel; the phone reaches the same server through a WireGuard tunnel and the lock."
+   },
+   {
+    "id": "approval",
+    "label": "Human gate",
+    "focus": [
+     "drafts",
+     "server",
+     "connectors"
+    ],
+    "note": "Send and delete reach the world only through the button and the same 6-second cancel; a delete moves mail to the provider's Trash."
+   }
+  ]
+ },
+ "components": [
+  {
+   "id": "imap",
+   "type": "external",
+   "label": "IMAP / SMTP inboxes",
+   "sublabel": "Gmail, Fastmail, any IMAP",
+   "pos": [
+    40,
+    150
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
+   "id": "graph",
+   "type": "external",
+   "label": "Microsoft Graph",
+   "sublabel": "Outlook accounts",
+   "pos": [
+    40,
+    260
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
+   "id": "phone",
+   "type": "external",
+   "label": "Phone, home-screen app",
+   "sublabel": "Tailscale app, 100.x",
+   "pos": [
+    40,
+    1110
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
+   "id": "connectors",
+   "type": "backend",
+   "label": "Connectors",
+   "sublabel": "sync, labels, send",
+   "pos": [
+    330,
+    235
+   ],
+   "size": [
+    180,
+    64
+   ]
+  },
+  {
+   "id": "blobs",
+   "type": "database",
+   "label": "Blob store",
+   "sublabel": "attachments by sha256",
+   "pos": [
+    330,
+    600
+   ],
+   "size": [
+    180,
+    64
+   ]
+  },
+  {
+   "id": "db",
+   "type": "database",
+   "label": "SQLite",
+   "sublabel": "FTS5, sqlite-vec, usage ledger",
+   "pos": [
+    630,
+    235
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
+   "id": "ollama",
+   "type": "external",
+   "label": "Ollama",
+   "sublabel": "qwen3:8b, nomic-embed, tone",
+   "pos": [
+    600,
+    50
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
+   "id": "files",
+   "type": "database",
+   "label": "Prompt files",
+   "sublabel": "criteria, voice, rules",
+   "pos": [
+    1170,
+    50
+   ],
+   "size": [
+    160,
+    64
+   ]
+  },
+  {
+   "id": "sorter",
+   "type": "backend",
+   "label": "Sorter",
+   "sublabel": "qwen3 + haiku",
+   "pos": [
+    910,
+    180
+   ],
+   "size": [
+    180,
+    64
+   ],
+   "tag": "trickle \u00b7 backlog"
+  },
+  {
+   "id": "drafter",
+   "type": "backend",
+   "label": "Drafter",
+   "sublabel": "replies, follow-ups",
+   "pos": [
+    910,
+    290
+   ],
+   "size": [
+    180,
+    64
+   ]
+  },
+  {
+   "id": "ask",
+   "type": "backend",
+   "label": "Ask Celeste",
+   "sublabel": "search, list, propose",
+   "pos": [
+    910,
+    400
+   ],
+   "size": [
+    180,
+    64
+   ]
+  },
+  {
+   "id": "projects",
+   "type": "backend",
+   "label": "Projects",
+   "sublabel": "propose, file by sorter",
+   "pos": [
+    910,
+    510
+   ],
+   "size": [
+    180,
+    64
+   ]
+  },
+  {
+   "id": "eval",
+   "type": "backend",
+   "label": "Eval harness",
+   "sublabel": "replay mail per model",
+   "pos": [
+    910,
+    620
+   ],
+   "size": [
+    180,
+    64
+   ]
+  },
+  {
+   "id": "claude",
+   "type": "external",
+   "label": "Claude API",
+   "sublabel": "haiku \u00b7 sonnet 5",
+   "pos": [
+    1170,
+    180
+   ],
+   "size": [
+    160,
+    400
+   ],
+   "tag": "4 roles"
+  },
+  {
+   "id": "server",
+   "type": "backend",
+   "label": "Next.js app server",
+   "sublabel": "RSC pages, server actions",
+   "pos": [
+    305,
+    720
+   ],
+   "size": [
+    820,
+    56
+   ]
+  },
+  {
+   "id": "tree",
+   "type": "frontend",
+   "label": "Folder tree",
+   "sublabel": "switcher, project bar",
+   "pos": [
+    505,
+    860
+   ],
+   "size": [
+    140,
+    64
+   ]
+  },
+  {
+   "id": "list",
+   "type": "frontend",
+   "label": "Mail list",
+   "sublabel": "one row per thread",
+   "pos": [
+    665,
+    860
+   ],
+   "size": [
+    140,
+    64
+   ]
+  },
+  {
+   "id": "thread",
+   "type": "frontend",
+   "label": "Thread view",
+   "sublabel": "bubbles, reply card",
+   "pos": [
+    825,
+    860
+   ],
+   "size": [
+    140,
+    64
+   ]
+  },
+  {
+   "id": "drafts",
+   "type": "frontend",
+   "label": "Drafts queue",
+   "sublabel": "confirm + 6 s cancel",
+   "pos": [
+    985,
+    860
+   ],
+   "size": [
+    140,
+    64
+   ],
+   "tag": "gate"
+  },
+  {
+   "id": "askp",
+   "type": "frontend",
+   "label": "Ask panel",
+   "sublabel": "resizable, citations",
+   "pos": [
+    1145,
+    860
+   ],
+   "size": [
+    140,
+    64
+   ]
+  },
+  {
+   "id": "editors",
+   "type": "frontend",
+   "label": "Editors",
+   "sublabel": "projects, categories",
+   "pos": [
+    505,
+    960
+   ],
+   "size": [
+    140,
+    64
+   ]
+  },
+  {
+   "id": "inboxes",
+   "type": "frontend",
+   "label": "Inboxes page",
+   "sublabel": "connect, models",
+   "pos": [
+    665,
+    960
+   ],
+   "size": [
+    140,
+    64
+   ]
+  },
+  {
+   "id": "messages",
+   "type": "external",
+   "label": "Messages.app + chat.db",
+   "sublabel": "this Mac, read-only",
+   "pos": [
+    40,
+    370
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
+   "id": "whatsapp",
+   "type": "external",
+   "label": "WhatsApp.app + ChatStorage",
+   "sublabel": "this Mac, read-only",
+   "pos": [
+    40,
+    520
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
+   "id": "watcher",
+   "type": "backend",
+   "label": "Chat watcher",
+   "sublabel": "file change \u2192 sync, in the app server",
+   "pos": [
+    310,
+    400
+   ],
+   "size": [
+    220,
+    64
+   ]
+  },
+  {
+   "id": "mailclock",
+   "type": "backend",
+   "label": "Mail clock",
+   "sublabel": "fetch every 2 min, in the app server",
+   "pos": [
+    315,
+    100
+   ],
+   "size": [
+    210,
+    64
+   ]
+  },
+  {
+   "id": "push",
+   "type": "external",
+   "label": "Push service",
+   "sublabel": "Apple / Google Web Push",
+   "pos": [
+    40,
+    860
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
+   "id": "lock",
+   "type": "backend",
+   "label": "Lock (proxy)",
+   "sublabel": "Mac passes, phone unlocks",
+   "pos": [
+    300,
+    860
+   ],
+   "size": [
+    150,
+    64
+   ]
+  },
+  {
+   "id": "tsserve",
+   "type": "security",
+   "label": "tailscale serve",
+   "sublabel": "HTTPS 443 \u2192 :3100",
+   "pos": [
+    340,
+    1110
+   ],
+   "size": [
+    150,
+    64
+   ],
+   "tag": "WireGuard"
+  },
+  {
+   "id": "tsctl",
+   "type": "cloud",
+   "label": "Tailscale control",
+   "sublabel": "keys, NAT traversal, DERP",
+   "pos": [
+    620,
+    1110
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
+   "id": "alex",
+   "type": "external",
+   "label": "Scheduling agent",
+   "sublabel": "MCP server, private tier",
+   "pos": [
+    1170,
+    960
+   ],
+   "size": [
+    190,
+    64
+   ]
+  }
+ ],
+ "boundaries": [
+  {
+   "kind": "region",
+   "label": "Operator's Mac (always-on server on 127.0.0.1:3100)",
+   "wraps": [
+    "connectors",
+    "blobs",
+    "db",
+    "files",
+    "sorter",
+    "drafter",
+    "ask",
+    "projects",
+    "eval",
+    "server",
+    "tree",
+    "list",
+    "thread",
+    "drafts",
+    "askp",
+    "editors",
+    "inboxes",
+    "lock",
+    "watcher",
+    "mailclock",
+    "tsserve"
+   ]
+  },
+  {
+   "kind": "region",
+   "label": "Next.js client in the browser",
+   "wraps": [
+    "tree",
+    "list",
+    "thread",
+    "drafts",
+    "askp",
+    "editors",
+    "inboxes"
+   ]
+  },
+  {
+   "kind": "security-group",
+   "label": "Tailnet (WireGuard)",
+   "wraps": [
+    "phone",
+    "tsserve"
+   ]
+  }
+ ],
+ "connections": [
+  {
+   "id": "imap-in",
+   "from": "imap",
+   "to": "connectors",
+   "label": "IMAP sync, SMTP send",
+   "fromSide": "right",
+   "toSide": "left",
+   "via": [
+    [
+     245,
+     182
+    ],
+    [
+     245,
+     267
+    ]
+   ],
+   "labelAt": [
+    125,
+    237
+   ]
+  },
+  {
+   "id": "graph-in",
+   "from": "graph",
+   "to": "connectors",
+   "label": "delta sync",
+   "variant": "dashed",
+   "labelAt": [
+    125,
+    343
+   ],
+   "fromSide": "right",
+   "toSide": "left",
+   "via": [
+    [
+     245,
+     292
+    ],
+    [
+     245,
+     267
+    ]
+   ]
+  },
+  {
+   "id": "store",
+   "from": "connectors",
+   "to": "db",
+   "label": "store, watermark",
+   "variant": "emphasis",
+   "labelAt": [
+    570,
+    222
+   ]
+  },
+  {
+   "id": "blob-write",
+   "from": "connectors",
+   "to": "blobs",
+   "label": "attachment bytes",
+   "fromSide": "right",
+   "toSide": "right",
+   "labelAt": [
+    420,
+    578
+   ],
+   "via": [
+    [
+     545,
+     267
+    ],
+    [
+     545,
+     632
+    ]
+   ]
+  },
+  {
+   "id": "new-mail",
+   "from": "db",
+   "to": "sorter",
+   "label": "new mail + six examples",
+   "variant": "emphasis",
+   "fromSide": "right",
+   "toSide": "left",
+   "labelAt": [
+    830,
+    214
+   ]
+  },
+  {
+   "id": "draft-read",
+   "from": "db",
+   "to": "drafter",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "ask-read",
+   "from": "db",
+   "to": "ask",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "proj-read",
+   "from": "db",
+   "to": "projects",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "eval-read",
+   "from": "db",
+   "to": "eval",
+   "label": "stored verdicts",
+   "fromSide": "right",
+   "toSide": "left",
+   "labelAt": [
+    855,
+    690
+   ]
+  },
+  {
+   "id": "trickle",
+   "from": "sorter",
+   "to": "ollama",
+   "label": "trickle sort, embed",
+   "variant": "dashed",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "labelAt": [
+    940,
+    135
+   ]
+  },
+  {
+   "id": "prompt-read",
+   "from": "files",
+   "to": "sorter",
+   "label": "criteria + rules",
+   "fromSide": "left",
+   "toSide": "top",
+   "labelAt": [
+    1120,
+    128
+   ]
+  },
+  {
+   "id": "backlog",
+   "from": "sorter",
+   "to": "claude",
+   "label": "backlog sort",
+   "variant": "emphasis",
+   "fromSide": "right",
+   "toSide": "left",
+   "labelAt": [
+    1135,
+    240
+   ]
+  },
+  {
+   "id": "drafts-model",
+   "from": "drafter",
+   "to": "claude",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "ask-model",
+   "from": "ask",
+   "to": "claude",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "propose",
+   "from": "projects",
+   "to": "claude",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "rules-write",
+   "from": "claude",
+   "to": "files",
+   "label": "distil rules",
+   "variant": "dashed",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "labelAt": [
+    1290,
+    147
+   ]
+  },
+  {
+   "id": "serve",
+   "from": "db",
+   "to": "server",
+   "label": "reads, writes actions",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "labelAt": [
+    740,
+    520
+   ]
+  },
+  {
+   "id": "blob-serve",
+   "from": "blobs",
+   "to": "server",
+   "label": "preview, download",
+   "variant": "dashed",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "labelAt": [
+    480,
+    700
+   ],
+   "via": [
+    [
+     420,
+     700
+    ],
+    [
+     715,
+     700
+    ]
+   ]
+  },
+  {
+   "id": "approve",
+   "from": "server",
+   "to": "connectors",
+   "label": "approved send (with files) / trash to provider",
+   "variant": "security",
+   "fromSide": "top",
+   "toSide": "right",
+   "via": [
+    [
+     715,
+     710
+    ],
+    [
+     570,
+     710
+    ],
+    [
+     570,
+     267
+    ]
+   ],
+   "labelAt": [
+    570,
+    684
+   ]
+  },
+  {
+   "id": "ui-tree",
+   "from": "tree",
+   "to": "server",
+   "fromSide": "top",
+   "toSide": "bottom"
+  },
+  {
+   "id": "ui-list",
+   "from": "list",
+   "to": "server",
+   "fromSide": "top",
+   "toSide": "bottom"
+  },
+  {
+   "id": "ui-thread",
+   "from": "thread",
+   "to": "server",
+   "label": "send, revise",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "variant": "security"
+  },
+  {
+   "id": "ui-drafts",
+   "from": "drafts",
+   "to": "server",
+   "label": "send, skip, revise, attach",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "variant": "security",
+   "labelDx": 9
+  },
+  {
+   "id": "ui-ask",
+   "from": "askp",
+   "to": "server",
+   "label": "questions, proposals, files for Celeste",
+   "fromSide": "top",
+   "toSide": "bottom"
+  },
+  {
+   "id": "phone-access",
+   "from": "phone",
+   "to": "tsserve",
+   "label": "HTTPS, WireGuard",
+   "variant": "security",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "ui-editors",
+   "from": "editors",
+   "to": "tree",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "variant": "dashed"
+  },
+  {
+   "id": "ui-inboxes",
+   "from": "inboxes",
+   "to": "list",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "variant": "dashed"
+  },
+  {
+   "id": "texts-in",
+   "from": "messages",
+   "to": "connectors",
+   "label": "poll texts; send and delete via Messages.app",
+   "variant": "dashed",
+   "labelAt": [
+    125,
+    451
+   ],
+   "fromSide": "right",
+   "toSide": "left",
+   "via": [
+    [
+     245,
+     402
+    ],
+    [
+     245,
+     267
+    ]
+   ]
+  },
+  {
+   "id": "wa-in",
+   "from": "whatsapp",
+   "to": "connectors",
+   "label": "poll chats; send and delete via WhatsApp.app",
+   "variant": "dashed",
+   "labelAt": [
+    125,
+    601
+   ],
+   "fromSide": "right",
+   "toSide": "right",
+   "via": [
+    [
+     600,
+     552
+    ],
+    [
+     600,
+     267
+    ]
+   ]
+  },
+  {
+   "id": "texts-watch",
+   "from": "messages",
+   "to": "watcher",
+   "label": "chat.db changed",
+   "variant": "dashed",
+   "fromSide": "right",
+   "toSide": "left",
+   "via": [
+    [
+     245,
+     402
+    ],
+    [
+     245,
+     432
+    ]
+   ],
+   "labelAt": [
+    125,
+    471
+   ]
+  },
+  {
+   "id": "wa-watch",
+   "from": "whatsapp",
+   "to": "watcher",
+   "label": "ChatStorage changed",
+   "variant": "dashed",
+   "fromSide": "right",
+   "toSide": "left",
+   "via": [
+    [
+     245,
+     552
+    ],
+    [
+     245,
+     432
+    ]
+   ],
+   "labelAt": [
+    125,
+    621
+   ]
+  },
+  {
+   "id": "watch-sync",
+   "from": "watcher",
+   "to": "connectors",
+   "label": "sync that chat now",
+   "fromSide": "top",
+   "toSide": "bottom"
+  },
+  {
+   "id": "mailclock-fetch",
+   "from": "mailclock",
+   "to": "connectors",
+   "label": "fetch mail, then sort apart",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "labelAt": [
+    420,
+    200
+   ]
+  },
+  {
+   "id": "lock-app",
+   "from": "lock",
+   "to": "server",
+   "label": "session checked",
+   "fromSide": "top",
+   "toSide": "left",
+   "via": [
+    [
+     375,
+     820
+    ],
+    [
+     285,
+     820
+    ],
+    [
+     285,
+     748
+    ]
+   ]
+  },
+  {
+   "id": "push-out",
+   "from": "server",
+   "to": "push",
+   "label": "Need to reply notices",
+   "variant": "dashed",
+   "fromSide": "left",
+   "toSide": "right",
+   "via": [
+    [
+     255,
+     748
+    ],
+    [
+     255,
+     892
+    ]
+   ],
+   "labelAt": [
+    140,
+    840
+   ]
+  },
+  {
+   "id": "push-phone",
+   "from": "push",
+   "to": "phone",
+   "label": "notification",
+   "variant": "dashed",
+   "fromSide": "bottom",
+   "toSide": "top",
+   "labelAt": [
+    125,
+    1017
+   ]
+  },
+  {
+   "id": "ts-proxy",
+   "from": "tsserve",
+   "to": "lock",
+   "label": "proxy + Tailscale-User headers",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "variant": "security"
+  },
+  {
+   "id": "phone-ctl",
+   "from": "phone",
+   "to": "tsctl",
+   "label": "auth, peer keys",
+   "variant": "dashed",
+   "fromSide": "bottom",
+   "toSide": "bottom",
+   "via": [
+    [
+     125,
+     1212
+    ],
+    [
+     705,
+     1212
+    ]
+   ],
+   "labelAt": [
+    415,
+    1212
+   ]
+  },
+  {
+   "id": "mac-ctl",
+   "from": "tsserve",
+   "to": "tsctl",
+   "label": "node key, cert",
+   "variant": "dashed",
+   "fromSide": "right",
+   "toSide": "left"
+  },
+  {
+   "id": "alex-out",
+   "from": "server",
+   "to": "alex",
+   "label": "Add to Alex",
+   "fromSide": "right",
+   "toSide": "right"
+  }
+ ],
+ "cards": [
+  {
+   "dot": "cyan",
+   "title": "Ingest",
+   "items": [
+    "IMAP inboxes me@example.com and me@example.com; Outlook via Graph",
+    "Blocklist applied at fetch, never stored",
+    "Windows: today, 7 days, 30 days, all; history stays searchable but out of the triage rows (2026-09-14), no backfill on demand",
+    "Attachments on disk by sha256, previewed and downloaded from the thread; a draft's files and a conversation's share the store",
+    "Messages on this Mac (2026-09-11): one-to-one chats, 30 days then live (history no longer pulled, 2026-09-14), names from the address book, replies and deletes through Messages.app",
+    "WhatsApp on this Mac (2026-09-11): one-to-one chats and groups in the same Messages folder, 30 days then live (history no longer pulled, 2026-09-14), sends and deletes through WhatsApp.app",
+    "Texts sync the moment they land (2026-09-14): the server watches the chat database folders; the page polls every three seconds",
+    "Mail is fetched by the server every two minutes, tab open or not; sorting runs apart so it never holds the next fetch (2026-09-14)"
+   ]
+  },
+  {
+   "dot": "violet",
+   "title": "Intelligence",
+   "items": [
+    "Sorter fields: important, needs_reply, scheduling, sub-category, finance, project",
+    "Two roles: backlog on Haiku, trickle on qwen3:8b via Ollama",
+    "Trickle prompt carries six trusted verdicts (nomic vec0) and rules.md, rewritten after every backlog run",
+    "Propose projects: Sonnet reads an inbox and drafts its project list for the editor",
+    "Drafter, Ask Celeste, rules and proposals on Sonnet 5; one ModelProvider seam for any role"
+   ]
+  },
+  {
+   "dot": "emerald",
+   "title": "The app (2026-09-10)",
+   "items": [
+    "Folders: Drafts, Inbox (Need to reply, Unopened, No need to reply), Sent (Waiting, Not waiting), Deleted, Junk",
+    "Project bar: tabs per inbox; under All inboxes one pill per mailbox that folds its row",
+    "Thread: chat bubbles, quoted history folded, Draft with Celeste, Mark handled, No reply needed, Move to project",
+    "Drafts: two panes, Skip or Send moves to the next, counts refresh; the Ask panel rewrites the draft from one line, with Undo on the card; drop a file on the card or the Ask panel to attach it, sent with the reply",
+    "Ask Celeste: right panel, resizable, cites messages, proposes actions as buttons, reads a dropped PDF; \u00d7 closes every dialog"
+   ]
+  },
+  {
+   "dot": "amber",
+   "title": "Measurement",
+   "items": [
+    "celeste eval sort --models a,b --sample N --seed S [--examples --rules]",
+    "330 msgs: Haiku 83/96/98/78/98 \u00b7 qwen3 bare 82/58/90/45/94 \u00b7 qwen3 + aids 85/76/89/57/95",
+    "Agreement with stored verdicts per field, latency, tokens, cost",
+    "Stats page: messaging behaviour in counts, plus a per-relationship view (who waits longer, who writes more, which are going quiet); one identity per person, folded by display name across WhatsApp @lid, phone and mail",
+    "Tone reader (stats role, default ollama:qwen3:8b): samples 60 of the operator's own messages a month, quoted threads stripped, and stores one reading per month in tone_months. Started from /stats via /api/tone, about six seconds a month. Only ever asked about the operator, never about a correspondent",
+    "Psychology (stats role, local): four MBTI axes read five times each over different samples of the operator's own messages, stored in psych_axes with how many runs agreed. The model may only cite messages by their number in the sample; the quotes shown are fetched back from the database, so it can never write evidence of its own"
+   ]
+  },
+  {
+   "dot": "rose",
+   "title": "Human gate",
+   "items": [
+    "Nothing sends, trashes, or files a project without the button",
+    "A dropped file sits on the draft until Send; nothing reaches a provider before the click",
+    "Confirm dialog, then 6-second cancel",
+    "Delete goes through the same gate as Send; mail moves to the provider's Trash, never destroyed",
+    "Labels are the only unattended write"
+   ]
+  },
+  {
+   "dot": "slate",
+   "title": "Planned, not built",
+   "items": [
+    "iMessage group chats",
+    "Alex MCP + Obsidian context",
+    "Image OCR, personal model fine-tune"
+   ]
+  },
+  {
+   "dot": "emerald",
+   "title": "Mobile over Tailscale (2026-09-14)",
+   "items": [
+    "The Mac stays the server: launchd agent builds and serves on 127.0.0.1:3100, caffeinate keeps it awake on power",
+    "Both devices run the Tailscale app: one tailnet, WireGuard keys exchanged through Tailscale's control plane, traffic direct or via a DERP relay when NAT blocks it",
+    "tailscale serve terminates HTTPS on the Mac's MagicDNS name (<mac>.<tailnet>.ts.net, Let's Encrypt cert from Tailscale) and proxies to 127.0.0.1:3100; no port is open to the internet",
+    "The proxy adds Tailscale-User headers, which is how the lock tells a phone from this Mac's own browser; the phone types CELESTE_PASSCODE once for a 30-day session",
+    "Added to the home screen as an app; Web Push notices for what lands in Need to reply, one per thread, a flood as one line"
+   ]
+  }
+ ]
+}

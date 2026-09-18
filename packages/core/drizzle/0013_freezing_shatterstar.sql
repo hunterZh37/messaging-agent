@@ -1,0 +1,1 @@
+ALTER TABLE `drafts` ADD `mode` text DEFAULT 'reply' NOT NULL;

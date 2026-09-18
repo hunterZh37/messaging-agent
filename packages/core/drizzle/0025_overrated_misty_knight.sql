@@ -1,0 +1,1 @@
+CREATE INDEX `messages_thread_sent_idx` ON `messages` (`thread_id`,`sent_at`,`id`);

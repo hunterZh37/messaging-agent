@@ -1,0 +1,1 @@
+ALTER TABLE `messages` ADD `body_html` text;
