@@ -7,6 +7,7 @@ import {
   countByFinance,
   disposableThreadIds,
   folderCounts,
+  hiddenThreadIds,
   listInboxMessages,
   markMessagesReadElsewhere,
   markThreadOpened,
@@ -789,6 +790,42 @@ describe("Delete all", () => {
     const db = testDb();
     seed(db);
     expect(disposableThreadIds(db, {})).toEqual([]);
+  });
+});
+
+/**
+ * The same button over the Hidden list (operator, 2026-09-18: "for the
+ * hidden tab please build a button that allows me to delete all"). Hidden
+ * threads were out of the way but still in the mailbox, with no way to clear
+ * them out short of unhiding each one first.
+ */
+describe("Delete all, over Hidden", () => {
+  it("names the hidden threads and nothing that is merely safe to delete", () => {
+    const db = testDb();
+    seed(db);
+    db.update(sorts).set({ disposable: true }).where(eq(sorts.messageId, "a1:m2")).run();
+    db.update(threads).set({ hiddenAt: 500 }).where(eq(threads.id, "a1:t1")).run();
+
+    expect(hiddenThreadIds(db, {})).toEqual(["a1:t1"]);
+    // The two lists do not overlap: a hidden thread has left the mailbox's
+    // sorting rows, so Safe to delete never offers it as well.
+    expect(disposableThreadIds(db, {})).toEqual(["a1:t2"]);
+  });
+
+  it("follows the inbox and the window, the way the list above it does", () => {
+    const db = testDb();
+    seed(db);
+    db.update(threads).set({ hiddenAt: 500 }).where(eq(threads.id, "a1:t1")).run();
+
+    expect(hiddenThreadIds(db, { accountId: "a1" })).toEqual(["a1:t1"]);
+    expect(hiddenThreadIds(db, { accountId: "a2" })).toEqual([]);
+    expect(hiddenThreadIds(db, { since: 400 })).toEqual([]);
+  });
+
+  it("says nothing when nothing is hidden", () => {
+    const db = testDb();
+    seed(db);
+    expect(hiddenThreadIds(db, {})).toEqual([]);
   });
 });
 

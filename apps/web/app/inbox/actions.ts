@@ -42,7 +42,7 @@ import {
   type AlexItem,
   type AlexItemRow,
   type AlexSlot,
-  setThreadWaiting, hideThreads, keepThread, type KeepDestination } from "@messaging-agent/core";
+  setThreadWaiting, hideThreads, keepThread, hiddenThreadIds, type KeepDestination } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 
 type StepError = { error: string };
@@ -311,6 +311,20 @@ export interface DisposableScope {
 export async function disposableThreadsAction(scope: DisposableScope): Promise<string[]> {
   const { db } = core();
   return disposableThreadIds(db, { ...scope, folder: scope.folder ?? "inbox" });
+}
+
+/**
+ * The same, for the Hidden list (operator, 2026-09-18). Hidden threads are
+ * out of the way but still in the mailbox, and there was no way to clear
+ * them out short of unhiding each one first.
+ *
+ * Resolved when the button is pressed, not when the page was drawn, for the
+ * same reason: a sender who wrote again has taken their thread off this list
+ * meanwhile, and it must not go with the rest.
+ */
+export async function hiddenThreadsAction(scope: DisposableScope): Promise<string[]> {
+  const { db } = core();
+  return hiddenThreadIds(db, { ...scope, folder: scope.folder ?? "inbox" });
 }
 
 /**

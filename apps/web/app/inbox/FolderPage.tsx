@@ -1,6 +1,6 @@
 import { desc } from "drizzle-orm";
 import { countByFinance, countByProject, listCategories, listInboxMessages, schema } from "@messaging-agent/core";
-import { disposableThreadIds, unopenedThreadIds } from "@messaging-agent/core";
+import { disposableThreadIds, hiddenThreadIds, unopenedThreadIds } from "@messaging-agent/core";
 import { wholeInbox } from "@/lib/opened";
 import { core } from "@/lib/core";
 import { FOLDER_PATHS, listLimit, parseStatus, viewHref, type FolderKey, type ViewParams } from "@/lib/folders";
@@ -159,6 +159,10 @@ export async function FolderPage({ folder, searchParams }: { folder: FolderKey; 
   // switcher holds (2026-09-11), so their scope is the window alone.
   const disposableScope = isTexts ? { folder: "messages" as const, ...(start === null ? {} : { since: start }) } : { ...bulkScope, folder: "inbox" as const };
   const disposableThreads = status === "disposable" ? disposableThreadIds(db, disposableScope).length : 0;
+  // Hidden is counted the same way and over the same narrowing, so the number
+  // on the button is the number it would remove (operator, 2026-09-18).
+  const hiddenScope = isTexts ? { folder: "messages" as const, ...(start === null ? {} : { since: start }) } : { ...bulkScope, folder: "inbox" as const };
+  const hiddenThreads = status === "hidden" ? hiddenThreadIds(db, hiddenScope).length : 0;
 
   // Every link in the header carries the whole view but the one param it changes.
   const params: ViewParams = {
@@ -206,6 +210,7 @@ export async function FolderPage({ folder, searchParams }: { folder: FolderKey; 
             }
           : {})}
         {...(status === "disposable" ? { disposable: { scope: disposableScope, count: disposableThreads } } : {})}
+        {...(status === "hidden" ? { hidden: { scope: hiddenScope, count: hiddenThreads } } : {})}
       />
       <div className="inbox-grid">
         <ListScroll scrollKey={viewHref(FOLDER_PATHS[folder], { ...params, rows: undefined })} className="inbox-list">

@@ -695,6 +695,29 @@ export function disposableThreadIds(db: Db, opts: CountScope & { folder?: "inbox
 }
 
 /**
+ * Every thread the Hidden list would show for this view, without the page
+ * limit: what "Delete all" acts on there (operator, 2026-09-18).
+ *
+ * Hidden is one row per conversation already, so this is a thread list by
+ * nature rather than by a dedupe, but it goes through the same shape as
+ * Safe to delete so the button above both lists can be one button.
+ */
+export function hiddenThreadIds(db: Db, opts: CountScope & { folder?: "inbox" | "messages" } = {}): string[] {
+  const ids = db
+    .select({ threadId: messages.threadId })
+    .from(messages)
+    .innerJoin(threads, eq(threads.id, messages.threadId))
+    .leftJoin(sorts, eq(sorts.messageId, messages.id))
+    .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
+    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
+    .where(and(...scopeConditions({ ...opts, folder: opts.folder ?? "inbox", status: "hidden" })))
+    .orderBy(desc(messages.sentAt))
+    .all()
+    .map((r) => r.threadId);
+  return [...new Set(ids)];
+}
+
+/**
  * Marks a set of threads opened in one go, and hands back what each of them
  * said before. That return value is the undo: this is a bulk action with no
  * confirmation, so the way back has to be kept rather than reconstructed.

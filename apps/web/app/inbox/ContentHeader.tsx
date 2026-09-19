@@ -121,6 +121,8 @@ export function ContentHeader(props: {
    * everything mean one thing (spec 10a, 2026-09-11).
    */
   disposable?: { scope: import("./actions").DisposableScope; count: number };
+  /** Hidden gets the same Delete all, over its own set (operator, 2026-09-18). */
+  hidden?: { scope: import("./actions").DisposableScope; count: number };
 }) {
   const { folder, status, pathname, params, accountId, projects, groups, projectGroups, projectCounts, project } = props;
   const { categories, category, window: activeWindow, edit } = props;
@@ -213,6 +215,7 @@ export function ContentHeader(props: {
         <span className="head-spacer" />
         {props.unopened ? <MarkAllOpened scope={props.unopened.scope} count={props.unopened.count} /> : null}
         {props.disposable ? <DeleteAll scope={props.disposable.scope} count={props.disposable.count} /> : null}
+        {props.hidden ? <DeleteAll scope={props.hidden.scope} count={props.hidden.count} list="hidden" /> : null}
         <SyncButton />
       </div>
 
