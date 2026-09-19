@@ -36,6 +36,17 @@ export interface SortInput {
   accountId?: string;
   fromAddress: string;
   fromName: string | null;
+  /**
+   * Who the mail was actually sent to (operator, 2026-09-18). Left out until
+   * a mailing-list announcement reached Need to reply: the model was shown
+   * From, Subject and the body, so "the only recipient is the list, and you
+   * are not on it" was a fact nobody could see. Optional, because a caller
+   * holding nothing but a body can still sort.
+   */
+  toAddresses?: string[];
+  ccAddresses?: string[];
+  /** This inbox's own address, which is what makes "addressed to me" answerable. */
+  operatorAddress?: string | null;
   subject: string;
   bodyText: string;
   attachmentNames: string[];

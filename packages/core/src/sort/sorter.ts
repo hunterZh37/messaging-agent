@@ -2,7 +2,8 @@ import { z } from "zod";
 import { formatModelRef, type ModelProvider, type SystemBlock } from "../models/types";
 import { categoryNames, OTHER, type Category } from "./categories";
 import { renderExamples, type SortExample } from "./examples";
-import { NO_PROJECT, SortResultSchema, type SortInput, type Sorter, type SortProject } from "./types";
+import { NO_PROJECT, SortResultSchema, type SortInput, type Sorter, type SortProject, type SortResult } from "./types";
+import { addressedToOperator, isBroadcast } from "./broadcast";
 
 const SYSTEM = `You triage one inbound message for a single operator. You cannot act; you only classify.
 
@@ -41,13 +42,31 @@ export function renderProjectsSystem(projects: SortProject[]): string {
  * putting them in a system block would invalidate the cached prefix on every
  * call and cost more than they save.
  */
+/** A recipient list the model can read: a long one says how long rather than running for pages. */
+const RECIPIENTS_SHOWN = 8;
+function recipients(all: string[]): string {
+  if (all.length <= RECIPIENTS_SHOWN) return all.join(", ");
+  return `${all.slice(0, RECIPIENTS_SHOWN).join(", ")} and ${all.length - RECIPIENTS_SHOWN} more`;
+}
+
 export function renderSortUserMessage(input: SortInput, examples: SortExample[] = []): string {
   const from = input.fromName ? `${input.fromName} <${input.fromAddress}>` : input.fromAddress;
   const body = input.bodyText.length > BODY_LIMIT ? `${input.bodyText.slice(0, BODY_LIMIT)}\n[truncated]` : input.bodyText;
   const block = renderExamples(examples);
+  const to = input.toAddresses ?? [];
+  const cc = input.ccAddresses ?? [];
   const lines = [
     ...(block ? [block, ""] : []),
     `From: ${from}`,
+    // Who it went to, which was missing until a mailing-list announcement
+    // reading "[RSVP] … on 10/8" landed in Need to reply: the model could see
+    // the word RSVP and not that the only recipient was the list (operator,
+    // 2026-09-18). The verdict line is spelled out rather than left to be
+    // worked out from the addresses, because that is the inference the model
+    // was getting wrong.
+    ...(to.length ? [`To: ${recipients(to)}`] : []),
+    ...(cc.length ? [`Cc: ${recipients(cc)}`] : []),
+    ...(input.operatorAddress ? [`Addressed to you: ${addressedToOperator(input) ? "yes" : "no, you were not in To or Cc"}`] : []),
     `Date: ${new Date(input.sentAt).toISOString()}`,
     `Subject: ${input.subject}`,
     `Attachments: ${input.attachmentNames.length ? input.attachmentNames.join(", ") : "none"}`,
@@ -128,7 +147,30 @@ export function createSorterFor(provider: ModelProvider, aids: SorterAids = {}):
         schema: sortSchemaFor(categories, projects),
         maxTokens: MAX_TOKENS,
       });
-      return output;
+      return settle(input, output);
     },
+  };
+}
+
+/**
+ * The one correction applied over the model's verdict (operator, 2026-09-18).
+ *
+ * A broadcast to a mailing list the operator was not addressed on cannot be
+ * a message they personally owe an answer to: everybody on the list got it.
+ * That is a fact about the envelope, so it is decided here rather than asked
+ * of a model that will keep reading "RSVP" and "let us know" as if they were
+ * written to one person.
+ *
+ * It says nothing about whether the mail is worth keeping. Safe to delete
+ * stays the model's call, now that it can see who the mail was sent to: a
+ * list the operator reads on purpose and a list they have never opened look
+ * identical from the envelope alone.
+ */
+export function settle(input: SortInput, output: SortResult): SortResult {
+  if (!output.needs_reply || !isBroadcast(input)) return output;
+  return {
+    ...output,
+    needs_reply: false,
+    reason: `${output.reason} (Not a personal request: sent to a list you are not addressed on.)`,
   };
 }

@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import { now, type Db } from "../db/client";
-import { messages, projectAssignments, sorts, type MessageRow } from "../db/schema";
+import { accounts, messages, projectAssignments, sorts, type MessageRow } from "../db/schema";
 import { listProjects } from "../projects/projects";
 import { listCategories, type Category } from "./categories";
 import { NO_PROJECT, type Sorter, type SortInput, type SortProject } from "./types";
@@ -10,17 +10,34 @@ import { NO_PROJECT, type Sorter, type SortInput, type SortProject } from "./typ
  * so the trickle model can find what this inbox already judged (spec 7a);
  * every other sorter ignores them.
  */
-function sortInputFor(m: MessageRow): SortInput {
+function sortInputFor(m: MessageRow, operatorAddress: string | null = null): SortInput {
   return {
     id: m.id,
     accountId: m.accountId,
     fromAddress: m.fromAddress,
     fromName: m.fromName,
+    toAddresses: m.toAddresses,
+    ccAddresses: m.ccAddresses,
+    operatorAddress,
     subject: m.subject,
     bodyText: m.bodyText,
     attachmentNames: m.attachmentNames,
     sentAt: m.sentAt,
   };
+}
+
+/**
+ * This inbox's own address, cached per run: it is what decides whether a
+ * message was addressed to the operator or merely copied to a list they are
+ * on, and looking it up once per message would be a query per message.
+ */
+function addressOf(db: Db, cache: Map<string, string | null>, accountId: string): string | null {
+  const held = cache.get(accountId);
+  if (held !== undefined) return held;
+  const row = db.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, accountId)).get();
+  const email = row?.email ?? null;
+  cache.set(accountId, email);
+  return email;
 }
 
 /** The automatic sorter only looks at mail from the last 30 days (spec 5, "Backfill and retention"). */
@@ -44,6 +61,7 @@ export async function sortPending(
   const clock = opts.clock ?? now;
   const categories = operatorCategories(db);
   const projectCache = new Map<string, SortProject[]>();
+  const addressCache = new Map<string, string | null>();
   // Only the inbox is sorted: Sent is the operator's own words, Deleted items
   // and Junk are decisions the provider already made (spec 10a), and a chat
   // needs a reply by a rule, not a verdict (2026-09-11).
@@ -63,7 +81,7 @@ export async function sortPending(
   let failed = 0;
   for (const m of pending) {
     try {
-      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m));
+      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
       const written = db
         .insert(sorts)
         .values({
@@ -129,6 +147,7 @@ export async function sortOlder(
   const clock = opts.clock ?? now;
   const categories = operatorCategories(db);
   const projectCache = new Map<string, SortProject[]>();
+  const addressCache = new Map<string, string | null>();
   const conditions = [isNull(sorts.messageId), eq(messages.isFromOperator, false), eq(messages.folder, "inbox"), lt(messages.sentAt, opts.before)];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
   const older = db
@@ -145,7 +164,7 @@ export async function sortOlder(
   let failed = 0;
   for (const m of older) {
     try {
-      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m));
+      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
       const written = db
         .insert(sorts)
         .values({
@@ -242,6 +261,7 @@ export async function resortImportant(
 ): Promise<{ resorted: number; failed: number }> {
   const categories = operatorCategories(db);
   const projectCache = new Map<string, SortProject[]>();
+  const addressCache = new Map<string, string | null>();
   const rows = db
     .select({ m: messages })
     .from(messages)
@@ -256,7 +276,7 @@ export async function resortImportant(
   let failed = 0;
   for (const m of rows) {
     try {
-      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m));
+      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
       db.update(sorts).set({ category: r.category, finance: r.finance, disposable: r.disposable, reason: r.reason }).where(eq(sorts.messageId, m.id)).run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());
       resorted++;
@@ -286,6 +306,7 @@ export async function resortWindow(
 ): Promise<{ resorted: number; failed: number }> {
   const categories = operatorCategories(db);
   const projectCache = new Map<string, SortProject[]>();
+  const addressCache = new Map<string, string | null>();
   const conditions = [eq(messages.isFromOperator, false), eq(messages.folder, "inbox"), gte(messages.sentAt, opts.since)];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
   // Mail the sorter has not filed yet goes first, then the longest-ago filed,
@@ -306,7 +327,7 @@ export async function resortWindow(
   let failed = 0;
   for (const m of rows) {
     try {
-      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m));
+      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
       db.update(sorts)
         .set({ category: r.category, finance: r.finance, disposable: r.disposable, needsReply: r.needs_reply, scheduling: r.scheduling, reason: r.reason })
         .where(eq(sorts.messageId, m.id))
@@ -339,6 +360,7 @@ export async function resortNeedsReply(
 ): Promise<{ resorted: number; cleared: number }> {
   const categories = operatorCategories(db);
   const projectCache = new Map<string, SortProject[]>();
+  const addressCache = new Map<string, string | null>();
   const conditions = [
     eq(messages.isFromOperator, false),
     eq(messages.folder, "inbox"),
@@ -366,7 +388,7 @@ export async function resortNeedsReply(
   let cleared = 0;
   for (const m of rows) {
     try {
-      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m));
+      const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
       db.update(sorts)
         .set({ category: r.category, finance: r.finance, disposable: r.disposable, needsReply: r.needs_reply, scheduling: r.scheduling, reason: r.reason })
         .where(eq(sorts.messageId, m.id))
