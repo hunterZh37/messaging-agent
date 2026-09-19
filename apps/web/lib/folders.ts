@@ -123,8 +123,15 @@ export interface TreeRow {
   icon: TreeIcon | null;
   /** True for the indented rows under Inbox and Sent. */
   child: boolean;
-  /** Shown on the right, muted; hidden at 0. */
+  /** Shown on the right, muted. */
   count: number;
+  /**
+   * Does this row count anything? A zero used to be hidden, which made an
+   * empty Need to reply look like a row whose number had gone missing
+   * (operator, 2026-09-18). Zero is an answer, so a counted row always shows
+   * one. The folders above them count nothing and say nothing.
+   */
+  counted: boolean;
 }
 
 /**
@@ -145,8 +152,8 @@ export function treeRows(
     viewHref(FOLDER_PATHS[folder], { ...carried, ...(status ? { status } : {}) });
   return [
     // The approval queue has no folder and no filters, so it carries none.
-    { key: "drafts", label: "Drafts", href: "/drafts", icon: "drafts", child: false, count: counts.drafts },
-    { key: "inbox", label: FOLDER_TITLES.inbox, href: to("inbox"), icon: "inbox", child: false, count: 0 },
+    { key: "drafts", label: "Drafts", href: "/drafts", icon: "drafts", child: false, count: counts.drafts, counted: true },
+    { key: "inbox", label: FOLDER_TITLES.inbox, href: to("inbox"), icon: "inbox", child: false, count: 0, counted: false },
     {
       key: "inbox:needs_reply",
       label: STATUS_LABELS.needs_reply,
@@ -154,6 +161,7 @@ export function treeRows(
       icon: null,
       child: true,
       count: counts.needsReply,
+      counted: true,
     },
     {
       key: "inbox:unopened",
@@ -162,6 +170,7 @@ export function treeRows(
       icon: null,
       child: true,
       count: counts.unopened,
+      counted: true,
     },
     {
       key: "inbox:disposable",
@@ -170,24 +179,25 @@ export function treeRows(
       icon: null,
       child: true,
       count: counts.disposable,
+      counted: true,
     },
-    { key: "sent", label: FOLDER_TITLES.sent, href: to("sent"), icon: "sent", child: false, count: 0 },
-    { key: "sent:waiting", label: STATUS_LABELS.waiting, href: to("sent", "waiting"), icon: null, child: true, count: counts.waiting },
-    { key: "sent:not_waiting", label: STATUS_LABELS.not_waiting, href: to("sent", "not_waiting"), icon: null, child: true, count: 0 },
-    { key: "trash", label: FOLDER_TITLES.trash, href: to("trash"), icon: "deleted", child: false, count: 0 },
+    { key: "sent", label: FOLDER_TITLES.sent, href: to("sent"), icon: "sent", child: false, count: 0, counted: false },
+    { key: "sent:waiting", label: STATUS_LABELS.waiting, href: to("sent", "waiting"), icon: null, child: true, count: counts.waiting, counted: true },
+    { key: "sent:not_waiting", label: STATUS_LABELS.not_waiting, href: to("sent", "not_waiting"), icon: null, child: true, count: 0, counted: false },
+    { key: "trash", label: FOLDER_TITLES.trash, href: to("trash"), icon: "deleted", child: false, count: 0, counted: false },
     // Hidden is a place, not a verdict, so it stands beside Deleted items
     // rather than under Inbox (operator, 2026-09-16).
-    { key: "hidden", label: STATUS_LABELS.hidden, href: to("inbox", "hidden"), icon: "hidden", child: false, count: counts.hidden ?? 0 },
-    { key: "junk", label: FOLDER_TITLES.junk, href: to("junk"), icon: "junk", child: false, count: 0 },
+    { key: "hidden", label: STATUS_LABELS.hidden, href: to("inbox", "hidden"), icon: "hidden", child: false, count: counts.hidden ?? 0, counted: true },
+    { key: "junk", label: FOLDER_TITLES.junk, href: to("junk"), icon: "junk", child: false, count: 0, counted: false },
     // Texts (2026-09-11): their own folder, with the two rows that matter for a chat.
     ...(counts.texts
       ? [
           // "All chats": the toggle above already says Messages (2026-09-14).
-          { key: "messages", label: "All chats", href: to("messages"), icon: "messages" as const, child: false, count: 0 },
-          { key: "messages:needs_reply", label: STATUS_LABELS.needs_reply, href: to("messages", "needs_reply"), icon: null, child: true, count: counts.texts.needsReply },
-          { key: "messages:unopened", label: STATUS_LABELS.unopened, href: to("messages", "unopened"), icon: null, child: true, count: counts.texts.unopened },
-          { key: "messages:disposable", label: STATUS_LABELS.disposable, href: to("messages", "disposable"), icon: null, child: true, count: counts.texts.disposable },
-          { key: "messages:hidden", label: STATUS_LABELS.hidden, href: to("messages", "hidden"), icon: "hidden" as const, child: false, count: counts.texts.hidden ?? 0 },
+          { key: "messages", label: "All chats", href: to("messages"), icon: "messages" as const, child: false, count: 0, counted: false },
+          { key: "messages:needs_reply", label: STATUS_LABELS.needs_reply, href: to("messages", "needs_reply"), icon: null, child: true, count: counts.texts.needsReply, counted: true },
+          { key: "messages:unopened", label: STATUS_LABELS.unopened, href: to("messages", "unopened"), icon: null, child: true, count: counts.texts.unopened, counted: true },
+          { key: "messages:disposable", label: STATUS_LABELS.disposable, href: to("messages", "disposable"), icon: null, child: true, count: counts.texts.disposable, counted: true },
+          { key: "messages:hidden", label: STATUS_LABELS.hidden, href: to("messages", "hidden"), icon: "hidden" as const, child: false, count: counts.texts.hidden ?? 0, counted: true },
         ]
       : []),
   ];

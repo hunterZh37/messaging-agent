@@ -263,7 +263,7 @@ function Tree(props: { counts: TreeCounts; activeKey: string; params: ViewParams
           >
             {Glyph ? <Glyph /> : null}
             <span className="tree-label">{row.label}</span>
-            {lessGone(row.count, listAdjust.get(row.key)?.rows) > 0 ? <span className="tree-count">{lessGone(row.count, listAdjust.get(row.key)?.rows)}</span> : null}
+            {row.counted ? <span className="tree-count">{lessGone(row.count, listAdjust.get(row.key)?.rows)}</span> : null}
           </Link>
         );
       })}
