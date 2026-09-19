@@ -425,8 +425,25 @@ export type TreeScope = Omit<CountScope, "folder" | "status" | "limit" | "before
  * exactly as the Sent list ignores it. Drafts are the whole approval queue,
  * which has no window and no filters of its own.
  */
-export function folderCounts(db: Db, opts: TreeScope = {}): { drafts: number; needsReply: number; unopened: number; disposable: number; waiting: number; hidden: number; texts: { needsReply: number; unopened: number; disposable: number; hidden: number } } {
+export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; drafts: number; needsReply: number; unopened: number; disposable: number; waiting: number; hidden: number; texts: { needsReply: number; unopened: number; disposable: number; hidden: number } } {
   const drafts = listPendingDrafts(db, opts.accountId ? { accountId: opts.accountId } : {}).length;
+
+  // What the Inbox list itself holds (operator, 2026-09-18: "need an inbox
+  // number for mails"). The rows beneath it each counted something and the
+  // folder over them counted nothing, so the one row that answers "how much
+  // is there" was the one row with no answer. Counted the way that list is
+  // drawn, message by message rather than thread by thread, so the number
+  // over the list is the number of rows in it.
+  const inbox =
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(messages)
+      .innerJoin(threads, eq(threads.id, messages.threadId))
+      .leftJoin(sorts, eq(sorts.messageId, messages.id))
+      .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
+      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
+      .where(and(...scopeConditions({ since: opts.since, accountId: opts.accountId, folder: "inbox", ...(opts.now === undefined ? {} : { now: opts.now }) })))
+      .get()?.count ?? 0;
 
   // Texts (2026-09-11): the two rows under Messages, counted over the chats
   // alone, whatever inbox the switcher holds.
@@ -504,7 +521,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { drafts: number; ne
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status: "hidden" })))
       .get()?.count ?? 0;
 
-  return { drafts, needsReply, unopened, disposable, hidden, waiting: applyWaiting(sentRows, sent).length, texts };
+  return { inbox, drafts, needsReply, unopened, disposable, hidden, waiting: applyWaiting(sentRows, sent).length, texts };
 }
 
 /**

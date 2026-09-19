@@ -133,6 +133,8 @@ const GLYPHS: Record<TreeIcon, () => ReactNode> = {
 
 /** The counts the tree shows beside Drafts, Need to reply and Waiting for reply. */
 export interface TreeCounts {
+  /** Everything the Inbox list itself holds (operator, 2026-09-18). */
+  inbox: number;
   drafts: number;
   needsReply: number;
   /** Inbox threads holding something the operator has not opened (spec 10a). */

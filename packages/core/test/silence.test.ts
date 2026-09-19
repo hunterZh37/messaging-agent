@@ -11,7 +11,7 @@ import { inboxSilences, stalledInboxes, SILENCE_FLOOR_MS } from "../src/queue/si
 const HOUR = 3_600_000;
 const NOW = 1_789_800_000_000;
 
-function account(db: ReturnType<typeof testDb>, id: string, provider = "imap"): void {
+function account(db: ReturnType<typeof testDb>, id: string, provider: "imap" | "outlook" | "imessage" | "whatsapp" = "imap"): void {
   db.insert(accounts).values(accountRow({ id, provider, email: `${id}@example.com` })).run();
   db.insert(watermarks).values({ accountId: id, historyId: "{}", lastSyncAt: NOW - 60_000 }).run();
 }

@@ -141,7 +141,7 @@ export interface TreeRow {
  * the operator is in, which every row carries along.
  */
 export function treeRows(
-  counts: { drafts: number; needsReply: number; unopened: number; disposable: number; waiting: number; hidden?: number; texts?: { needsReply: number; unopened: number; disposable: number; hidden?: number } },
+  counts: { inbox: number; drafts: number; needsReply: number; unopened: number; disposable: number; waiting: number; hidden?: number; texts?: { needsReply: number; unopened: number; disposable: number; hidden?: number } },
   p: ViewParams = {},
 ): TreeRow[] {
   // A tree row changes the folder and the child row and nothing else: the
@@ -153,7 +153,7 @@ export function treeRows(
   return [
     // The approval queue has no folder and no filters, so it carries none.
     { key: "drafts", label: "Drafts", href: "/drafts", icon: "drafts", child: false, count: counts.drafts, counted: true },
-    { key: "inbox", label: FOLDER_TITLES.inbox, href: to("inbox"), icon: "inbox", child: false, count: 0, counted: false },
+    { key: "inbox", label: FOLDER_TITLES.inbox, href: to("inbox"), icon: "inbox", child: false, count: counts.inbox, counted: true },
     {
       key: "inbox:needs_reply",
       label: STATUS_LABELS.needs_reply,

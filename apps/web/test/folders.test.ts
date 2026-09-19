@@ -23,7 +23,7 @@ describe("parseFolder", () => {
   });
 });
 
-const COUNTS = { drafts: 2, needsReply: 5, unopened: 4, disposable: 6, waiting: 3 };
+const COUNTS = { inbox: 0, drafts: 2, needsReply: 5, unopened: 4, disposable: 6, waiting: 3 };
 
 describe("treeRows", () => {
   it("lists Drafts, Inbox, Sent, Deleted items and Junk, with their children", () => {
