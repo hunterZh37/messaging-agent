@@ -57,6 +57,9 @@ export interface FetchedAccount {
   result: AccountResult;
 }
 
+/** How many inboxes are fetched at once. Four is a throughput win without looking like a scraper to any one provider. */
+const FETCH_CONCURRENCY = 4;
+
 /**
  * The fetch half of the pipeline (2026-09-14): every account's new mail
  * stored, and nothing else. Split out so the server's mail clock can bring
@@ -70,7 +73,7 @@ export async function fetchAccounts(db: Db, deps: Pick<PipelineDeps, "connectorF
   // connectorFor can throw synchronously (e.g. missing credentials or an
   // unconnected account), so build it inside the per-account try/catch:
   // one bad account must never abort sync for the others.
-  for (const entry of entries) {
+  const one = async (entry: FetchedAccount): Promise<void> => {
     try {
       entry.connector = deps.connectorFor(entry.account);
       entry.result.sync = await entry.connector.sync(db, entry.account, {
@@ -84,7 +87,27 @@ export async function fetchAccounts(db: Db, deps: Pick<PipelineDeps, "connectorF
         db.update(accounts).set({ status: "needs_signin", lastError: err.message }).where(eq(accounts.id, entry.account.id)).run();
       }
     }
-  }
+  };
+
+  // Several accounts at once (operator, 2026-09-18: "the sync takes
+  // forever"). This was a loop with an await in it, so seven inboxes cost
+  // the sum of seven, not the slowest of seven, and almost all of that time
+  // was spent waiting on somebody else's server.
+  //
+  // Bounded rather than all at once: each account holds a connection and a
+  // parse buffer, and a provider that sees every mailbox open at the same
+  // instant is a provider that starts refusing. Each account still writes to
+  // the one SQLite file, which is safe because better-sqlite3 is synchronous
+  // and only the waiting overlaps, never two writes.
+  //
+  // Accounts are independent by construction: each has its own watermark and
+  // its own row, and the shared `tail` above still keeps a second sync of the
+  // same account from starting while this one runs.
+  const queue = [...entries];
+  const workers = Array.from({ length: Math.min(FETCH_CONCURRENCY, queue.length) }, async () => {
+    for (let entry = queue.shift(); entry; entry = queue.shift()) await one(entry);
+  });
+  await Promise.all(workers);
 
   return entries;
 }
