@@ -813,3 +813,51 @@ export function setThreadWaiting(db: Db, threadId: string, waiting: boolean, clo
     .where(eq(threads.id, threadId))
     .run();
 }
+
+/** Where a thread lands when it is taken out of Safe to delete. */
+export type KeepDestination = "inbox" | "needs_reply";
+
+/**
+ * Take a thread out of Safe to delete and say where it goes instead
+ * (operator, 2026-09-18: "move a mail from Safe to delete").
+ *
+ * The sorter is not asked again and nothing is re-judged: this is the
+ * operator's word, the same way "No reply needed" and the waiting dismissal
+ * already beat their heuristics.
+ *
+ * Every message in the thread loses the verdict, not only the newest. The
+ * list is per thread and the verdict is per message, so clearing the newest
+ * alone would leave the thread sitting there behind an older receipt.
+ *
+ * `needs_reply` is two facts rather than one, so it writes both: the newest
+ * message gains the verdict, and a "handled" mark on it comes off, because
+ * the Need-to-reply list passes over anything carrying one and the rescue
+ * would have gone nowhere visible.
+ *
+ * Returns how many messages were changed, so a caller can tell a thread that
+ * was never on the list from one that has just left it.
+ */
+export function keepThread(db: Db, threadId: string, dest: KeepDestination = "inbox"): number {
+  const ids = db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(eq(messages.threadId, threadId))
+    .all()
+    .map((r) => r.id);
+  if (ids.length === 0) return 0;
+
+  const cleared = db.update(sorts).set({ disposable: false }).where(inArray(sorts.messageId, ids)).run().changes;
+  if (dest !== "needs_reply") return cleared;
+
+  const latest = db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(eq(messages.threadId, threadId))
+    .orderBy(desc(messages.sentAt), desc(messages.id))
+    .limit(1)
+    .get();
+  if (!latest) return cleared;
+  db.update(sorts).set({ needsReply: true }).where(eq(sorts.messageId, latest.id)).run();
+  db.delete(actions).where(and(eq(actions.messageId, latest.id), eq(actions.kind, "handled"))).run();
+  return cleared;
+}

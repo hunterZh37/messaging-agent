@@ -7,6 +7,7 @@ import { useSendGate } from "../queue/SendProvider";
 
 /** The × on a row: the same glyph the History rows and the file chips wear. */
 import { EyeOffIcon, TrashIcon } from "./icons";
+import { KeepControl } from "./KeepControl";
 
 /**
  * One row of the Safe-to-delete list, with an × at its right (spec 10a,
@@ -31,6 +32,7 @@ export function TrashRow({
   handledLeaves = false,
   hideable = false,
   statusList = false,
+  keepable = false,
 }: {
   threadId: string;
   subject: string;
@@ -41,9 +43,13 @@ export function TrashRow({
   hideable?: boolean;
   /** One of the four sorting lists, which a hidden thread leaves; Inbox and Messages themselves keep it (2026-09-15). */
   statusList?: boolean;
+  /** Safe to delete, where the row can also be rescued rather than thrown away (operator, 2026-09-18). */
+  keepable?: boolean;
 }) {
   const { trash, leavingThreads, deletingThreads, returningThreads, handledThreads } = useSendGate();
   const [going, setGoing] = useState(false);
+  const [kept, setKept] = useState(false);
+  const [keepError, setKeepError] = useState<string | null>(null);
   const [drag, setDrag] = useState(0);
   const touch = useRef<{ x: number; y: number; horizontal: boolean | null } | null>(null);
   if ((statusList ? leavingThreads : deletingThreads).includes(threadId)) return null;
@@ -99,7 +105,7 @@ export function TrashRow({
 
   return (
     <div
-      className={`${going ? "inbox-row-item going" : back ? "inbox-row-item arriving" : "inbox-row-item"}${drag < 0 ? " swiping" : ""}${hideable ? " hideable" : ""}`}
+      className={`${going || kept ? "inbox-row-item going" : back ? "inbox-row-item arriving" : "inbox-row-item"}${drag < 0 ? " swiping" : ""}${hideable ? " hideable" : ""}${keepable ? " keepable" : ""}`}
       style={drag < 0 ? { transform: `translateX(${drag}px)` } : undefined}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -107,6 +113,23 @@ export function TrashRow({
       onTouchCancel={onTouchEnd}
     >
       {children}
+      {keepable ? (
+        <KeepControl
+          threadId={threadId}
+          subject={subject}
+          onKeeping={() => {
+            setKeepError(null);
+            setKept(true);
+          }}
+          // A row that slid out on a write that did not happen would be a lie
+          // about where the mail is. It comes back, wearing the reason.
+          onFailed={(message) => {
+            setKept(false);
+            setKeepError(message);
+          }}
+        />
+      ) : null}
+      {keepError ? <span className="inbox-row-keep-error" role="status">{keepError}</span> : null}
       {hideable ? (
         <button
           type="button"

@@ -42,7 +42,7 @@ import {
   type AlexItem,
   type AlexItemRow,
   type AlexSlot,
-  setThreadWaiting, hideThreads } from "@messaging-agent/core";
+  setThreadWaiting, hideThreads, keepThread, type KeepDestination } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 
 type StepError = { error: string };
@@ -411,6 +411,24 @@ export async function trashThreadsAction(threadIds: string[]): Promise<{ moved: 
  * "No reply needed" on a thread the operator sent last: it leaves Waiting for
  * reply at once (spec 10a). `waiting: true` puts it back.
  */
+/**
+ * Take a thread out of Safe to delete (operator, 2026-09-18: "move a mail
+ * from Safe to delete"), and say where it goes instead.
+ *
+ * The sorter is not re-run. This is the operator overruling it, the same way
+ * the waiting dismissal already does, so it is a write and not a re-judgement.
+ */
+export async function keepThreadAction(threadId: string, dest: KeepDestination): Promise<{ ok: true } | StepError> {
+  try {
+    const { db } = core();
+    keepThread(db, threadId, dest);
+    revalidatePath("/inbox");
+    return { ok: true };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
+
 export async function setThreadWaitingAction(threadId: string, waiting: boolean): Promise<{ ok: true } | StepError> {
   try {
     const { db } = core();
