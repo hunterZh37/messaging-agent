@@ -1300,6 +1300,31 @@ main.stats-page { max-width: 1040px; margin: 0 auto; padding: 0 22px 60px; }
 .range-row .chip { text-decoration: none; }
 .stat-empty { margin-top: 28px; }
 
+/* The quieter half of the stats page, kept on it but out of the way
+   (operator, 2026-09-19: "information overload"). Shut, a fold is one line
+   that still answers whether there is anything inside worth opening. */
+.stat-fold { border-top: 1px solid var(--line); margin-top: 14px; }
+.stat-fold > summary {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  padding: 14px 2px; cursor: pointer; list-style: none;
+  border-radius: 10px; transition: background-color 120ms;
+}
+.stat-fold > summary::-webkit-details-marker { display: none; }
+.stat-fold > summary:hover { background: color-mix(in srgb, var(--fg) 4%, transparent); }
+.stat-fold > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The chevron turns, so shut and open never look alike. */
+.stat-fold > summary::before {
+  content: ""; flex: none; width: 7px; height: 7px; margin-right: 2px;
+  border-right: 1.8px solid var(--muted); border-bottom: 1.8px solid var(--muted);
+  transform: rotate(-45deg); transition: transform 140ms ease;
+}
+.stat-fold[open] > summary::before { transform: rotate(45deg); }
+.fold-title { font-size: 16px; font-weight: 600; letter-spacing: -0.01em; }
+.fold-summary { font-size: 13px; color: var(--muted); }
+.fold-body { padding-bottom: 6px; }
+/* The cards inside a fold have the fold's own line above them already. */
+.fold-body > .stat-card:first-child { margin-top: 0; }
+
 .stat-figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-block: 18px; }
 .stat-figures > div { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 15px 17px; }
 .stat-figures b { display: block; font-size: 27px; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }

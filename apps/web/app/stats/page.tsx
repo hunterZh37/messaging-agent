@@ -3,6 +3,7 @@ import { Tone } from "./Tone";
 import { RangeChips } from "./RangeChips";
 import { Psych } from "./Psych";
 import { Projects } from "./Projects";
+import { Fold } from "./Fold";
 import { mailboxStamp, projectsFor, relationshipsFor, statsFor, warmStats } from "@/lib/statsCache";
 import { RANGES, rangeKeyFrom, type RangeKey } from "@/lib/statsRanges";
 import { core } from "@/lib/core";
@@ -351,59 +352,22 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
               </p>
             </section>
 
-            <section className="stat-card">
-              <h2>How you conduct yourself</h2>
-              <div className="habit-grid">
-                <div className="habit">
-                  <b>{pct(h.startedByYou, h.startedByYou + h.startedByThem)}</b>
-                  <span>of conversations you opened</span>
-                  <span className="meta">{count(h.startedByYou)} of {count(h.startedByYou + h.startedByThem)}</span>
-                </div>
-                <div className="habit">
-                  <b>{pct(h.lastWordYours, h.threadsTotal)}</b>
-                  <span>you had the last word in</span>
-                  <span className="meta">{count(h.lastWordYours)} of {count(h.threadsTotal)}</span>
-                </div>
-                <div className="habit">
-                  <b>
-                    {h.medianWordsYou ?? "—"} <span className="vs">vs {h.medianWordsThem ?? "—"}</span>
-                  </b>
-                  <span>words in a typical message</span>
-                  <span className="meta">yours, then theirs</span>
-                </div>
-                <div className="habit">
-                  <b>{pct(h.doubleTexts, totals.sent)}</b>
-                  <span>of your messages follow your own</span>
-                  <span className="meta">{count(h.doubleTexts)} sent back to back</span>
-                </div>
-                <div className="habit">
-                  <b>{count(h.questionsAsked)}</b>
-                  <span>of your messages ask something</span>
-                  <span className="meta">{pct(h.questionsAsked, totals.sent)} of them</span>
-                </div>
-                <div className="habit">
-                  <b>{count(h.lateNight)}</b>
-                  <span>sent between midnight and 5am</span>
-                  <span className="meta">{pct(h.lateNight, totals.sent)} of them</span>
-                </div>
-              </div>
-              <p className="stat-note">
-                Counts, not conclusions. Each of these can be checked against the database; none of them says what kind
-                of person it makes anyone. Messages sent back to back are usually one thought arriving in three parts.
-              </p>
-            </section>
+            <Between rows={relationshipsFor(key, stamp)} />
 
-            <Bars
-              rows={hours}
-              label={`Your day${busiest && busiest.sent > 0 ? ` — you write most at ${Number(busiest.key)}:00` : ""}`}
-              peak={peak(hours)}
-            />
-            <Bars rows={days} label="Your week" peak={peak(days)} />
-            <Bars rows={months} label="Over the years" peak={peak(months)} />
+            <Psych read={psychRead(db)} />
 
-            <section className="stat-card">
-              <h2>Mail and chats</h2>
-              <div className="split">
+            {/* Below the line: on the page, out of the way (operator,
+                2026-09-19). Each says what is inside while it is shut. */}
+            <Fold title="Your day, your week, the years" summary={`busiest at ${busiest && busiest.sent > 0 ? `${Number(busiest.key)}:00` : "no hour yet"} · ${chatTotal > mailTotal ? "more chat than mail" : "more mail than chat"}`}>
+              <Bars
+                rows={hours}
+                label={`Your day${busiest && busiest.sent > 0 ? ` — you write most at ${Number(busiest.key)}:00` : ""}`}
+                peak={peak(hours)}
+              />
+              <Bars rows={days} label="Your week" peak={peak(days)} />
+              <Bars rows={months} label="Over the years" peak={peak(months)} />
+              <section className="stat-card">
+                <h2>Mail and chats</h2>
                 <div className="split-bar">
                   <span className="split-chats" style={{ width: `${(chatTotal / Math.max(1, chatTotal + mailTotal)) * 100}%` }} />
                 </div>
@@ -415,18 +379,63 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
                     <b>{count(mailTotal)}</b> mail
                   </span>
                 </div>
-              </div>
-              <p className="stat-note">
-                Every other number on this page counts both together, so it mostly describes whichever of these is
-                larger.
-              </p>
-            </section>
+              </section>
+            </Fold>
 
-            <People rows={stats.topCorrespondents} />
-            <Between rows={relationshipsFor(key, stamp)} />
-            <Projects stats={projectsFor(key, stamp)} />
-            <Tone rows={readings(db)} unread={unreadMonths(db).length} />
-            <Psych read={psychRead(db)} />
+            <Fold title="How you conduct yourself" summary={`you open ${pct(h.startedByYou, h.startedByYou + h.startedByThem)} of conversations · last word in ${pct(h.lastWordYours, h.threadsTotal)}`}>
+              <section className="stat-card">
+                <div className="habit-grid">
+                  <div className="habit">
+                    <b>{pct(h.startedByYou, h.startedByYou + h.startedByThem)}</b>
+                    <span>of conversations you opened</span>
+                    <span className="meta">{count(h.startedByYou)} of {count(h.startedByYou + h.startedByThem)}</span>
+                  </div>
+                  <div className="habit">
+                    <b>{pct(h.lastWordYours, h.threadsTotal)}</b>
+                    <span>you had the last word in</span>
+                    <span className="meta">{count(h.lastWordYours)} of {count(h.threadsTotal)}</span>
+                  </div>
+                  <div className="habit">
+                    <b>
+                      {h.medianWordsYou ?? "—"} <span className="vs">vs {h.medianWordsThem ?? "—"}</span>
+                    </b>
+                    <span>words in a typical message</span>
+                    <span className="meta">yours, then theirs</span>
+                  </div>
+                  <div className="habit">
+                    <b>{pct(h.doubleTexts, totals.sent)}</b>
+                    <span>of your messages follow your own</span>
+                    <span className="meta">{count(h.doubleTexts)} sent back to back</span>
+                  </div>
+                  <div className="habit">
+                    <b>{count(h.questionsAsked)}</b>
+                    <span>of your messages ask something</span>
+                    <span className="meta">{pct(h.questionsAsked, totals.sent)} of them</span>
+                  </div>
+                  <div className="habit">
+                    <b>{count(h.lateNight)}</b>
+                    <span>sent between midnight and 5am</span>
+                    <span className="meta">{pct(h.lateNight, totals.sent)} of them</span>
+                  </div>
+                </div>
+                <p className="stat-note">
+                  Counts, not conclusions. Each of these can be checked against the database; none of them says what kind
+                  of person it makes anyone. Messages sent back to back are usually one thought arriving in three parts.
+                </p>
+              </section>
+            </Fold>
+
+            <Fold title="Who you hear from" summary={`${count(stats.topCorrespondents.length)} names, busiest first`}>
+              <People rows={stats.topCorrespondents} />
+            </Fold>
+
+            <Fold title="How your own writing read" summary={`${readings(db).length} months read${unreadMonths(db).length > 0 ? `, ${unreadMonths(db).length} still to read` : ""}`}>
+              <Tone rows={readings(db)} unread={unreadMonths(db).length} />
+            </Fold>
+
+            <Fold title="Projects" summary={`${count(projectsFor(key, stamp).totals.projects)} projects · ${count(projectsFor(key, stamp).totals.filed)} messages filed`}>
+              <Projects stats={projectsFor(key, stamp)} />
+            </Fold>
           </>
         )}
       </main>
