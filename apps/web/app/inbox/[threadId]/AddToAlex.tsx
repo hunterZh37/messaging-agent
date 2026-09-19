@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { AlexItem, AlexItemRow, AlexSlot } from "@messaging-agent/core";
 import { addToAlexAction, alexFreeTimesAction, retryAlexItemAction } from "../actions";
+import { Floating, useAnchoredPanel } from "@/lib/anchored";
 
 function CalendarIcon() {
   return (
@@ -76,7 +77,12 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const wrap = useRef<HTMLDivElement>(null);
+  const button = useRef<HTMLButtonElement>(null);
   const router = useRouter();
+  // The bar sits at the foot of the thread, so the panel opens upward, and it
+  // is painted at the end of the page so no column can paint over it
+  // (operator, 2026-09-19).
+  const placed = useAnchoredPanel(button, open, 300, "above");
 
   useEffect(() => {
     if (!open) return;
@@ -84,7 +90,11 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
       if (e.key === "Escape") setOpen(false);
     }
     function onDown(e: MouseEvent) {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+      // The panel is painted at the end of the page now, so it is no longer
+      // inside the wrapper and a press in it would read as a press outside.
+      const t = e.target as HTMLElement | null;
+      if (wrap.current?.contains(t) || t?.closest?.(".alex-panel")) return;
+      setOpen(false);
     }
     window.addEventListener("keydown", onKey);
     window.addEventListener("mousedown", onDown);
@@ -157,13 +167,14 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
 
   return (
     <div className="add-alex" ref={wrap}>
-      <button type="button" className="btn quiet" aria-haspopup="dialog" aria-expanded={open} disabled={pending} onClick={() => (open ? setOpen(false) : openPanel())}>
+      <button ref={button} type="button" className="btn quiet" aria-haspopup="dialog" aria-expanded={open} disabled={pending} onClick={() => (open ? setOpen(false) : openPanel())}>
         <CalendarIcon />
         <span>{pending ? "Adding…" : "Add to Alex"}</span>
       </button>
 
       {open ? (
-        <div className="switcher-panel alex-panel" role="dialog" aria-label="Add to Alex">
+        <Floating>
+        <div className="switcher-panel alex-panel" role="dialog" aria-label="Add to Alex" style={placed}>
           {connected ? null : (
             <div className="error">Alex is not connected. Put ALEX_MCP_TOKEN in .env and restart.</div>
           )}
@@ -251,6 +262,7 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
             </button>
           </div>
         </div>
+        </Floating>
       ) : null}
 
     </div>

@@ -13,6 +13,7 @@ import {
   sendDelayFor,
   keptToastLabel,
   hiddenToastLabel,
+  blockedToastLabel,
   progressFraction,
   progressLabel,
   trashChunkSize,
@@ -662,6 +663,34 @@ describe("hide", () => {
     expect(hiddenToastLabel(["a1:t1"])).toBe("Hid 1 thread · still in Inbox");
     expect(hiddenToastLabel(["a", "b"])).toBe("Hid 2 threads · still in Inbox");
     expect(hiddenToastLabel(["acc:any;-;+1", "acc:1@s.whatsapp.net"])).toBe("Hid 2 chats · still in Messages");
+  });
+});
+
+/**
+ * A mailbox that could not be written to at all (operator, 2026-09-19: "why
+ * can't I delete DocuSeal?"). The provider had refused nothing: that
+ * account's Google sign-in had expired, and the old toast blamed the mail.
+ */
+describe("a delete that could not reach the mailbox", () => {
+  it("names the account and what it needs, rather than blaming the mail", () => {
+    const label = blockedToastLabel([{ email: "me@example.com", message: "Google sign-in expired: Token has been expired or revoked." }]);
+    expect(label).toBe("Could not delete: me@example.com needs signing in again");
+  });
+
+  it("quotes the mailbox when the reason is not a sign-in", () => {
+    expect(blockedToastLabel([{ email: "me@example.com", message: "over quota" }])).toBe('Could not delete: me@example.com said "over quota"');
+  });
+
+  it("counts the rest when more than one mailbox is out", () => {
+    const label = blockedToastLabel([
+      { email: "me@example.com", message: "invalid_grant" },
+      { email: "you@example.com", message: "invalid_grant" },
+    ]);
+    expect(label).toBe("Could not delete: me@example.com needs signing in again and 1 more");
+  });
+
+  it("says nothing when nothing went wrong, so the kept toast still speaks", () => {
+    expect(blockedToastLabel([])).toBeNull();
   });
 });
 

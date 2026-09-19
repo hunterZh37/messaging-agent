@@ -1244,7 +1244,10 @@ textarea.field.ask-input { resize: none; font-size: 14px; min-height: 40px; heig
 .add-alex > .btn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 /* It sits at the right end of the action row, so it opens leftwards: anchored
    left it ran off the edge of the pane. */
-.alex-panel { top: auto; bottom: 44px; left: auto; right: 0; width: 300px; max-width: calc(100vw - 32px); gap: 8px; padding: 10px; }
+/* Placed in the viewport by useAnchoredPanel now, so the offsets that pinned
+   it inside the action bar are cleared rather than left to fight the inline
+   ones (operator, 2026-09-19: the columns were painting over it). */
+.alex-panel { top: auto; bottom: auto; left: auto; right: auto; max-width: calc(100vw - 32px); gap: 8px; padding: 10px; }
 .alex-kinds { display: flex; gap: 6px; }
 .alex-kinds .chip { flex: 1 1 0; justify-content: center; }
 .alex-field { display: flex; flex-direction: column; gap: 3px; }

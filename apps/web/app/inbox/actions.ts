@@ -357,7 +357,7 @@ export async function restoreThreadsAction(threadIds: string[]): Promise<{ moved
  * stays in Messages or WhatsApp. The same rows a delete would move, moved
  * here alone; Put back and Undo bring them back as after a delete.
  */
-export async function hideThreadsAction(threadIds: string[]): Promise<{ moved: number; failed: number; kept: string[] } | StepError> {
+export async function hideThreadsAction(threadIds: string[]): Promise<{ moved: number; failed: number; kept: string[]; reasons?: { email: string; message: string }[] } | StepError> {
   try {
     const { db } = core();
     const { moved } = hideThreads(db, threadIds);
@@ -384,7 +384,7 @@ export async function unhideThreadsAction(threadIds: string[]): Promise<{ unhidd
   }
 }
 
-export async function trashThreadsAction(threadIds: string[]): Promise<{ moved: number; failed: number; kept: string[] } | StepError> {
+export async function trashThreadsAction(threadIds: string[]): Promise<{ moved: number; failed: number; kept: string[]; reasons?: { email: string; message: string }[] } | StepError> {
   try {
     const { cfg, db } = core();
     const result = await trashThreads(db, (account) => connectorForAccount(cfg, db, account), threadIds);

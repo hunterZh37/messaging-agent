@@ -20,7 +20,7 @@ import {
   trashOnLeaving,
   type PendingSend,
   type PendingTrash,
-  type SendState, keptToastLabel, hiddenToastLabel, trashChunkSize } from "@/lib/queue";
+  type SendState, keptToastLabel, hiddenToastLabel, blockedToastLabel, trashChunkSize } from "@/lib/queue";
 import { sendAction } from "../actions";
 import { hideThreadsAction, markHandledAction, restoreThreadsAction, trashThreadsAction } from "../inbox/actions";
 import { isUndoKey } from "@/lib/keys";
@@ -196,7 +196,7 @@ export function SendProvider({ children }: { children: ReactNode }) {
       const run = async () => {
         const total = job.threadIds.length;
         const size = trashChunkSize(job.threadIds);
-        const sum = { moved: 0, failed: 0, kept: [] as string[] };
+        const sum = { moved: 0, failed: 0, kept: [] as string[], reasons: [] as { email: string; message: string }[] };
         dispatch({ type: "trash_progress", id: job.id, done: 0, total });
         for (let i = 0; i < total; i += size) {
           const r = await act(job.threadIds.slice(i, i + size));
@@ -204,6 +204,7 @@ export function SendProvider({ children }: { children: ReactNode }) {
           sum.moved += r.moved;
           sum.failed += r.failed;
           sum.kept.push(...r.kept);
+          if (r.reasons) for (const x of r.reasons) if (!sum.reasons.some((y) => y.email === x.email)) sum.reasons.push(x);
           dispatch({ type: "trash_progress", id: job.id, done: Math.min(i + size, total), total });
         }
         return sum;
@@ -220,8 +221,14 @@ export function SendProvider({ children }: { children: ReactNode }) {
           // What the provider kept comes back on screen, and is said
           // (2026-09-11: two chats Messages.app would not delete sat hidden
           // under a "Delete all · 2" that had nothing to show).
+          // Why, when there is a why. A mailbox that could not be signed
+          // into is the operator's to fix, and saying "the provider kept it"
+          // hides that (2026-09-19).
+          const blocked = blockedToastLabel(r.reasons ?? []);
           const kept = r.kept ?? [];
-          if (kept.length > 0) {
+          if (blocked) {
+            dispatch({ type: "trashed", id: `${job.id}-blocked`, label: blocked, now: Date.now() });
+          } else if (kept.length > 0) {
             job = { ...job, threadIds: job.threadIds.filter((id) => !kept.includes(id)) };
             dispatch({ type: "trashed", id: `${job.id}-kept`, label: keptToastLabel(kept.length, kept.some((id) => id.includes(";-;"))), now: Date.now() });
           }

@@ -9,15 +9,27 @@ import { createPortal } from "react-dom";
  * The header's filter row scrolls sideways, and a scrolling box clips
  * anything hanging out of it, so the panel is fixed and measured instead.
  */
-export function useAnchoredPanel(anchor: RefObject<HTMLElement | null>, open: boolean, width: number): CSSProperties {
-  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
+export function useAnchoredPanel(
+  anchor: RefObject<HTMLElement | null>,
+  open: boolean,
+  width: number,
+  /** "above" for a control near the foot of the page, which opens upward. */
+  placement: "below" | "above" = "below",
+): CSSProperties {
+  const [at, setAt] = useState<{ top: number; bottom: number; left: number } | null>(null);
   useLayoutEffect(() => {
     if (!open) return setAt(null);
     const place = () => {
       const r = anchor.current?.getBoundingClientRect();
       if (!r) return;
       const margin = 8;
-      setAt({ top: r.bottom + 6, left: Math.max(margin, Math.min(r.left, window.innerWidth - width - margin)) });
+      setAt({
+        top: r.bottom + 6,
+        bottom: window.innerHeight - r.top + 6,
+        // Kept on screen: a control at the right edge would otherwise open
+        // a panel half of which is past it.
+        left: Math.max(margin, Math.min(r.left, window.innerWidth - width - margin)),
+      });
     };
     place();
     window.addEventListener("resize", place);
@@ -27,7 +39,10 @@ export function useAnchoredPanel(anchor: RefObject<HTMLElement | null>, open: bo
       window.removeEventListener("scroll", place, true);
     };
   }, [anchor, open, width]);
-  return at ? { position: "fixed", top: at.top, left: at.left, width } : { visibility: "hidden" };
+  if (!at) return { visibility: "hidden" };
+  return placement === "above"
+    ? { position: "fixed", bottom: at.bottom, left: at.left, width }
+    : { position: "fixed", top: at.top, left: at.left, width };
 }
 
 /**

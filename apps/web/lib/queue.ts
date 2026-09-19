@@ -506,6 +506,26 @@ export function trashChunkSize(threadIds: string[]): number {
   return allChats(threadIds) ? 2 : 10;
 }
 
+/**
+ * What the toast says when a mailbox could not be written to at all
+ * (operator, 2026-09-19: "why can't I delete DocuSeal?").
+ *
+ * It was not DocuSeal and the provider had refused nothing: that account's
+ * Google sign-in had expired, so no write to it could land. The old toast
+ * said "the provider kept it", which is a sentence about the mail and sent
+ * the operator looking in the wrong place. This one names the account and
+ * what it needs.
+ */
+export function blockedToastLabel(reasons: { email: string; message: string }[]): string | null {
+  const first = reasons[0];
+  if (!first) return null;
+  const others = reasons.length > 1 ? ` and ${reasons.length - 1} more` : "";
+  const expired = /sign-?in expired|expired or revoked|invalid_grant|unauthor/i.test(first.message);
+  return expired
+    ? `Could not delete: ${first.email} needs signing in again${others}`
+    : `Could not delete: ${first.email} said "${first.message}"${others}`;
+}
+
 /** What the toast says when the provider would not let some of a delete go (2026-09-11: Messages.app kept two chats). */
 export function keptToastLabel(count: number, chats = false): string {
   const what = chats ? (count === 1 ? "1 chat" : `${count} chats`) : threadCountLabel(count);

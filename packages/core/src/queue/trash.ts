@@ -17,6 +17,13 @@ import { recordAction } from "./actions";
 export interface TrashResult {
   moved: number;
   failed: number;
+  /**
+   * Why a mailbox could not be written to, when the answer is something
+   * other than "it refused" (operator, 2026-09-19). An expired sign-in is
+   * the common one, and it is the operator's to fix, so it has to reach
+   * them rather than only the log.
+   */
+  reasons?: { email: string; message: string }[];
 }
 
 /**
@@ -249,6 +256,8 @@ export async function trashThreads(
   const byAccount = inboxMessagesForThreads(db, threadIds);
   let moved = 0;
   let failed = 0;
+  /** Why a mailbox could not be written to, when that is the reason rather than a refusal. */
+  const reasons: { email: string; message: string }[] = [];
   for (const [accountId, messageIds] of byAccount) {
     const account = db.select().from(accounts).where(eq(accounts.id, accountId)).get();
     if (!account) {
@@ -261,10 +270,16 @@ export async function trashThreads(
       failed += r.failed;
     } catch (err) {
       failed += messageIds.length;
+      // Carried back, not only logged (operator, 2026-09-19: "why can't I
+      // delete DocuSeal?"). The mailbox had not refused anything: its Google
+      // sign-in had expired, so nothing could be written to it at all. The
+      // toast said the provider kept the mail, which sent the operator
+      // looking for a fault in the mail rather than in the account.
+      reasons.push({ email: account.email, message: (err as Error).message });
       console.error(`trash failed for ${account.email}:`, (err as Error).message);
     }
   }
-  return { moved, failed };
+  return { moved, failed, ...(reasons.length > 0 ? { reasons } : {}) };
 }
 
 /**

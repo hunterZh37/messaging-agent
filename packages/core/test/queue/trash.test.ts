@@ -468,7 +468,10 @@ describe("trashThreads", () => {
       ["a1:t1", "a2:t3"],
     );
 
-    expect(r).toEqual({ moved: 2, failed: 1 });
+    // The reason comes back with the count (operator, 2026-09-19): a mailbox
+    // that could not be written to is the operator's to fix, and a number
+    // alone cannot tell them which one or why.
+    expect(r).toEqual({ moved: 2, failed: 1, reasons: [{ email: "work@example.com", message: "Graph is down" }] });
     expect(folderOf(db, "a1:m1")).toBe("trash");
     expect(folderOf(db, "a2:m4")).toBe("inbox");
   });
