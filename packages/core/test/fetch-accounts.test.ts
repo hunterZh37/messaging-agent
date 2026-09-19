@@ -85,7 +85,7 @@ describe("fetchAccounts", () => {
     seed(db, 3);
     const peak = { now: 0, most: 0 };
     const make = watched(peak, async (id) => {
-      if (id === "a1") throw new AccountAuthError("token expired");
+      if (id === "a1") throw new AccountAuthError(id, "token expired");
     });
     await fetchAccounts(db, { connectorFor: (a) => make(a.id), backfillDays: 7, blocklist: { addresses: [], domains: [] } as never }, undefined);
     const rows = db.select().from(accounts).all();

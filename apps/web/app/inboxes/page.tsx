@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { eq, sql } from "drizzle-orm";
-import { backlogSorterIsTrickle, formatModelRef, MODEL_ENV_VARS, MODEL_ROLES, schema } from "@messaging-agent/core";
+import { backlogSorterIsTrickle, formatModelRef, inboxSilences, MODEL_ENV_VARS, MODEL_ROLES, schema } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 import { Nav } from "../queue/Sidebar";
 import { treeCounts } from "../queue/counts";
@@ -48,6 +48,17 @@ function kindLabel(a: { provider: "imap" | "outlook" | "imessage" | "whatsapp"; 
   return a.kind === "gmail" ? "Gmail" : "IMAP";
 }
 
+/** A stretch of time, said the way somebody would say it out loud. */
+function quietly(ms: number | null): string {
+  if (ms === null) return "a while";
+  const mins = Math.round(ms / 60_000);
+  if (mins < 60) return `${mins} min`;
+  const hours = ms / 3_600_000;
+  if (hours < 36) return `${hours < 10 ? hours.toFixed(1) : Math.round(hours)} hours`;
+  const days = ms / 86_400_000;
+  return `${days < 10 ? days.toFixed(1) : Math.round(days)} days`;
+}
+
 export default async function InboxesPage({ searchParams }: { searchParams: Promise<{ error?: string; account?: string }> }) {
   const { error, account } = await searchParams;
   const { db, cfg } = core();
@@ -61,6 +72,8 @@ export default async function InboxesPage({ searchParams }: { searchParams: Prom
 
   const accountRows = db.select().from(schema.accounts).all();
   const lastSyncByAccount = new Map(db.select().from(schema.watermarks).all().map((w) => [w.accountId, w.lastSyncAt]));
+  // Which inboxes have gone quieter than they ever normally do.
+  const silences = new Map(inboxSilences(db).map((x) => [x.accountId, x]));
   const pendingCounts = db
     .select({ accountId: schema.messages.accountId, count: sql<number>`count(*)` })
     .from(schema.drafts)
@@ -93,6 +106,7 @@ export default async function InboxesPage({ searchParams }: { searchParams: Prom
           accountRows.map((a) => {
             const lastSync = lastSyncByAccount.get(a.id);
             const pending = pendingByAccount.get(a.id) ?? 0;
+            const silence = silences.get(a.id);
             return (
               <div key={a.id} className="msg inbox-account">
                 <div className="who">
@@ -104,6 +118,13 @@ export default async function InboxesPage({ searchParams }: { searchParams: Prom
                   <span>{lastSync ? `Synced ${relativeTime(lastSync)}` : "Never synced"}</span>
                   <span>{pending} pending</span>
                   {a.status === "needs_signin" ? <span className="error">needs sign-in</span> : null}
+                  {/* A sync that stores nothing looks exactly like an inbox nobody
+                      wrote to. This one says which (operator, 2026-09-18). */}
+                  {silence?.stale ? (
+                    <span className="error" title={`Usually something every ${quietly(silence.typicalGapMs)}. Sync is still running, so this is mail that is not arriving rather than a sync that stopped.`}>
+                      nothing in {quietly(silence.quietForMs)}, usually every {quietly(silence.typicalGapMs)}
+                    </span>
+                  ) : null}
                   {a.status === "disconnected" ? <span style={{ color: "var(--muted)" }}>disconnected</span> : null}
                 </div>
                 {a.status !== "ok" ? (
