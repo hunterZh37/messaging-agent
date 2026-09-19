@@ -48,6 +48,7 @@ export function TrashRow({
 }) {
   const { trash, leavingThreads, deletingThreads, returningThreads, handledThreads } = useSendGate();
   const [going, setGoing] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [kept, setKept] = useState(false);
   const [keepError, setKeepError] = useState<string | null>(null);
   const [drag, setDrag] = useState(0);
@@ -105,7 +106,7 @@ export function TrashRow({
 
   return (
     <div
-      className={`${going || kept ? "inbox-row-item going" : back ? "inbox-row-item arriving" : "inbox-row-item"}${drag < 0 ? " swiping" : ""}${hideable ? " hideable" : ""}${keepable ? " keepable" : ""}`}
+      className={`${going || kept ? "inbox-row-item going" : back ? "inbox-row-item arriving" : "inbox-row-item"}${drag < 0 ? " swiping" : ""}${hideable ? " hideable" : ""}${keepable ? " keepable" : ""}${menuOpen ? " tools-open" : ""}`}
       style={drag < 0 ? { transform: `translateX(${drag}px)` } : undefined}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -113,10 +114,12 @@ export function TrashRow({
       onTouchCancel={onTouchEnd}
     >
       {children}
+      <div className="row-tools">
       {keepable ? (
         <KeepControl
           threadId={threadId}
           subject={subject}
+          onOpenChange={setMenuOpen}
           onKeeping={() => {
             setKeepError(null);
             setKept(true);
@@ -150,6 +153,7 @@ export function TrashRow({
       >
         <TrashIcon />
       </button>
+      </div>
     </div>
   );
 }

@@ -24,18 +24,24 @@ const DESTINATIONS: { dest: KeepDestination; name: string; desc: string }[] = [
   { dest: "needs_reply", name: "Need to reply", desc: "You owe an answer on it" },
 ];
 
-export function KeepControl({ threadId, subject, onKeeping, onFailed }: {
+export function KeepControl({ threadId, subject, onKeeping, onFailed, onOpenChange }: {
   threadId: string;
   subject: string;
   /** The row slides out before the server answers, the way a delete does. */
   onKeeping: () => void;
   /** It comes back if the server refuses, or the row would vanish on a write that never happened. */
   onFailed: (message: string) => void;
+  /** The row lifts above the ones below it while the menu is down, or they paint over it. */
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [, startTransition] = useTransition();
   const wrap = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    onOpenChange?.(open);
+  }, [open, onOpenChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -71,7 +77,7 @@ export function KeepControl({ threadId, subject, onKeeping, onFailed }: {
     <div className="inbox-row-keep" ref={wrap}>
       <button
         type="button"
-        className="applied-clear keep-btn"
+        className="keep-btn"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Keep the thread ${subject || "(no subject)"}`}
