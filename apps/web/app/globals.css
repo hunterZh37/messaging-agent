@@ -917,6 +917,19 @@ html[data-switching] .inbox-grid, html[data-switching] main > .empty-wrap { opac
 .filter-chip-label { flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 .filter-chip-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .filter-chip svg { flex: none; width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
+/* On a desktop the header has room to spare, so a chip is as wide as what it
+   has to say (operator, 2026-09-19: "no need to shrink the labels, we have
+   plenty space"). The fixed widths below are for the narrow case, where the
+   row scrolls sideways and chips that sized themselves would jump about as
+   the values changed. A minimum keeps them from twitching on every change,
+   and a maximum keeps one long project name from pushing the rest off. */
+@media (min-width: 900px) {
+  .head-filters { gap: 14px; overflow-x: visible; -webkit-mask-image: none; mask-image: none; }
+  .filter-chip { width: auto; min-width: 150px; max-width: 360px; padding-right: 10px; }
+  .filter-chip.period-chip { width: auto; min-width: 118px; }
+  .filter-chip.project-picker { width: auto; min-width: 190px; max-width: 400px; }
+  .filter-chip .switcher-chev, .filter-chip > svg:last-child { margin-left: 4px; }
+}
 .filter-panel { top: 38px; width: 220px; }
 /* The inbox switcher, first of the header's filters (2026-09-15). */
 .head-filters .switcher { display: inline-flex; }
