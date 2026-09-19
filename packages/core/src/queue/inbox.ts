@@ -312,8 +312,16 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // sorter says nobody will need again once it has been read (spec 7,
   // 2026-09-11). Only the inbox has such a verdict, and a message with no
   // verdict at all is never offered for deletion.
+  //
+  // This one row reaches back past the live line (operator, 2026-09-18).
+  // `liveOnly` was added on 2026-09-14 to stop back-filled history flooding
+  // Need to reply, and it was applied to all four rows at once. On this row
+  // flooding is the point: old junk is the best junk to delete, and the rule
+  // was hiding 1,448 of this mailbox's 1,678 inbox messages from the one
+  // list whose job is to clear them out. Nothing here claims the operator
+  // owes anything, which is what the live line exists to prevent.
   if (folder === "inbox" && opts.status === "disposable") {
-    conditions.push(eq(sorts.disposable, true), liveOnly());
+    conditions.push(eq(sorts.disposable, true));
   }
   // A chat is safe to delete by a rule (operator, 2026-09-11): the handle has
   // no name in the address book (the chat's subject is the handle itself)

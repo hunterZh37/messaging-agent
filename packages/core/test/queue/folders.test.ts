@@ -794,6 +794,43 @@ describe("Delete all", () => {
 });
 
 /**
+ * Safe to delete reaches back past the live line (operator, 2026-09-18).
+ *
+ * `liveOnly` was added to stop back-filled history flooding Need to reply,
+ * and applied to all four status rows at once. On this row flooding is the
+ * point: it was hiding most of a real mailbox from the one list whose job is
+ * to clear it out.
+ */
+describe("Safe to delete and the live line", () => {
+  it("lists mail from long before the inbox was connected", () => {
+    const db = testDb();
+    seed(db);
+    // Sent a year before this account existed, which no other status row shows.
+    const connected = db.select().from(accounts).where(eq(accounts.id, "a1")).get()!.createdAt;
+    const old = connected - 365 * 86_400_000;
+    db.insert(messages)
+      .values({
+        ...base, id: "a1:mold", accountId: "a1", providerMessageId: "INBOX:old", threadId: "a1:told", rfcMessageId: null,
+        fromAddress: "news@vendor.com", toAddresses: ["me@example.com"], subject: "Last year in robotics",
+        bodyText: "A newsletter.", isFromOperator: false, folder: "inbox", sentAt: old, receivedAt: old,
+      })
+      .run();
+    db.insert(threads)
+      .values({ id: "a1:told", accountId: "a1", providerThreadId: "told", subject: "Last year in robotics", lastMessageAt: old, lastFromOperator: false })
+      .run();
+    db.insert(sorts)
+      .values({ messageId: "a1:mold", important: false, needsReply: false, scheduling: false, category: null, finance: "none", disposable: true, reason: "a newsletter", model: "x", labeledAt: null, createdAt: 1 })
+      .run();
+
+    expect(disposableThreadIds(db, {})).toContain("a1:told");
+    expect(folderCounts(db, {}).disposable).toBeGreaterThan(0);
+    // The rows that exist to say the operator owes something still do not
+    // reach back: that is what the live line is for.
+    expect(listInboxMessages(db, { status: "needs_reply" }).map((r) => r.message.id)).not.toContain("a1:mold");
+  });
+});
+
+/**
  * The same button over the Hidden list (operator, 2026-09-18: "for the
  * hidden tab please build a button that allows me to delete all"). Hidden
  * threads were out of the way but still in the mailbox, with no way to clear
