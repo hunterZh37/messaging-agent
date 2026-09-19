@@ -484,6 +484,13 @@ main.inbox-page { max-width: none; margin: 0; padding: 0; }
 .head-row.first > .head-title, .head-row.first > .head-sub { white-space: nowrap; flex-shrink: 0; }
 /* Pushes the refresh control to the far right of the first row. */
 .head-spacer { flex: 1 1 auto; }
+/* The filter row is the only thing in this header that gives way. Everything
+   beside it holds its size (operator, 2026-09-19: with the Ask Celeste panel
+   open, "Delete all · 0" was squeezed down to "0" and tucked under the
+   project chip). A button whose label is crushed away is not a smaller
+   button, it is a different button. */
+.head-row.first > *:not(.head-filters):not(.head-spacer) { flex: none; }
+.head-row .chip.edit { white-space: nowrap; }
 /* Between one group of controls and the next. */
 .head-div { width: 1px; align-self: stretch; min-height: 18px; margin: 0 2px; background: var(--line); }
 .head-row .chip { display: inline-flex; align-items: center; height: 26px; }
@@ -924,7 +931,7 @@ html[data-switching] .inbox-grid, html[data-switching] main > .empty-wrap { opac
    the values changed. A minimum keeps them from twitching on every change,
    and a maximum keeps one long project name from pushing the rest off. */
 @media (min-width: 900px) {
-  .head-filters { gap: 14px; overflow-x: visible; -webkit-mask-image: none; mask-image: none; }
+  .head-filters { gap: 14px; }
   .filter-chip { width: auto; min-width: 150px; max-width: 360px; padding-right: 10px; }
   .filter-chip.period-chip { width: auto; min-width: 118px; }
   .filter-chip.project-picker { width: auto; min-width: 190px; max-width: 400px; }
