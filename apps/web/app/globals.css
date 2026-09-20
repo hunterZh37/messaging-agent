@@ -1303,6 +1303,9 @@ main.stats-page { max-width: 1040px; margin: 0 auto; padding: 0 22px 60px; }
 /* The quieter half of the stats page, kept on it but out of the way
    (operator, 2026-09-19: "information overload"). Shut, a fold is one line
    that still answers whether there is anything inside worth opening. */
+/* A proposal whose threads have gone: said, not offered (2026-09-19). */
+.ask-action-gone { color: var(--muted); font-style: italic; }
+
 .stat-fold { border-top: 1px solid var(--line); margin-top: 14px; }
 .stat-fold > summary {
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;

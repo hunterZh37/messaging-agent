@@ -163,11 +163,25 @@ function ActionButton({
   const pathname = usePathname();
   const { lookingAtDraft } = useAsk();
   const threadIds = threadsOf(action);
+  /**
+   * The proposal names threads, and none of them was found when the answer
+   * was written (operator, 2026-09-19). A button that cannot work must not
+   * look like one: this used to stay pressable and answer "thread not found"
+   * only after the press, under a sentence saying the draft was ready.
+   *
+   * Proposals made before this was checked at the source are still in the
+   * history, so the guard stays whatever the model does now.
+   */
+  const namesNothing = threadIds.length > 0 && (action.threads?.length ?? 0) === 0 && action.kind !== "apply_draft";
   // A draft rewrite the panel already put on the card, and a draft it wrote
   // without being asked twice, both read as done from the first paint.
   const auto = Array.isArray(drafted) && drafted.length > 0 ? { label: actionDoneLabel(action.kind, drafted.length, 0), href: `/drafts?draft=${drafted[0]}` } : null;
   const done = ran ?? (applied ? { label: actionDoneLabel("apply_draft", 1, 0) } : auto);
   const running = drafted === "running";
+
+  if (namesNothing) {
+    return <span className="ask-note ask-action-gone">{actionLabel(action)} · that thread is no longer here</span>;
+  }
 
   // Opening is a link, and several threads are several links: the chips
   // beneath are those links, so there is no button to press here.
