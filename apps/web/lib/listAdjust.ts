@@ -56,3 +56,34 @@ export const listAdjust = {
     return version;
   },
 };
+
+/**
+ * The tree row a counted list is drawn as. Hidden stands beside Deleted items
+ * rather than under Inbox, so it is the one whose key is not `folder:list`.
+ */
+export function treeKeyForList(folder: string, list: string): string {
+  if (list === "hidden") return "hidden";
+  return list === folder ? folder : `${folder}:${list}`;
+}
+
+/** What a list on screen has let go of, per tree row, given the threads leaving it. */
+export function goneByKey(
+  rows: { threadId: string; keys: string[] }[],
+  leaving: Iterable<string>,
+): Map<string, ListGone> {
+  const out = new Set(leaving);
+  const seen = new Map<string, { rows: number; threads: Set<string> }>();
+  for (const row of rows) {
+    if (!out.has(row.threadId)) continue;
+    for (const key of row.keys) {
+      let found = seen.get(key);
+      if (!found) {
+        found = { rows: 0, threads: new Set() };
+        seen.set(key, found);
+      }
+      found.rows++;
+      found.threads.add(row.threadId);
+    }
+  }
+  return new Map([...seen].map(([key, v]) => [key, { rows: v.rows, threads: v.threads.size }]));
+}

@@ -8,6 +8,7 @@ import {
   disposableThreadIds,
   folderCounts,
   hiddenThreadIds,
+  listsOfMessages,
   listInboxMessages,
   markMessagesReadElsewhere,
   markThreadOpened,
@@ -935,5 +936,59 @@ describe("Need to reply for chats: people you know, recently", () => {
     // Still in the plain Messages list, and still searchable.
     expect(listInboxMessages(db, { folder: "messages" }).map((r) => r.thread.subject)).toContain("Aunt");
     expect(folderCounts(db, { now: NOW }).texts.unopened).toBe(listInboxMessages(db, { folder: "messages", status: "unopened" }).length);
+  });
+});
+
+/**
+ * The membership the tree's optimistic counts read (operator, 2026-09-20:
+ * "I want the number update to be really snappy"). It has to agree with the
+ * counts exactly: a number that drops too far and springs back on the next
+ * paint is worse than one that arrives a moment late.
+ */
+describe("which counted lists a message is in", () => {
+  const everyMessageId = (db: ReturnType<typeof testDb>) => db.select({ id: messages.id }).from(messages).all().map((r) => r.id);
+  const total = (lists: Map<string, string[]>, list: string) => [...lists.values()].filter((v) => v.includes(list)).length;
+
+  it("agrees with the counts, list for list", () => {
+    const db = testDb();
+    seed(db);
+    const counts = folderCounts(db, { since: 0 });
+    const lists = listsOfMessages(db, "inbox", everyMessageId(db), { since: 0 });
+    expect(total(lists, "inbox")).toBe(counts.inbox);
+    expect(total(lists, "owed")).toBe(counts.owed);
+    expect(total(lists, "knowing")).toBe(counts.knowing);
+    expect(total(lists, "unopened")).toBe(counts.unopened);
+    expect(total(lists, "disposable")).toBe(counts.disposable);
+    expect(total(lists, "hidden")).toBe(counts.hidden);
+  });
+
+  it("still agrees once a thread is hidden, which moves it between two of them", () => {
+    const db = testDb();
+    seed(db);
+    db.update(threads).set({ hiddenAt: 900 }).where(eq(threads.id, "a1:t1")).run();
+    const counts = folderCounts(db, { since: 0 });
+    const lists = listsOfMessages(db, "inbox", everyMessageId(db), { since: 0 });
+    expect(total(lists, "inbox")).toBe(counts.inbox);
+    expect(total(lists, "hidden")).toBe(counts.hidden);
+    expect(counts.hidden).toBeGreaterThan(0);
+  });
+
+  it("counts a message under every list it is in at once, not just the first", () => {
+    const db = testDb();
+    seed(db);
+    const lists = listsOfMessages(db, "inbox", everyMessageId(db), { since: 0 });
+    expect([...lists.values()].some((v) => v.length > 1)).toBe(true);
+    expect([...lists.values()].every((v) => v.includes("inbox") || v.includes("hidden"))).toBe(true);
+  });
+
+  it("follows the window and the inbox the counts follow", () => {
+    const db = testDb();
+    seed(db);
+    expect(listsOfMessages(db, "inbox", everyMessageId(db), { since: 1_000_000 }).size).toBe(0);
+    expect(listsOfMessages(db, "inbox", everyMessageId(db), { accountId: "nobody", since: 0 }).size).toBe(0);
+  });
+
+  it("asks nothing when there is nothing on screen", () => {
+    expect(listsOfMessages(testDb(), "inbox", [], { since: 0 }).size).toBe(0);
   });
 });

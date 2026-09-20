@@ -966,3 +966,60 @@ export function keepThread(db: Db, threadId: string, dest: KeepDestination = "in
   db.delete(actions).where(and(eq(actions.messageId, latest.id), eq(actions.kind, "handled"))).run();
   return cleared;
 }
+
+/** The counted tree rows under each folder, in the order the tree draws them. */
+export const COUNTED_LISTS = {
+  inbox: ["unopened", "owed", "knowing", "disposable", "hidden"],
+  messages: ["needs_reply", "unopened", "disposable", "hidden"],
+} as const satisfies Record<"inbox" | "messages", readonly string[]>;
+
+/**
+ * Which counted lists each of these messages is in (operator, 2026-09-20: "I
+ * want the number update to be really snappy").
+ *
+ * A deleted row leaves its own list at once, and every other count it was in
+ * waited on the provider: on the Inbox itself nothing moved at all, because
+ * nothing knew which rows the number over it was counting. The list can now
+ * say, for each row on screen, every number it is part of, and the tree takes
+ * them all off the moment the card goes.
+ *
+ * Read by running the lists' own conditions over these ids rather than
+ * restating them here. There are eight or so rules about what belongs in
+ * "Reply / Action Required" alone, and a second copy of them in the browser
+ * would be wrong the first time one changed: a number that drops too far and
+ * springs back is worse than one that arrives late.
+ */
+export function listsOfMessages(
+  db: Db,
+  folder: "inbox" | "messages",
+  messageIds: string[],
+  opts: TreeScope = {},
+): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  if (messageIds.length === 0) return out;
+  const add = (id: string, list: string) => {
+    const had = out.get(id);
+    if (had) had.push(list);
+    else out.set(id, [list]);
+  };
+  // SQLite binds one variable per id, so long pages ask in batches.
+  const batches: string[][] = [];
+  for (let i = 0; i < messageIds.length; i += 400) batches.push(messageIds.slice(i, i + 400));
+  const ask = (status: string | undefined) => {
+    for (const ids of batches) {
+      const rows = db
+        .select({ id: messages.id })
+        .from(messages)
+        .innerJoin(threads, eq(threads.id, messages.threadId))
+        .leftJoin(sorts, eq(sorts.messageId, messages.id))
+        .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
+        .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
+        .where(and(inArray(messages.id, ids), ...scopeConditions({ ...opts, folder, ...(status ? { status: status as CountScope["status"] } : {}) })))
+        .all();
+      for (const r of rows) add(r.id, status ?? folder);
+    }
+  };
+  ask(undefined);
+  for (const status of COUNTED_LISTS[folder]) ask(status);
+  return out;
+}

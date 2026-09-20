@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { goneFromList, lessGone, listAdjust } from "../lib/listAdjust";
+import { goneFromList, lessGone, listAdjust, goneByKey, treeKeyForList } from "../lib/listAdjust";
 
 /** The counts drop with the cards, not when the provider is done (2026-09-15). */
 describe("goneFromList", () => {
@@ -34,5 +34,44 @@ describe("listAdjust", () => {
     expect(listAdjust.get("inbox:disposable")).toBeUndefined();
     expect(calls).toBe(2);
     off();
+  });
+});
+
+/**
+ * Every number a card was part of, not only the one over the list it sat in
+ * (operator, 2026-09-20: "I want the number update to be really snappy").
+ */
+describe("what a list takes off each tree row", () => {
+  const rows = [
+    { threadId: "t1", keys: ["inbox", "inbox:unopened", "inbox:disposable"] },
+    { threadId: "t1", keys: ["inbox", "inbox:disposable"] },
+    { threadId: "t2", keys: ["inbox", "inbox:owed"] },
+  ];
+
+  it("takes one off every row the card was counted in", () => {
+    const gone = goneByKey(rows, ["t2"]);
+    expect(gone.get("inbox")).toEqual({ rows: 1, threads: 1 });
+    expect(gone.get("inbox:owed")).toEqual({ rows: 1, threads: 1 });
+    expect(gone.has("inbox:disposable")).toBe(false);
+  });
+
+  /** The tree counts rows and Delete all counts threads, so both are kept. */
+  it("counts two rows of one thread as two rows and one thread", () => {
+    const gone = goneByKey(rows, ["t1"]);
+    expect(gone.get("inbox")).toEqual({ rows: 2, threads: 1 });
+    expect(gone.get("inbox:disposable")).toEqual({ rows: 2, threads: 1 });
+    expect(gone.get("inbox:unopened")).toEqual({ rows: 1, threads: 1 });
+  });
+
+  it("takes nothing off while nothing is leaving", () => {
+    expect(goneByKey(rows, []).size).toBe(0);
+  });
+
+  it("names the tree row a list is drawn as", () => {
+    expect(treeKeyForList("inbox", "disposable")).toBe("inbox:disposable");
+    expect(treeKeyForList("inbox", "inbox")).toBe("inbox");
+    // Archive stands beside Deleted items rather than under Inbox.
+    expect(treeKeyForList("inbox", "hidden")).toBe("hidden");
+    expect(treeKeyForList("messages", "hidden")).toBe("hidden");
   });
 });

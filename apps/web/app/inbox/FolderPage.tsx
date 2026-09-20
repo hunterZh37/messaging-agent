@@ -144,7 +144,8 @@ export async function FolderPage({ folder, searchParams }: { folder: FolderKey; 
   // the number on that button is the number beside the row it belongs to.
   // An open inbox pill narrows these too, so the number on "Mark all opened"
   // is the number the button acts on (stress loop, 2026-09-11).
-  const treeCountsForView = treeCounts(selectedId, { ...treeScope(effective, at), ...(focusId ? { accountId: focusId } : {}) });
+  const countScope = { ...treeScope(effective, at), ...(focusId ? { accountId: focusId } : {}) };
+  const treeCountsForView = treeCounts(selectedId, countScope);
 
   // What "Mark all opened" and "Delete all" act on: the view exactly as it is
   // narrowed. Delete all counts threads rather than rows, because a delete is
@@ -220,6 +221,7 @@ export async function FolderPage({ folder, searchParams }: { folder: FolderKey; 
             params={params}
             window={window}
             lastSyncAt={lastSyncAt}
+            countScope={countScope}
             deletable={isInbox || isTexts}
             restorable={folder === "trash"}
             handledLeaves={status === "needs_reply"}

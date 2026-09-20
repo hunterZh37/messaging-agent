@@ -1,12 +1,13 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { listProjects, listSenderRules, senderKey, UNFILED, type InboxRow, type ProjectRow, type Wants } from "@messaging-agent/core";
+import { listProjects, listSenderRules, listsOfMessages, senderKey, UNFILED, type InboxRow, type ProjectRow, type TreeScope, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 import { ListKeys } from "./ListKeys";
 import { FOLDER_TITLES, LIST_PAGE, parseStatus, threadPath, viewHref, type FolderKey, type ViewParams } from "@/lib/folders";
 import { formatTime, relativeTime, shortAccount, cleanSnippet } from "@/lib/format";
 import type { WindowKey } from "@/lib/selection";
 import { groupByThread } from "@/lib/threads";
+import { treeKeyForList } from "@/lib/listAdjust";
 import { rowTags } from "@/lib/rowTags";
 import { ChannelIcon } from "./icons";
 import { ThreadGroup } from "./ThreadGroup";
@@ -102,6 +103,8 @@ export function InboxList(props: {
   window: WindowKey;
   selectedThreadId?: string;
   lastSyncAt: number | null;
+  /** The scope the tree's counts were read with, so what is taken off them matches. */
+  countScope?: TreeScope;
   /**
    * Every row carries an × that deletes its thread (spec 10a, 2026-09-11).
    * Only the Safe-to-delete view asks for it: elsewhere the thread page's
@@ -178,6 +181,19 @@ export function InboxList(props: {
     );
   };
 
+  // Which numbers each row on screen is part of, read from the lists' own
+  // conditions rather than restated here: there are eight rules about what
+  // belongs in Reply / Action Required alone, and a second copy of them in
+  // the browser would be wrong the first time one changed.
+  const countRows = (() => {
+    if (folder !== "inbox" && folder !== "messages") {
+      // Sent and the rest keep what they had: the one row over this list.
+      return params.status ? rows.map((r) => ({ threadId: r.thread.id, keys: [`${folder}:${params.status}`] })) : [];
+    }
+    const lists = listsOfMessages(core().db, folder, rows.map((r) => r.message.id), props.countScope ?? {});
+    return rows.map((r) => ({ threadId: r.thread.id, keys: (lists.get(r.message.id) ?? []).map((l) => treeKeyForList(folder, l)) }));
+  })();
+
   const groups = groupByThread(rows);
   const more = rows.length >= props.limit;
 
@@ -185,8 +201,10 @@ export function InboxList(props: {
     <div className="inbox-panel">
       <ListKeys />
       <ListSeen listKey={listKey} />
-      {/* The counts drop with the cards, not when the provider is done (2026-09-15). */}
-      {params.status ? <ListCount treeKey={`${folder}:${params.status}`} rowThreadIds={rows.map((r) => r.thread.id)} handledLeaves={props.handledLeaves ?? false} /> : null}
+      {/* The counts drop with the cards, not when the provider is done
+          (2026-09-15), and every count a card was in rather than only the one
+          over this list (operator, 2026-09-20: "really snappy"). */}
+      {countRows.length > 0 ? <ListCount rows={countRows} handledLeaves={props.handledLeaves ?? false} /> : null}
       <div className="inbox-rows">
         {rows.length === 0 ? (
           <div className="inbox-empty">

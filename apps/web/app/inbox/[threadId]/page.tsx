@@ -214,6 +214,7 @@ export default async function ThreadPage({
             window={window}
             selectedThreadId={threadId}
             lastSyncAt={null}
+            countScope={treeScope(effective)}
             deletable={isInbox || isTexts}
             restorable={folder === "trash"}
             handledLeaves={status === "needs_reply"}
