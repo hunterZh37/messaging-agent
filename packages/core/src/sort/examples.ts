@@ -195,14 +195,12 @@ function exampleFor(db: Db, messageId: string): SortExample | null {
     subject: row.subject,
     snippet: snippetOf(row.bodyText),
     verdict: {
-      important: row.sort.important,
-      needs_reply: row.sort.needsReply,
+      wants: row.sort.wants,
       scheduling: row.sort.scheduling,
-      // Mail that is not important carries no sub-category, and the sorter
+      // Mail bound for the bin carries no sub-category, and the sorter
       // answers "Other" for it, so that is what the example shows.
       category: row.sort.category ?? OTHER,
       finance: row.sort.finance as Finance,
-      disposable: row.sort.disposable,
       project: assignedProjectName(db, messageId),
     },
   };

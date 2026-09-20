@@ -28,8 +28,8 @@ function seed(db: TestDb) {
     .run();
   db.insert(sorts)
     .values([
-      { messageId: "a1:m1", important: true, needsReply: true, scheduling: false, category: "Needs reply", finance: "none", reason: "x", model: "m", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:m3", important: true, needsReply: true, scheduling: false, category: "Needs reply", finance: "none", reason: "y", model: "m", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m1", wants: "reply", scheduling: false, category: "Needs reply", finance: "none", reason: "x", model: "m", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m3", wants: "reply", scheduling: false, category: "Needs reply", finance: "none", reason: "y", model: "m", labeledAt: null, createdAt: 1 },
     ])
     .run();
 }

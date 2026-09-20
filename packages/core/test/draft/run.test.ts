@@ -29,10 +29,10 @@ function seed(db: ReturnType<typeof testDb>) {
   ]).run();
   const s = { scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 };
   db.insert(sorts).values([
-    { ...s, messageId: "a1:m1", important: true, needsReply: true },
-    { ...s, messageId: "a1:m2", important: true, needsReply: true },
-    { ...s, messageId: "a1:m3", important: true, needsReply: true },
-    { ...s, messageId: "a1:m4", important: true, needsReply: false },
+    { ...s, messageId: "a1:m1", wants: "reply", },
+    { ...s, messageId: "a1:m2", wants: "reply", },
+    { ...s, messageId: "a1:m3", wants: "reply", },
+    { ...s, messageId: "a1:m4", wants: "knowing", },
   ]).run();
 }
 
@@ -53,7 +53,7 @@ describe("selectDraftCandidates", () => {
     // A newer message in the same thread is a new question, drafted afresh.
     db.insert(messages).values({ accountId: "a1", rfcMessageId: null, fromName: null, toAddresses: ["me@example.com"], ccAddresses: [], snippet: null, attachmentNames: [], receivedAt: 1, isFromOperator: false, bodyText: "b", id: "a1:m5", providerMessageId: "m5", threadId: "a1:t1", fromAddress: "bob@x.com", subject: "A", sentAt: NOW - DAY / 2 }).run();
     db.update(threads).set({ lastMessageAt: NOW - DAY / 2 }).where(eq(threads.id, "a1:t1")).run();
-    db.insert(sorts).values({ scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1, messageId: "a1:m5", important: true, needsReply: true }).run();
+    db.insert(sorts).values({ scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1, messageId: "a1:m5", wants: "reply", }).run();
     expect(selectDraftCandidates(db, () => NOW).map((m) => m.id)).toEqual(["a1:m5"]);
   });
 });
@@ -339,7 +339,7 @@ describe("a drafter that sees nothing to answer", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ status: "declined", originalText: "a receipt", replyToMessageId: "a1:m2" });
     // The pipeline leaves a declined message alone.
-    db.insert(sorts).values({ messageId: "a1:m2", important: true, needsReply: true, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 }).run();
+    db.insert(sorts).values({ messageId: "a1:m2", wants: "reply", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 }).run();
     const p = await draftPending(db, drafter, "voice", { clock: () => 999 });
     expect(p).toEqual({ drafted: 0, failed: 0, declined: 0 });
     expect(calls).toBe(1);

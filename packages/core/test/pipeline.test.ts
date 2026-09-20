@@ -27,7 +27,7 @@ function scriptedSorter(): Sorter {
   return {
     model: "test-sorter",
     async sort() {
-      return { important: true, needs_reply: true, scheduling: false, category: "Needs reply", finance: "none" as const, disposable: false, project: "None", reason: "test" };
+      return { wants: "reply", scheduling: false, category: "Needs reply", finance: "none" as const,  project: "None", reason: "test" };
     },
   };
 }

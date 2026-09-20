@@ -42,15 +42,15 @@ function seed(db: ReturnType<typeof testDb>) {
     .run();
   db.insert(sorts)
     .values([
-      { messageId: "a1:m1", important: true, needsReply: true, scheduling: false, category: "Needs reply", finance: "expense", reason: "bill", model: "anthropic:claude-haiku-4-5", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:m2", important: true, needsReply: true, scheduling: true, category: "Needs reply", finance: "none", reason: "asks", model: "anthropic:claude-haiku-4-5", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:m3", important: false, needsReply: false, scheduling: false, category: null, finance: "none", disposable: true, reason: "newsletter", model: "anthropic:claude-haiku-4-5", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m1", wants: "reply", scheduling: false, category: "Needs reply", finance: "expense", reason: "bill", model: "anthropic:claude-haiku-4-5", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m2", wants: "reply", scheduling: true, category: "Needs reply", finance: "none", reason: "asks", model: "anthropic:claude-haiku-4-5", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m3", wants: "bin", scheduling: false, category: null, finance: "none",  reason: "newsletter", model: "anthropic:claude-haiku-4-5", labeledAt: null, createdAt: 1 },
     ])
     .run();
 }
 
 function verdict(p: Partial<SortResult> = {}): SortResult {
-  return { important: true, needs_reply: true, scheduling: false, category: "Needs reply", finance: "none", disposable: false, project: NO_PROJECT, reason: "because", ...p };
+  return { wants: "reply", scheduling: false, category: "Needs reply", finance: "none",  project: NO_PROJECT, reason: "because", ...p };
 }
 
 /** A model, scripted by sender, that also reports what it would have cost. */
@@ -151,7 +151,7 @@ describe("runSortEval", () => {
     const before = db.select().from(sorts).all();
 
     const haiku = fakeSorter("anthropic:claude-haiku-4-5", () => verdict());
-    const local = fakeSorter("ollama:qwen3:8b", () => verdict({ important: false }), 900);
+    const local = fakeSorter("ollama:qwen3:8b", () => verdict({ wants: "bin", }), 900);
 
     const r = await runSortEval(db, testConfig(), {
       models: [HAIKU, LOCAL],
@@ -189,10 +189,10 @@ describe("runSortEval", () => {
       sorterFor: () => fakeSorter("anthropic:claude-haiku-4-5", () => verdict()),
     });
     const baseline = db.select().from(evalResults).where(eq(evalResults.model, BASELINE)).all();
-    expect(baseline.find((b) => b.messageId === "a1:m1")!.output).toMatchObject({ important: true, needs_reply: true, finance: "expense", disposable: false, category: "Needs reply" });
+    expect(baseline.find((b) => b.messageId === "a1:m1")!.output).toMatchObject({ wants: "reply", finance: "expense",  category: "Needs reply" });
     // Safe to delete is copied into the run beside the rest, so the target
     // cannot move under a later re-sort either (spec 13).
-    expect(baseline.find((b) => b.messageId === "a1:m3")!.output).toMatchObject({ disposable: true });
+    expect(baseline.find((b) => b.messageId === "a1:m3")!.output).toMatchObject({ wants: "bin" });
     expect(baseline.every((b) => b.latencyMs === null)).toBe(true);
     void r;
   });
@@ -244,12 +244,12 @@ describe("sortEvalReport", () => {
     // Haiku repeats the baseline exactly; the local model gets m3 wrong.
     const haiku = fakeSorter("anthropic:claude-haiku-4-5", (i) =>
       i.fromAddress === "news@example.com"
-        ? verdict({ important: false, needs_reply: false, category: "FYI", disposable: true })
+        ? verdict({ wants: "bin", category: "FYI", })
         : verdict({ finance: i.fromAddress === "bob@example.com" ? "expense" : "none", scheduling: i.fromAddress === "ann@example.com" }),
     );
     const local = fakeSorter(
       "ollama:qwen3:8b",
-      (i) => (i.fromAddress === "news@example.com" ? verdict({ important: true, needs_reply: true, category: "Needs reply" }) : verdict({ finance: i.fromAddress === "bob@example.com" ? "expense" : "none" })),
+      (i) => (i.fromAddress === "news@example.com" ? verdict({ wants: "reply", category: "Needs reply" }) : verdict({ finance: i.fromAddress === "bob@example.com" ? "expense" : "none" })),
       800,
     );
     const r = await runSortEval(db, testConfig(), {
@@ -268,14 +268,14 @@ describe("sortEvalReport", () => {
 
     expect(report.sampleSize).toBe(3);
     const haiku = report.models.find((m) => m.model === "anthropic:claude-haiku-4-5")!;
-    expect(haiku.agreement).toEqual({ important: 1, needs_reply: 1, finance: 1, disposable: 1, category: 1, project: 1 });
+    expect(haiku.agreement).toEqual({ wants: 1, scheduling: 1, finance: 1, category: 1, project: 1 });
     expect(haiku.meanLatencyMs).toBe(10);
     expect(haiku.inputTokens).toBe(3000);
     // 3000 in at $1/M plus 300 out at $5/M.
     expect(haiku.estimatedCostUsd).toBeCloseTo(0.0045, 6);
 
     const local = report.models.find((m) => m.model === "ollama:qwen3:8b")!;
-    expect(local.agreement.important).toBeCloseTo(2 / 3, 6);
+    expect(local.agreement.wants).toBeCloseTo(2 / 3, 6);
     expect(local.agreement.category).toBeCloseTo(2 / 3, 6);
     expect(local.agreement.finance).toBe(1);
     expect(local.meanLatencyMs).toBe(800);
@@ -286,7 +286,7 @@ describe("sortEvalReport", () => {
     expect(report.pairwise[0]!.a).toBe("anthropic:claude-haiku-4-5");
     expect(report.pairwise[0]!.b).toBe("ollama:qwen3:8b");
     expect(report.pairwise[0]!.compared).toBe(3);
-    expect(report.pairwise[0]!.agreement.important).toBeCloseTo(2 / 3, 6);
+    expect(report.pairwise[0]!.agreement.wants).toBeCloseTo(2 / 3, 6);
   });
 
   it("scores safe to delete like the other axes, and names it in the table", async () => {
@@ -294,9 +294,9 @@ describe("sortEvalReport", () => {
     const report = sortEvalReport(db, runId);
     // The baseline calls the newsletter disposable. Haiku says so too; the
     // local model calls it worth keeping, and misses exactly that one.
-    expect(report.models.find((m) => m.model === "anthropic:claude-haiku-4-5")!.agreement.disposable).toBe(1);
-    expect(report.models.find((m) => m.model === "ollama:qwen3:8b")!.agreement.disposable).toBeCloseTo(2 / 3, 6);
-    expect(renderSortEvalReport(report)).toContain("disposable");
+    expect(report.models.find((m) => m.model === "anthropic:claude-haiku-4-5")!.agreement.wants).toBe(1);
+    expect(report.models.find((m) => m.model === "ollama:qwen3:8b")!.agreement.wants).toBeCloseTo(2 / 3, 6);
+    expect(renderSortEvalReport(report)).toContain("wants");
   });
 
   it("renders a table naming every model, the run and the sample", async () => {
@@ -304,7 +304,7 @@ describe("sortEvalReport", () => {
     const text = renderSortEvalReport(sortEvalReport(db, runId));
     expect(text).toContain("ollama:qwen3:8b");
     expect(text).toContain("anthropic:claude-haiku-4-5");
-    expect(text).toContain("important");
+    expect(text).toContain("wants");
     expect(text).toContain("3 messages");
     expect(text).toContain(runId);
   });

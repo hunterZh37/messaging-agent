@@ -1,5 +1,5 @@
 import { alias } from "drizzle-orm/sqlite-core";
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, ne, or, sql, type SQL } from "drizzle-orm";
 import { now as nowMs, type Db } from "../db/client";
 import { asksSomething, stripQuoted } from "../text/quoted";
 import type { Finance } from "../sort/types";
@@ -52,7 +52,18 @@ export const handledActions = alias(actions, "handled_actions");
  * `disposable` each cut across them; `waiting` and `not_waiting` split sent
  * mail.
  */
-export type FolderStatus = "needs_reply" | "no_reply" | "unopened" | "disposable" | "waiting" | "not_waiting" | "hidden";
+export type FolderStatus =
+  /** The four rungs of the ladder (operator, 2026-09-19), in its own order. */
+  | "needs_reply"
+  | "action"
+  | "knowing"
+  | "disposable"
+  /** Orthogonal to the ladder: read state, the operator's own archiving, and the two sent rows. */
+  | "no_reply"
+  | "unopened"
+  | "waiting"
+  | "not_waiting"
+  | "hidden";
 
 /** What the waiting heuristic reads off a thread; the dismissal is optional so callers built before it still fit. */
 export type WaitingThread = Pick<ThreadRow, "lastFromOperator" | "lastMessageAt"> & { waitingDismissedAt?: number | null };
@@ -236,7 +247,13 @@ function noName(): SQL {
  */
 export function scopeConditions(opts: InboxScope = {}): SQL[] {
   const folder = opts.folder ?? "inbox";
-  const sorting = opts.status === "needs_reply" || opts.status === "unopened" || opts.status === "no_reply" || opts.status === "disposable";
+  const sorting =
+    opts.status === "needs_reply" ||
+    opts.status === "action" ||
+    opts.status === "knowing" ||
+    opts.status === "unopened" ||
+    opts.status === "no_reply" ||
+    opts.status === "disposable";
   // Every row follows the window, Safe to delete for chats included
   // (operator, 2026-09-13: it had ignored it, and the header said 7 days
   // over a list reaching back to February).
@@ -254,7 +271,7 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
     if (opts.status === "hidden") conditions.push(folder === "inbox" ? latestInboxInThread() : latestInThread());
   }
   if (opts.important) {
-    conditions.push(eq(sorts.important, true));
+    conditions.push(ne(sorts.wants, "bin"));
     conditions.push(isNull(handledActions.id));
   }
   if (opts.category) conditions.push(eq(sorts.category, opts.category));
@@ -275,7 +292,7 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // message instead, an exchange answered three replies ago stayed on the
   // list forever, once for every question ever asked in it.
   if (folder === "inbox" && opts.status === "needs_reply") {
-    conditions.push(latestInThread(), eq(sorts.needsReply, true), isNull(handledActions.id), liveOnly());
+    conditions.push(latestInThread(), eq(sorts.wants, "reply"), isNull(handledActions.id), liveOnly());
   }
   // A chat needs a reply when the other person had the last word and nobody
   // has marked it handled: a fact, not a verdict (operator, 2026-09-11: the
@@ -320,8 +337,19 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // was hiding 1,448 of this mailbox's 1,678 inbox messages from the one
   // list whose job is to clear them out. Nothing here claims the operator
   // owes anything, which is what the live line exists to prevent.
+  // The two middle rungs (operator, 2026-09-19). They read like the two
+  // either side of them: the newest inbound message of the thread, nothing
+  // the operator has already marked handled, and inside the live line —
+  // which "action" keeps because it is a claim on the operator, and the bin
+  // does not because clearing out old junk is the point of that row.
+  if (folder === "inbox" && opts.status === "action") {
+    conditions.push(latestInThread(), eq(sorts.wants, "action"), isNull(handledActions.id), liveOnly());
+  }
+  if (folder === "inbox" && opts.status === "knowing") {
+    conditions.push(latestInThread(), eq(sorts.wants, "knowing"), liveOnly());
+  }
   if (folder === "inbox" && opts.status === "disposable") {
-    conditions.push(eq(sorts.disposable, true));
+    conditions.push(eq(sorts.wants, "bin"));
   }
   // A chat is safe to delete by a rule (operator, 2026-09-11): the handle has
   // no name in the address book (the chat's subject is the handle itself)
@@ -348,7 +376,7 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
     conditions.push(
       or(
         isNull(sorts.messageId),
-        eq(sorts.needsReply, false),
+        ne(sorts.wants, "reply"),
         isNotNull(handledActions.id),
         sql`not (${latestInThread()})`,
       )!,
@@ -425,7 +453,7 @@ export type TreeScope = Omit<CountScope, "folder" | "status" | "limit" | "before
  * exactly as the Sent list ignores it. Drafts are the whole approval queue,
  * which has no window and no filters of its own.
  */
-export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; drafts: number; needsReply: number; unopened: number; disposable: number; waiting: number; hidden: number; texts: { needsReply: number; unopened: number; disposable: number; hidden: number } } {
+export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; drafts: number; needsReply: number; action: number; knowing: number; unopened: number; disposable: number; waiting: number; hidden: number; texts: { needsReply: number; unopened: number; disposable: number; hidden: number } } {
   const drafts = listPendingDrafts(db, opts.accountId ? { accountId: opts.accountId } : {}).length;
 
   // What the Inbox list itself holds (operator, 2026-09-18: "need an inbox
@@ -469,6 +497,20 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status: "needs_reply" })))
       .get()?.count ?? 0;
+
+  // The two middle rungs, counted exactly as the two either side of them.
+  const rungCount = (status: "action" | "knowing") =>
+    db
+      .select({ count: sql<number>`count(*)` })
+      .from(messages)
+      .innerJoin(threads, eq(threads.id, messages.threadId))
+      .leftJoin(sorts, eq(sorts.messageId, messages.id))
+      .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
+      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
+      .where(and(...scopeConditions({ ...opts, folder: "inbox", status })))
+      .get()?.count ?? 0;
+  const action = rungCount("action");
+  const knowing = rungCount("knowing");
 
   const unopened =
     db
@@ -521,7 +563,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status: "hidden" })))
       .get()?.count ?? 0;
 
-  return { inbox, drafts, needsReply, unopened, disposable, hidden, waiting: applyWaiting(sentRows, sent).length, texts };
+  return { inbox, drafts, needsReply, action, knowing, unopened, disposable, hidden, waiting: applyWaiting(sentRows, sent).length, texts };
 }
 
 /**
@@ -533,7 +575,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
 export function countByCategory(db: Db, opts: { accountId?: string; since?: number } = {}): Record<string, number> {
   const conditions = [
     eq(messages.isFromOperator, false),
-    eq(sorts.important, true),
+    ne(sorts.wants, "bin"),
     isNotNull(sorts.category),
     isNull(handledActions.id),
   ];
@@ -599,7 +641,7 @@ export function countByFinance(db: Db, opts: CountScope = {}): { income: number;
  * no `handled` action, and inside `since` when one is given.
  */
 export function countImportantUnhandled(db: Db, opts: { accountId?: string; since?: number } = {}): number {
-  const conditions = [eq(messages.isFromOperator, false), eq(sorts.important, true), isNull(handledActions.id)];
+  const conditions = [eq(messages.isFromOperator, false), ne(sorts.wants, "bin"), isNull(handledActions.id)];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
   if (opts.since !== undefined) conditions.push(gte(messages.sentAt, opts.since));
 
@@ -894,7 +936,11 @@ export function keepThread(db: Db, threadId: string, dest: KeepDestination = "in
     .map((r) => r.id);
   if (ids.length === 0) return 0;
 
-  const cleared = db.update(sorts).set({ disposable: false }).where(inArray(sorts.messageId, ids)).run().changes;
+  const cleared = db
+    .update(sorts)
+    .set({ wants: "knowing" })
+    .where(and(inArray(sorts.messageId, ids), eq(sorts.wants, "bin")))
+    .run().changes;
   if (dest !== "needs_reply") return cleared;
 
   const latest = db
@@ -905,7 +951,7 @@ export function keepThread(db: Db, threadId: string, dest: KeepDestination = "in
     .limit(1)
     .get();
   if (!latest) return cleared;
-  db.update(sorts).set({ needsReply: true }).where(eq(sorts.messageId, latest.id)).run();
+  db.update(sorts).set({ wants: "reply" }).where(eq(sorts.messageId, latest.id)).run();
   db.delete(actions).where(and(eq(actions.messageId, latest.id), eq(actions.kind, "handled"))).run();
   return cleared;
 }

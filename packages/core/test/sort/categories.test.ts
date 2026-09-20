@@ -20,7 +20,7 @@ function seedSort(db: ReturnType<typeof testDb>, id: string, category: string | 
       bodyText: "b", snippet: null, attachmentNames: [], isFromOperator: false, sentAt: 1, receivedAt: 1,
     })
     .run();
-  db.insert(sorts).values({ messageId: id, important: true, needsReply: false, scheduling: false, category, reason: "r", model: "x", labeledAt: null, createdAt: 1 }).run();
+  db.insert(sorts).values({ messageId: id, wants: "knowing", scheduling: false, category, reason: "r", model: "x", labeledAt: null, createdAt: 1 }).run();
 }
 
 describe("seedCategoriesIfEmpty", () => {

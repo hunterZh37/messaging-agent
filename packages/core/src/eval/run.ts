@@ -165,12 +165,10 @@ export async function runSortEval(db: Db, cfg: Config, opts: SortEvalOptions): P
         messageId: row.m.id,
         model: BASELINE,
         output: {
-          important: row.s.important,
-          needs_reply: row.s.needsReply,
+          wants: row.s.wants,
           scheduling: row.s.scheduling,
           category: row.s.category ?? OTHER,
           finance: row.s.finance as SortResult["finance"],
-          disposable: row.s.disposable,
           project: assignedProjectName(db, row.m.id),
           reason: row.s.reason,
         },

@@ -15,9 +15,9 @@ describe("applyOutlookCategories", () => {
       { ...base, id: "a1:m3", providerMessageId: "m3", fromAddress: "c@x.com", sentAt: 3 },
     ]).run();
     db.insert(sorts).values([
-      { messageId: "a1:m1", important: true, needsReply: true, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:m2", important: true, needsReply: false, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:m3", important: false, needsReply: false, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m1", wants: "reply", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m2", wants: "knowing", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m3", wants: "bin", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
     ]).run();
     const client = new FakeOutlookClient();
     client.messageCategories.set("m1", ["personal"]);
@@ -44,9 +44,9 @@ describe("applyOutlookCategories", () => {
       { ...base, id: "a1:m3", providerMessageId: "m3", fromAddress: "c@x.com", sentAt: 3 },
     ]).run();
     db.insert(sorts).values([
-      { messageId: "a1:m1", important: true, needsReply: false, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:m2", important: true, needsReply: false, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:m3", important: true, needsReply: false, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m1", wants: "knowing", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m2", wants: "knowing", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m3", wants: "bin", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
     ]).run();
     const client = new FakeOutlookClient();
     client.categoryFailures.add("m2");

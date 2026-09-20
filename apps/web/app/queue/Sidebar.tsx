@@ -137,6 +137,9 @@ export interface TreeCounts {
   inbox: number;
   drafts: number;
   needsReply: number;
+  /** The two middle rungs of the ladder (operator, 2026-09-19). */
+  action: number;
+  knowing: number;
   /** Inbox threads holding something the operator has not opened (spec 10a). */
   unopened: number;
   /** Inbox mail the sorter says nobody will need again (spec 7, 2026-09-11). */

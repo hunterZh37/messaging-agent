@@ -47,8 +47,7 @@ export function selectDraftCandidates(db: Db, clock: () => number = now): Messag
         eq(messages.isFromOperator, false),
         // Texts are drafted on request only (operator, 2026-09-11: read + reply, no auto-drafting).
         ne(messages.folder, "messages"),
-        eq(sorts.important, true),
-        eq(sorts.needsReply, true),
+        eq(sorts.wants, "reply"),
         notInArray(messages.id, drafted),
       ),
     )

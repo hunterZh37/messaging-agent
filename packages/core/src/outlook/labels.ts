@@ -25,8 +25,8 @@ export async function applyOutlookCategories(db: Db, client: OutlookClient, acco
   for (const { s, providerMessageId } of rows) {
     try {
       const add: string[] = [];
-      if (s.important) add.push(OUTLOOK_CATEGORIES.important);
-      if (s.needsReply) add.push(OUTLOOK_CATEGORIES.needsReply);
+      if (s.wants !== "bin") add.push(OUTLOOK_CATEGORIES.important);
+      if (s.wants === "reply") add.push(OUTLOOK_CATEGORIES.needsReply);
       if (add.length) await client.addCategories(providerMessageId, add);
       db.update(sorts).set({ labeledAt: clock() }).where(eq(sorts.messageId, s.messageId)).run();
       labeled++;

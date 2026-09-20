@@ -25,12 +25,10 @@ const listMail: SortInput = {
 };
 
 const verdict = (over: Partial<SortResult> = {}): SortResult => ({
-  important: true,
-  needs_reply: true,
-  scheduling: true,
+  wants: "reply", scheduling: true,
   category: "Scheduling",
   finance: "none",
-  disposable: false,
+  
   project: "No project",
   reason: "This is a scheduling request, requiring a response to RSVP.",
   ...over,
@@ -78,7 +76,7 @@ describe("mail sent to a list rather than to you", () => {
 describe("the verdict, once the envelope is read", () => {
   it("takes a broadcast out of Need to reply and says why", () => {
     const out = settle(listMail, verdict());
-    expect(out.needs_reply).toBe(false);
+    expect(out.wants).toBe("knowing");
     expect(out.reason).toContain("sent to a list you are not addressed on");
   });
 
@@ -88,14 +86,13 @@ describe("the verdict, once the envelope is read", () => {
    * the envelope, so that call stays with the model.
    */
   it("says nothing about whether the mail is worth keeping", () => {
-    const out = settle(listMail, verdict({ disposable: false, important: true }));
-    expect(out.disposable).toBe(false);
-    expect(out.important).toBe(true);
-    expect(settle(listMail, verdict({ disposable: true })).disposable).toBe(true);
+    const out = settle(listMail, verdict({ wants: "knowing", }));
+    expect(out.wants).toBe("knowing");
+    expect(settle(listMail, verdict({ wants: "bin" })).wants).toBe("bin");
   });
 
   it("leaves a verdict alone when no reply was claimed", () => {
-    const quiet = verdict({ needs_reply: false });
+    const quiet = verdict({ wants: "knowing" });
     expect(settle(listMail, quiet)).toBe(quiet);
   });
 

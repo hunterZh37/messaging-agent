@@ -59,8 +59,8 @@ function seed(db: ReturnType<typeof testDb>) {
     .run();
   db.insert(sorts)
     .values([
-      { messageId: "a1:m1", important: true, needsReply: true, scheduling: false, category: "Scheduling", reason: "asks about Friday", model: "x", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:m2", important: true, needsReply: true, scheduling: false, category: "Needs reply", reason: "sent the deck", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m1", wants: "reply", scheduling: false, category: "Scheduling", reason: "asks about Friday", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:m2", wants: "reply", scheduling: false, category: "Needs reply", reason: "sent the deck", model: "x", labeledAt: null, createdAt: 1 },
     ])
     .run();
 }
@@ -142,7 +142,7 @@ describe("the finance axis", () => {
   function money(db: ReturnType<typeof testDb>) {
     db.update(sorts).set({ finance: "expense" }).where(eq(sorts.messageId, "a1:m1")).run();
     db.insert(sorts)
-      .values({ messageId: "a1:m3", important: false, needsReply: false, scheduling: false, category: null, finance: "income", reason: "a payout", model: "x", labeledAt: null, createdAt: 1 })
+      .values({ messageId: "a1:m3", wants: "bin", scheduling: false, category: null, finance: "income", reason: "a payout", model: "x", labeledAt: null, createdAt: 1 })
       .run();
   }
 
@@ -481,7 +481,7 @@ describe("Need to reply is a fact about the thread", () => {
       })
       .run();
     db.insert(sorts)
-      .values({ messageId: "a1:m9", important: true, needsReply: false, scheduling: false, category: "FYI", finance: "none", reason: "closed it", model: "x", labeledAt: null, createdAt: 1 })
+      .values({ messageId: "a1:m9", wants: "knowing", scheduling: false, category: "FYI", finance: "none", reason: "closed it", model: "x", labeledAt: null, createdAt: 1 })
       .run();
   }
 
@@ -683,7 +683,7 @@ describe("Safe to delete", () => {
 
   /** m2 is a deck nobody needs twice; m1 is a person asking a question. */
   function junkmail(db: ReturnType<typeof testDb>) {
-    db.update(sorts).set({ disposable: true }).where(eq(sorts.messageId, "a1:m2")).run();
+    db.update(sorts).set({ wants: "bin", }).where(eq(sorts.messageId, "a1:m2")).run();
   }
 
   it("holds what the sorter said nobody will need again, and nothing else", () => {
@@ -714,7 +714,7 @@ describe("Safe to delete", () => {
     const db = testDb();
     seed(db);
     junkmail(db);
-    db.update(sorts).set({ disposable: true }).where(eq(sorts.messageId, "a1:m1")).run();
+    db.update(sorts).set({ wants: "knowing" }).where(eq(sorts.messageId, "a1:m1")).run();
     const project = createProject(db, "a1", "Consulting", "client work");
     fileThread(db, "a1:t2", project.id);
 
@@ -745,7 +745,7 @@ describe("Safe to delete", () => {
       })
       .run();
     db.insert(sorts)
-      .values({ messageId: "a2:m9", important: false, needsReply: false, scheduling: false, category: null, finance: "none", disposable: true, reason: "a promotion", model: "x", labeledAt: null, createdAt: 1 })
+      .values({ messageId: "a2:m9", wants: "bin", scheduling: false, category: null, finance: "none",  reason: "a promotion", model: "x", labeledAt: null, createdAt: 1 })
       .run();
 
     expect(folderCounts(db, {}).disposable).toBe(2);
@@ -758,7 +758,7 @@ describe("Delete all", () => {
   it("names every thread the list would show, once each, and nothing else", () => {
     const db = testDb();
     seed(db);
-    db.update(sorts).set({ disposable: true }).where(eq(sorts.messageId, "a1:m2")).run();
+    db.update(sorts).set({ wants: "bin", }).where(eq(sorts.messageId, "a1:m2")).run();
     expect(disposableThreadIds(db, { accountId: "a1" })).toEqual(["a1:t2"]);
     expect(disposableThreadIds(db, { accountId: "a2" })).toEqual([]);
     // The window narrows it the way it narrows the list.
@@ -776,9 +776,9 @@ describe("Delete all", () => {
       })
       .run();
     db.insert(sorts)
-      .values({ messageId: "a1:m8", important: false, needsReply: false, scheduling: false, category: null, finance: "none", disposable: true, reason: "a digest", model: "x", labeledAt: null, createdAt: 1 })
+      .values({ messageId: "a1:m8", wants: "bin", scheduling: false, category: null, finance: "none",  reason: "a digest", model: "x", labeledAt: null, createdAt: 1 })
       .run();
-    db.update(sorts).set({ disposable: true }).where(eq(sorts.messageId, "a1:m2")).run();
+    db.update(sorts).set({ wants: "bin" }).where(eq(sorts.messageId, "a1:m2")).run();
 
     // Two rows in the list and in the tree's count, one thread to delete.
     expect(listInboxMessages(db, { status: "disposable" })).toHaveLength(2);
@@ -819,7 +819,7 @@ describe("Safe to delete and the live line", () => {
       .values({ id: "a1:told", accountId: "a1", providerThreadId: "told", subject: "Last year in robotics", lastMessageAt: old, lastFromOperator: false })
       .run();
     db.insert(sorts)
-      .values({ messageId: "a1:mold", important: false, needsReply: false, scheduling: false, category: null, finance: "none", disposable: true, reason: "a newsletter", model: "x", labeledAt: null, createdAt: 1 })
+      .values({ messageId: "a1:mold", wants: "bin", scheduling: false, category: null, finance: "none",  reason: "a newsletter", model: "x", labeledAt: null, createdAt: 1 })
       .run();
 
     expect(disposableThreadIds(db, {})).toContain("a1:told");
@@ -840,7 +840,7 @@ describe("Delete all, over Hidden", () => {
   it("names the hidden threads and nothing that is merely safe to delete", () => {
     const db = testDb();
     seed(db);
-    db.update(sorts).set({ disposable: true }).where(eq(sorts.messageId, "a1:m2")).run();
+    db.update(sorts).set({ wants: "bin" }).where(eq(sorts.messageId, "a1:m2")).run();
     db.update(threads).set({ hiddenAt: 500 }).where(eq(threads.id, "a1:t1")).run();
 
     expect(hiddenThreadIds(db, {})).toEqual(["a1:t1"]);

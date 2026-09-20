@@ -1,24 +1,24 @@
 import { z } from "zod";
 import type { Category } from "./categories";
+import { WANTS } from "../db/schema";
 
 /** Which way money moves in a message: its own axis, beside importance (spec 7). */
 export const FINANCE_VALUES = ["none", "income", "expense"] as const;
 export type Finance = (typeof FINANCE_VALUES)[number];
 
 export const SortResultSchema = z.object({
-  important: z.boolean(),
-  needs_reply: z.boolean(),
+  /**
+   * The one thing this message wants from the operator (operator,
+   * 2026-09-19), in the ladder's own order. It replaced `important`,
+   * `needs_reply` and `disposable`, three booleans a model could set in
+   * combinations that contradicted each other.
+   */
+  wants: z.enum(WANTS),
+  /** A fact about the message: it proposes, asks for or changes a time. */
   scheduling: z.boolean(),
   /** One of the operator's sub-categories, or "Other" (spec 7). */
   category: z.string(),
   finance: z.enum(FINANCE_VALUES),
-  /**
-   * Mail nobody will need again once it has been read, so it is safe to put
-   * in the Trash (spec 7, 2026-09-11). Judged for every message, like
-   * finance: a marketing blast is disposable whether or not it was worth
-   * surfacing, and a contract never is.
-   */
-  disposable: z.boolean(),
   /** One of the inbox's projects, or "None" (spec 10d). */
   project: z.string(),
   reason: z.string(),

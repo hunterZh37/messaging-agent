@@ -30,9 +30,9 @@ function seed(db: ReturnType<typeof testDb>) {
     .run();
   db.insert(sorts)
     .values([
-      { messageId: "a1:INBOX:1", important: true, needsReply: true, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:INBOX:2", important: true, needsReply: false, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:[Gmail]/Sent Mail:3", important: false, needsReply: false, scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:INBOX:1", wants: "reply", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:INBOX:2", wants: "knowing", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:[Gmail]/Sent Mail:3", wants: "bin", scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 },
     ])
     .run();
 }

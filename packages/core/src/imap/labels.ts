@@ -42,8 +42,8 @@ export async function applyImapLabels(
     for (const { s, providerMessageId } of rows) {
       try {
         const add: string[] = [];
-        if (s.important) add.push(LABELS.important);
-        if (s.needsReply) add.push(LABELS.needsReply);
+        if (s.wants !== "bin") add.push(LABELS.important);
+        if (s.wants === "reply") add.push(LABELS.needsReply);
         if (add.length) {
           const { folder, uid } = splitProviderMessageId(providerMessageId);
           await imap.addLabels(folder, uid, add);

@@ -36,9 +36,9 @@ function seed(db: ReturnType<typeof testDb>) {
     .run();
   db.insert(sorts)
     .values([
-      { messageId: "a1:t1:m2", important: true, needsReply: true, scheduling: true, category: "Scheduling", reason: "asks to confirm Friday", model: "x", labeledAt: null, createdAt: 1 },
-      { messageId: "a1:t2:m1", important: false, needsReply: false, scheduling: false, category: null, reason: "routine invoice", model: "x", labeledAt: null, createdAt: 1 },
-      { messageId: "a2:t3:m1", important: true, needsReply: true, scheduling: false, category: "Needs reply", reason: "asks to lead standup", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:t1:m2", wants: "reply", scheduling: true, category: "Scheduling", reason: "asks to confirm Friday", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a1:t2:m1", wants: "bin", scheduling: false, category: null, reason: "routine invoice", model: "x", labeledAt: null, createdAt: 1 },
+      { messageId: "a2:t3:m1", wants: "reply", scheduling: false, category: "Needs reply", reason: "asks to lead standup", model: "x", labeledAt: null, createdAt: 1 },
     ])
     .run();
 }
@@ -56,7 +56,7 @@ describe("listInboxMessages", () => {
     expect(rows[0]?.handled).toBe(false);
   });
 
-  it("filters to important rows only when important: true", () => {
+  it("filters to the rows worth surfacing when important is asked for", () => {
     const db = testDb();
     seed(db);
     const rows = listInboxMessages(db, { important: true });

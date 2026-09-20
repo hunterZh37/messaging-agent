@@ -23,7 +23,7 @@ describe("parseFolder", () => {
   });
 });
 
-const COUNTS = { inbox: 0, drafts: 2, needsReply: 5, unopened: 4, disposable: 6, waiting: 3 };
+const COUNTS = { inbox: 0, action: 0, knowing: 0, drafts: 2, needsReply: 5, unopened: 4, disposable: 6, waiting: 3 };
 
 describe("treeRows", () => {
   it("lists Drafts, Inbox, Sent, Deleted items and Junk, with their children", () => {
@@ -31,19 +31,23 @@ describe("treeRows", () => {
     expect(rows.map((r) => r.label)).toEqual([
       "Drafts",
       "Inbox",
-      "Need to reply",
       "Unopened",
-      "Safe to delete",
+      "Reply",
+      "Action Required",
+      "Worth Knowing",
+      "Safe to Delete",
       "Sent",
       "Waiting for reply",
       "Not waiting for reply",
       "Deleted items",
-      "Hidden",
+      "Archive",
       "Junk & Spam",
     ]);
     expect(rows.filter((r) => r.child).map((r) => r.key)).toEqual([
-      "inbox:needs_reply",
       "inbox:unopened",
+      "inbox:needs_reply",
+      "inbox:action",
+      "inbox:knowing",
       "inbox:disposable",
       "sent:waiting",
       "sent:not_waiting",
@@ -199,7 +203,7 @@ describe("the Mail / Messages toggle", () => {
 
   it("splits the tree: mail folders on one side, the chat rows on the other", () => {
     const rows = treeRows(WITH_TEXTS);
-    expect(rowsForSide(rows, "mail").map((r) => r.key)).toEqual(["drafts", "inbox", "inbox:needs_reply", "inbox:unopened", "inbox:disposable", "sent", "sent:waiting", "sent:not_waiting", "trash", "hidden", "junk"]);
+    expect(rowsForSide(rows, "mail").map((r) => r.key)).toEqual(["drafts", "inbox", "inbox:unopened", "inbox:needs_reply", "inbox:action", "inbox:knowing", "inbox:disposable", "sent", "sent:waiting", "sent:not_waiting", "trash", "hidden", "junk"]);
     expect(rowsForSide(rows, "messages").map((r) => r.key)).toEqual(["messages", "messages:needs_reply", "messages:unopened", "messages:disposable", "messages:hidden"]);
   });
 

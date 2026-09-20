@@ -28,7 +28,7 @@ const SYSTEM = `You are writing a file called rules.md for a much smaller model 
 
 You will be given the verdicts a stronger model and the operator have already reached on this inbox, one per line, as:
 
-from | subject | important/needs_reply/scheduling/category/finance/disposable/project | reason
+from | subject | wants/scheduling/category/finance/project | reason
 
 Read them for patterns and write the rules those patterns imply. Use these sections, in this order:
 
@@ -77,12 +77,10 @@ export function collectTrustedVerdicts(db: Db, opts: CollectVerdictsOptions): st
     .select({
       fromAddress: messages.fromAddress,
       subject: messages.subject,
-      important: sorts.important,
-      needsReply: sorts.needsReply,
+      wants: sorts.wants,
       scheduling: sorts.scheduling,
       category: sorts.category,
       finance: sorts.finance,
-      disposable: sorts.disposable,
       reason: sorts.reason,
       project: projects.name,
     })
@@ -96,12 +94,10 @@ export function collectTrustedVerdicts(db: Db, opts: CollectVerdictsOptions): st
     .all()
     .map((r) => {
       const verdict = [
-        r.important ? "yes" : "no",
-        r.needsReply ? "yes" : "no",
-        r.scheduling ? "yes" : "no",
+        r.wants,
+        r.scheduling ? "scheduling" : "-",
         r.category ?? OTHER,
         r.finance,
-        r.disposable ? "yes" : "no",
         r.project ?? NO_PROJECT,
       ].join("/");
       return [oneLine(r.fromAddress), oneLine(r.subject), verdict, oneLine(r.reason)].join(" | ");

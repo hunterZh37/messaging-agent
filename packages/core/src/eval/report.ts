@@ -13,7 +13,7 @@ import { BASELINE } from "./run";
  */
 
 /** The fields a sort verdict is scored on. Reason is prose, so it is not one of them. */
-export const SCORED_FIELDS = ["important", "needs_reply", "finance", "disposable", "category", "project"] as const;
+export const SCORED_FIELDS = ["wants", "scheduling", "finance", "category", "project"] as const;
 export type ScoredField = (typeof SCORED_FIELDS)[number];
 
 export type Agreement = Record<ScoredField, number>;
@@ -57,11 +57,12 @@ export interface SortEvalReport {
  */
 function scored(v: SortResult): Record<ScoredField, string> {
   return {
-    important: String(v.important),
-    needs_reply: String(v.needs_reply),
+    wants: v.wants,
+    scheduling: String(v.scheduling),
     finance: v.finance,
-    disposable: String(v.disposable),
-    category: v.important ? v.category : "",
+    // Mail bound for the bin carries no sub-category, so two models that both
+    // bin a message agree about its category whatever they named.
+    category: v.wants === "bin" ? "" : v.category,
     project: v.project,
   };
 }

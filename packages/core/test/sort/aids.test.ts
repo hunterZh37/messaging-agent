@@ -5,12 +5,10 @@ import { createSorterFor, RULES_HEADING } from "../../src/sort/sorter";
 import { NO_PROJECT, type SortInput, type SortResult } from "../../src/sort/types";
 
 const VERDICT: SortResult = {
-  important: true,
-  needs_reply: false,
-  scheduling: false,
+  wants: "knowing", scheduling: false,
   category: "Money",
   finance: "expense",
-  disposable: false,
+  
   project: NO_PROJECT,
   reason: "a bill",
 };
@@ -33,7 +31,7 @@ const EXAMPLE: SortExample = {
   fromLine: "Acme Billing <billing@acme.com>",
   subject: "Invoice 1001",
   snippet: "Please pay the last one.",
-  verdict: { important: true, needs_reply: false, scheduling: false, category: "Money", finance: "expense", disposable: false, project: "Consulting" },
+  verdict: { wants: "knowing", scheduling: false, category: "Money", finance: "expense",  project: "Consulting" },
 };
 
 function provider(): FakeProvider {

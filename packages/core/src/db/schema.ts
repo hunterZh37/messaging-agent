@@ -158,26 +158,32 @@ export const watermarks = sqliteTable("watermarks", {
   lastSyncAt: integer("last_sync_at").notNull(),
 });
 
+/**
+ * The one thing a message wants from the operator (operator, 2026-09-19).
+ *
+ * In order, and the order is the precedence: a message that is owed a reply
+ * is `reply` whatever else is also true of it. This replaced `important`,
+ * `needs_reply` and `disposable`, which were three independent booleans and
+ * could therefore contradict each other — owed a reply and safe to delete at
+ * the same time — with which list the message appeared on decided by
+ * whichever query asked first.
+ */
+export const WANTS = ["reply", "action", "knowing", "bin"] as const;
+export type Wants = (typeof WANTS)[number];
+
 export const sorts = sqliteTable("sorts", {
   messageId: text("message_id").primaryKey().references(() => messages.id),
-  important: integer("important", { mode: "boolean" }).notNull(),
-  needsReply: integer("needs_reply", { mode: "boolean" }).notNull(),
+  wants: text("wants", { enum: WANTS }).notNull(),
+  /** A fact about the message, not a claim on the operator: it proposes, asks for or changes a time. */
   scheduling: integer("scheduling", { mode: "boolean" }).notNull(),
-  /** Operator sub-category under Important; null when the message is not important (spec 7). */
+  /** Operator sub-category; null when the message is not worth surfacing (spec 7). */
   category: text("category"),
   /**
-   * Which way money moves in this message, its own axis beside importance
+   * Which way money moves in this message, its own axis beside the rung
    * (spec 7): `income`, `expense`, or `none`. Judged for every message, so
-   * a receipt is found whether or not it was important enough to surface.
+   * a receipt is found whether or not it was worth surfacing.
    */
   finance: text("finance").notNull().default("none"),
-  /**
-   * Mail nobody will need again once it has been read (spec 7, 2026-09-11):
-   * what "Safe to delete" lists and what Delete all acts on. Judged for every
-   * message, like finance. Rows written before this axis existed read false
-   * until they are re-sorted.
-   */
-  disposable: integer("disposable", { mode: "boolean" }).notNull().default(false),
   reason: text("reason").notNull(),
   model: text("model").notNull(),
   labeledAt: integer("labeled_at"),

@@ -62,16 +62,14 @@ describe("sortSchemaFor", () => {
   it("makes the model answer on every axis, safe-to-delete included", () => {
     const schema = z.toJSONSchema(sortSchemaFor([{ name: "Money", description: "bills." }], [{ name: "Consulting", description: "client work." }]));
     expect(Object.keys(schema.properties as Record<string, unknown>)).toEqual([
-      "important",
-      "needs_reply",
+      "wants",
       "scheduling",
       "category",
       "finance",
-      "disposable",
       "project",
       "reason",
     ]);
-    expect(schema.required).toContain("disposable");
-    expect((schema.properties as Record<string, { type?: string }>).disposable).toEqual({ type: "boolean" });
+    expect(schema.required).toContain("wants");
+    expect((schema.properties as Record<string, { enum?: string[] }>).wants?.enum).toEqual(["reply", "action", "knowing", "bin"]);
   });
 });

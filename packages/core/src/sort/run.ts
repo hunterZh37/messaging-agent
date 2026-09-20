@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, isNull, lt, ne, sql } from "drizzle-orm";
 import { now, type Db } from "../db/client";
 import { accounts, messages, projectAssignments, sorts, type MessageRow } from "../db/schema";
 import { listProjects } from "../projects/projects";
@@ -86,17 +86,15 @@ export async function sortPending(
         .insert(sorts)
         .values({
           messageId: m.id,
-          important: r.important,
-          needsReply: r.needs_reply,
+          wants: r.wants,
           scheduling: r.scheduling,
-          // Only important mail is filed; the model's category is ignored otherwise.
-          category: r.important ? r.category : null,
-          // Money moves whether or not the message was worth surfacing, so
-          // this is kept for every message (spec 7).
+          // Nothing bound for the bin carries a sub-category: it is a way of
+          // filing what the operator will look at, and they will not look at
+          // this (operator, 2026-09-19).
+          category: r.wants === "bin" ? null : r.category,
+          // Money moves whatever the rung, so this is kept for every message
+          // (spec 7).
           finance: r.finance,
-          // Safe to delete is judged for every message too, so the row that
-          // says so is written even when nothing else about it stood out.
-          disposable: r.disposable,
           reason: r.reason,
           model: sorter.model,
           labeledAt: null,
@@ -169,14 +167,10 @@ export async function sortOlder(
         .insert(sorts)
         .values({
           messageId: m.id,
-          important: r.important,
-          needsReply: r.needs_reply,
+          wants: r.wants,
           scheduling: r.scheduling,
-          category: r.important ? r.category : null,
+          category: r.wants === "bin" ? null : r.category,
           finance: r.finance,
-          // Safe to delete is judged for every message too, so the row that
-          // says so is written even when nothing else about it stood out.
-          disposable: r.disposable,
           reason: r.reason,
           model: sorter.model,
           labeledAt: null,
@@ -266,7 +260,7 @@ export async function resortImportant(
     .select({ m: messages })
     .from(messages)
     .innerJoin(sorts, eq(sorts.messageId, messages.id))
-    .where(and(eq(sorts.important, true), eq(messages.folder, "inbox")))
+    .where(and(ne(sorts.wants, "bin"), eq(messages.folder, "inbox")))
     .orderBy(messages.sentAt)
     .limit(opts.limit ?? 500)
     .all()
@@ -277,7 +271,7 @@ export async function resortImportant(
   for (const m of rows) {
     try {
       const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
-      db.update(sorts).set({ category: r.category, finance: r.finance, disposable: r.disposable, reason: r.reason }).where(eq(sorts.messageId, m.id)).run();
+      db.update(sorts).set({ category: r.category, finance: r.finance, reason: r.reason }).where(eq(sorts.messageId, m.id)).run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());
       resorted++;
     } catch (err) {
@@ -329,7 +323,7 @@ export async function resortWindow(
     try {
       const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
       db.update(sorts)
-        .set({ category: r.category, finance: r.finance, disposable: r.disposable, needsReply: r.needs_reply, scheduling: r.scheduling, reason: r.reason })
+        .set({ wants: r.wants, category: r.wants === "bin" ? null : r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason })
         .where(eq(sorts.messageId, m.id))
         .run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());
@@ -364,7 +358,7 @@ export async function resortNeedsReply(
   const conditions = [
     eq(messages.isFromOperator, false),
     eq(messages.folder, "inbox"),
-    eq(sorts.needsReply, true),
+    eq(sorts.wants, "reply"),
     sql`${messages.id} = (
       select m.id from messages m
       where m.thread_id = ${messages.threadId}
@@ -390,12 +384,17 @@ export async function resortNeedsReply(
     try {
       const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
       db.update(sorts)
-        .set({ category: r.category, finance: r.finance, disposable: r.disposable, needsReply: r.needs_reply, scheduling: r.scheduling, reason: r.reason })
+        // This pass asks one question: is a reply still owed? So a thread
+        // that no longer needs one comes down a rung, never all the way to
+        // the bin. Nothing was asked about whether it is worth keeping, and
+        // quietly moving mail that was recently owed an answer into Safe to
+        // delete is the wrong direction to be wrong in.
+        .set({ wants: r.wants === "reply" ? "reply" : "knowing", category: r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason })
         .where(eq(sorts.messageId, m.id))
         .run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());
       resorted++;
-      if (!r.needs_reply) cleared++;
+      if (r.wants !== "reply") cleared++;
     } catch (err) {
       console.error(`re-sort failed for ${m.id}:`, (err as Error).message);
     }

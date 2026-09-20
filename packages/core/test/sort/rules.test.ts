@@ -59,9 +59,7 @@ function seed(db: TestDb, count: number, opts: { model?: string; labeledAt?: num
     db.insert(sorts)
       .values({
         messageId: id,
-        important: true,
-        needsReply: false,
-        scheduling: false,
+        wants: "knowing", scheduling: false,
         category: "Money",
         finance: "expense",
         reason: "a bill",
@@ -82,7 +80,7 @@ describe("collectTrustedVerdicts", () => {
       .values({ messageId: `a1:m0-${BACKLOG}`, projectId: "p1", source: "sorter", score: null, assignedAt: 1 })
       .run();
     expect(collectTrustedVerdicts(db, { trickleModel: TRICKLE })).toEqual([
-      "billing@acme.com | Invoice 0 | yes/no/no/Money/expense/no/Consulting | a bill",
+      "billing@acme.com | Invoice 0 | knowing/-/Money/expense/Consulting | a bill",
     ]);
   });
 

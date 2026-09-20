@@ -23,7 +23,7 @@ interface Seed {
   subject: string;
   body: string;
   /** No verdict at all when absent: the message being judged. */
-  sort?: { model: string; labeledAt?: number; important?: boolean; needsReply?: boolean; category?: string | null; finance?: string };
+  sort?: { model: string; labeledAt?: number; wants?: "reply" | "action" | "knowing" | "bin"; category?: string | null; finance?: string };
   project?: string;
 }
 
@@ -67,8 +67,7 @@ function seed(db: TestDb, rows: Seed[]): void {
       db.insert(sorts)
         .values({
           messageId: r.id,
-          important: r.sort.important ?? true,
-          needsReply: r.sort.needsReply ?? false,
+          wants: r.sort.wants ?? "knowing",
           scheduling: false,
           category: r.sort.category === undefined ? "Money" : r.sort.category,
           finance: r.sort.finance ?? "expense",
@@ -167,7 +166,7 @@ describe("findExamples", () => {
         fromName: "Acme Billing",
         subject: "Invoice 1001 from Acme",
         body: "Line one about the invoice.\nLine two about the invoice.\nLine three nobody sees.\n\n> quoted history",
-        sort: { model: BACKLOG, needsReply: true, category: "Money", finance: "expense" },
+        sort: { model: BACKLOG, wants: "reply", category: "Money", finance: "expense" },
         project: "Consulting",
       },
     ]);
@@ -178,12 +177,10 @@ describe("findExamples", () => {
     expect(example?.subject).toBe("Invoice 1001 from Acme");
     expect(example?.snippet).toBe("Line one about the invoice.\nLine two about the invoice.");
     expect(example?.verdict).toEqual({
-      important: true,
-      needs_reply: true,
-      scheduling: false,
+      wants: "reply", scheduling: false,
       category: "Money",
       finance: "expense",
-      disposable: false,
+      
       project: "Consulting",
     });
   });
@@ -261,7 +258,7 @@ describe("renderExamples", () => {
     fromLine: "Acme Billing <billing@acme.com>",
     subject: "Invoice 1001",
     snippet: "Please pay the attached invoice.",
-    verdict: { important: true, needs_reply: false, scheduling: false, category: "Money", finance: "expense", disposable: false, project: "Consulting" },
+    verdict: { wants: "knowing", scheduling: false, category: "Money", finance: "expense",  project: "Consulting" },
   };
 
   it("heads the block and puts each verdict under its message", () => {
@@ -271,7 +268,7 @@ describe("renderExamples", () => {
     expect(s).toContain("Subject: Invoice 1001");
     expect(s).toContain("Please pay the attached invoice.");
     expect(s).toContain(
-      'Verdict: {"important":true,"needs_reply":false,"scheduling":false,"category":"Money","finance":"expense","disposable":false,"project":"Consulting"}',
+      'Verdict: {"wants":"knowing","scheduling":false,"category":"Money","finance":"expense","project":"Consulting"}',
     );
   });
 

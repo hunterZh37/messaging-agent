@@ -18,7 +18,7 @@ function seed(db: ReturnType<typeof testDb>) {
     { ...base, id: "a1:m1", providerMessageId: "m1", rfcMessageId: "<m1@x>", fromAddress: "me@example.com", toAddresses: ["bob@x.com"], bodyText: "first", isFromOperator: true, sentAt: 100 },
     { ...base, id: "a1:m2", providerMessageId: "m2", rfcMessageId: "<m2@x>", fromAddress: "bob@x.com", toAddresses: ["me@example.com"], bodyText: "Friday?", isFromOperator: false, sentAt: 200 },
   ]).run();
-  db.insert(sorts).values({ messageId: "a1:m2", important: true, needsReply: true, scheduling: true, reason: "asks for a date", model: "x", labeledAt: null, createdAt: 1 }).run();
+  db.insert(sorts).values({ messageId: "a1:m2", wants: "reply", scheduling: true, reason: "asks for a date", model: "x", labeledAt: null, createdAt: 1 }).run();
   db.insert(drafts).values({ id: "d1", threadId: "a1:t1", replyToMessageId: "a1:m2", originalText: "Yes, Friday.", finalText: null, toAddresses: ["bob@x.com"], ccAddresses: [], status: "pending", model: "x", sentProviderMessageId: null, error: null, createdAt: 1, updatedAt: 1 }).run();
 }
 

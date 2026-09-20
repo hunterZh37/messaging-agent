@@ -24,8 +24,8 @@ function seed(db: ReturnType<typeof testDb>) {
   ]).run();
   const s = { scheduling: false, reason: "", model: "x", labeledAt: null, createdAt: 1 };
   db.insert(sorts).values([
-    { ...s, messageId: "a1:m1", important: true, needsReply: true },
-    { ...s, messageId: "a1:m2", important: false, needsReply: false },
+    { ...s, messageId: "a1:m1", wants: "reply", },
+    { ...s, messageId: "a1:m2", wants: "knowing", },
   ]).run();
 }
 
