@@ -26,14 +26,17 @@ export function FileControl({ threadId, subject, accountId, projects, groups, cu
   accountId: string;
   /** The projects of this row's own inbox, which is the only place it can be filed. */
   projects: ProjectRow[];
-  /** Group names by id: the bigger thing a project sits under, named under it. */
-  groups?: Record<string, string>;
+  /** The bigger projects, in the order the operator put them in. */
+  groups?: { id: string; name: string }[];
   currentId: string | null;
   /** Core's reserved name for no project, passed in so this stays free of server-only imports. */
   unfiledLabel: string;
   onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // Which bigger project is open. The menu shows those first and the
+  // smaller ones inside the one the operator picks.
+  const [inGroup, setInGroup] = useState<string | null>(null);
   const [naming, setNaming] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +67,7 @@ export function FileControl({ threadId, subject, accountId, projects, groups, cu
 
   function close() {
     setOpen(false);
+    setInGroup(null);
     setNaming(false);
     setName("");
   }
@@ -101,10 +105,32 @@ export function FileControl({ threadId, subject, accountId, projects, groups, cu
     });
   }
 
-  const rows = [
-    ...projects.map((p) => ({ id: p.id as string | null, name: p.name, group: (p.groupId ? groups?.[p.groupId] : null) ?? null })),
-    { id: null, name: unfiledLabel, group: null },
-  ];
+  const byGroup = (id: string) => projects.filter((p) => p.groupId === id);
+  const known = new Set((groups ?? []).map((g) => g.id));
+  // A project nobody has grouped has no bigger project to sit inside, so it
+  // stands among them rather than being unreachable behind one.
+  const loose = projects.filter((p) => !p.groupId || !known.has(p.groupId));
+  const openGroup = (groups ?? []).find((g) => g.id === inGroup) ?? null;
+  const here = projects.find((p) => p.id === currentId) ?? null;
+
+  const inside = openGroup
+    ? byGroup(openGroup.id).map((p) => ({ kind: "project" as const, id: p.id as string | null, name: p.name, note: null as string | null }))
+    : [
+        ...(groups ?? [])
+          .filter((g) => byGroup(g.id).length > 0)
+          .map((g) => ({
+            kind: "group" as const,
+            id: g.id,
+            name: g.name,
+            note: `${byGroup(g.id).length} inside`,
+          })),
+        ...loose.map((p) => ({ kind: "project" as const, id: p.id as string | null, name: p.name, note: null as string | null })),
+        { kind: "project" as const, id: null, name: unfiledLabel, note: null as string | null },
+      ];
+
+  const marked = (row: { kind: "group" | "project"; id: string | null }) =>
+    row.kind === "project" ? currentId === row.id : here?.groupId === row.id;
+
   return (
     <div className="inbox-row-keep" ref={wrap}>
       <button
@@ -123,25 +149,33 @@ export function FileControl({ threadId, subject, accountId, projects, groups, cu
         <div className="keep-menu projects" role="menu" aria-label="File this under">
           {/* The list scrolls; what is under it does not scroll away with it. */}
           <div className="keep-scroll">
-            {rows.map((p) => (
+            {openGroup ? (
+              <button type="button" className="keep-row back" role="menuitem" onClick={() => setInGroup(null)}>
+                <span className="picker-name">
+                  <span className="keep-back" aria-hidden="true">‹</span> {openGroup.name}
+                </span>
+              </button>
+            ) : null}
+            {inside.map((row) => (
               <button
-                key={p.id ?? "unfiled"}
+                key={`${row.kind}:${row.id ?? "unfiled"}`}
                 type="button"
-                role="menuitemradio"
-                aria-checked={currentId === p.id}
-                className={currentId === p.id ? "keep-row on" : "keep-row"}
-                onClick={() => file(p.id)}
+                role={row.kind === "group" ? "menuitem" : "menuitemradio"}
+                {...(row.kind === "group" ? { "aria-haspopup": "menu" as const } : { "aria-checked": marked(row) })}
+                className={marked(row) ? "keep-row on" : "keep-row"}
+                onClick={() => (row.kind === "group" ? setInGroup(row.id) : file(row.id))}
               >
                 <span className="picker-name">
-                  {p.name}
-                  {currentId === p.id ? <span className="keep-now"> · where it is now</span> : null}
+                  {row.name}
+                  {marked(row) ? <span className="keep-now">{row.kind === "group" ? " · in here" : " · where it is now"}</span> : null}
+                  {row.kind === "group" ? <span className="keep-into" aria-hidden="true">›</span> : null}
                 </span>
-                {p.group ? <span className="picker-desc">{p.group}</span> : null}
+                {row.note ? <span className="picker-desc">{row.note}</span> : null}
               </button>
             ))}
           </div>
           <div className="keep-hairline" />
-          {naming ? (
+          {openGroup ? null : naming ? (
             <div className="keep-new">
               <input
                 className="field"

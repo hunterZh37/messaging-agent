@@ -62,8 +62,8 @@ export function TrashRow({
   ruled?: import("@messaging-agent/core").Wants | null;
   /** The projects of this row's own inbox; no projects, no File button. */
   projects?: import("@messaging-agent/core").ProjectRow[];
-  /** Group names by id, so a project row can say what it sits under. */
-  groups?: Record<string, string>;
+  /** The bigger projects of this row's inbox, in order. */
+  groups?: { id: string; name: string }[];
   /** Whose inbox the row is in, so a new project is made in that one. */
   accountId?: string;
   /** The project it is filed under now, marked in the menu. */
@@ -147,7 +147,7 @@ export function TrashRow({
           threadId={threadId}
           subject={subject}
           projects={projects}
-          groups={groups ?? {}}
+          groups={groups ?? []}
           accountId={accountId ?? ""}
           currentId={projectId}
           unfiledLabel={unfiledLabel ?? "Unfiled"}

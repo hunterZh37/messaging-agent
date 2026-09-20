@@ -781,6 +781,13 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 .keep-row.add .picker-name { color: var(--muted); }
 .keep-row.add:hover .picker-name { color: var(--fg); }
 .keep-plus { display: inline-block; width: 13px; font-weight: 600; }
+/* Two levels: the bigger projects, then the ones inside the one picked
+   (operator, 2026-09-20). The chevron says a row leads somewhere rather than
+   files anything; the back row says which one is open. */
+.keep-into { float: right; margin-left: 8px; color: var(--muted); }
+.keep-back { display: inline-block; width: 12px; color: var(--muted); }
+.keep-row.back .picker-name { color: var(--muted); font-size: 12.5px; }
+.keep-row.back:hover .picker-name { color: var(--fg); }
 .keep-new { display: flex; align-items: center; gap: 6px; padding: 3px; }
 .keep-new .field { min-height: 32px; min-width: 0; flex: 1 1 auto; font-size: 13px; }
 .keep-new .btn { flex: none; }
