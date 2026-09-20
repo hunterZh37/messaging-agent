@@ -25,8 +25,16 @@ import { NO_PROJECT, type Sorter, type SortResult } from "./types";
  */
 export const OPERATOR = "operator";
 
-/** Lowercased, so one rule covers Codes@x and codes@x. */
-const key = (address: string) => (address.match(/<([^>]+)>/)?.[1] ?? address).trim().toLowerCase();
+/**
+ * Lowercased, so one rule covers Codes@x and codes@x.
+ *
+ * Exported because a rule is written under this key and read back under it
+ * elsewhere: the list that shows whether a sender is already ruled on has to
+ * ask the same question this file answers, or the box comes up empty beside
+ * a rule that exists.
+ */
+export const senderKey = (address: string) => (address.match(/<([^>]+)>/)?.[1] ?? address).trim().toLowerCase();
+const key = senderKey;
 
 export function senderRuleFor(db: Db, fromAddress: string): SenderRuleRow | undefined {
   return db.select().from(senderRules).where(eq(senderRules.fromAddress, key(fromAddress))).get();

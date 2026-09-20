@@ -35,6 +35,7 @@ export function TrashRow({
   keepable = false,
   wants,
   senders,
+  ruled,
 }: {
   threadId: string;
   subject: string;
@@ -51,6 +52,8 @@ export function TrashRow({
   wants?: import("@messaging-agent/core").Wants | null;
   /** Who a standing rule would be about. */
   senders?: string[];
+  /** The rung a standing rule already puts this sender on, if there is one. */
+  ruled?: import("@messaging-agent/core").Wants | null;
 }) {
   const { trash, leavingThreads, deletingThreads, returningThreads, handledThreads } = useSendGate();
   const [going, setGoing] = useState(false);
@@ -127,6 +130,7 @@ export function TrashRow({
           subject={subject}
           wants={wants}
           senders={senders}
+          ruled={ruled}
           onOpenChange={setMenuOpen}
           onMoving={() => {
             setKeepError(null);

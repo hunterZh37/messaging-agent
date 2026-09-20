@@ -42,7 +42,7 @@ import {
   type AlexItem,
   type AlexItemRow,
   type AlexSlot,
-  setThreadWaiting, hideThreads, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
+  setThreadWaiting, hideThreads, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, clearSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 
 type StepError = { error: string };
@@ -542,4 +542,29 @@ export async function alexFreeTimesAction(startISO: string, endISO: string, minu
 /** Whether Alex can be written to at all, so the button can say what is missing. */
 export async function alexConnectedAction(): Promise<boolean> {
   return alexConnected(core().cfg.alex);
+}
+
+/**
+ * The standing rule on its own, so the checkbox that shows one can also set
+ * and clear one (operator, 2026-09-20: "the Always From toggle is
+ * automatically off even though I turned it on"). A box that reports the
+ * stored rule but only writes on a later pick would be the same lie the
+ * other way round, so the toggle acts when it is toggled.
+ */
+export async function ruleSenderAction(
+  threadId: string,
+  wants: Wants | null,
+): Promise<{ ok: true; senders: string[] } | StepError> {
+  try {
+    const { db } = core();
+    const senders = sendersOf(db, threadId);
+    for (const address of senders) {
+      if (wants) setSenderRule(db, address, wants);
+      else clearSenderRule(db, address);
+    }
+    revalidatePath("/inbox");
+    return { ok: true, senders };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
 }

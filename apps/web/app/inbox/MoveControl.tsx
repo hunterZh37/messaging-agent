@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Wants } from "@messaging-agent/core";
-import { correctThreadAction } from "./actions";
+import { correctThreadAction, ruleSenderAction } from "./actions";
 import { ChevronIcon } from "./icons";
 
 /**
@@ -26,11 +26,13 @@ const RUNGS: { wants: Wants; name: string; desc: string }[] = [
   { wants: "bin", name: "Safe to Delete", desc: "Never needed again once read" },
 ];
 
-export function MoveControl({ threadId, subject, wants, senders, onMoving, onFailed, onOpenChange }: {
+export function MoveControl({ threadId, subject, wants, ruled, senders, onMoving, onFailed, onOpenChange }: {
   threadId: string;
   subject: string;
   /** The rung it is on now, so the menu can mark it. */
   wants?: Wants | null;
+  /** The rung a standing rule already puts this sender on, so the box shows it rather than always starting off. */
+  ruled?: Wants | null;
   /** Who a standing rule would be about; the menu names them rather than saying "the sender". */
   senders?: string[];
   /** The row slides out before the server answers, the way a delete does. */
@@ -40,7 +42,7 @@ export function MoveControl({ threadId, subject, wants, senders, onMoving, onFai
   onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [always, setAlways] = useState(false);
+  const [always, setAlways] = useState(ruled != null);
   const [, startTransition] = useTransition();
   const wrap = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -48,6 +50,12 @@ export function MoveControl({ threadId, subject, wants, senders, onMoving, onFai
   useEffect(() => {
     onOpenChange?.(open);
   }, [open, onOpenChange]);
+
+  // The stored rule is the truth; a re-render that brings a new one wins over
+  // whatever the box was left showing.
+  useEffect(() => {
+    setAlways(ruled != null);
+  }, [ruled]);
 
   useEffect(() => {
     if (!open) return;
@@ -79,6 +87,26 @@ export function MoveControl({ threadId, subject, wants, senders, onMoving, onFai
       }
       if (r.moved === 0) {
         onFailed("Nothing moved. This thread has no message to put anywhere.");
+        return;
+      }
+      router.refresh();
+    });
+  }
+
+  /**
+   * Toggling the box is itself the instruction, applied now. Picking a rung
+   * with it ticked still carries the rule along, which is the common path;
+   * this is for the operator who opens the menu only to turn the standing
+   * rule on or off, and for whom nothing would otherwise happen.
+   */
+  function toggleAlways(on: boolean) {
+    setAlways(on);
+    const rung = on ? (wants ?? "knowing") : null;
+    startTransition(async () => {
+      const r = await ruleSenderAction(threadId, rung);
+      if ("error" in r) {
+        setAlways(!on);
+        onFailed(r.error);
         return;
       }
       router.refresh();
@@ -120,7 +148,7 @@ export function MoveControl({ threadId, subject, wants, senders, onMoving, onFai
           ))}
           {who ? (
             <label className="keep-always">
-              <input type="checkbox" checked={always} onChange={(e) => setAlways(e.target.checked)} />
+              <input type="checkbox" checked={always} onChange={(e) => toggleAlways(e.target.checked)} />
               <span>
                 and always from <b>{who}</b>
                 {senders && senders.length > 1 ? ` and ${senders.length - 1} more` : ""}

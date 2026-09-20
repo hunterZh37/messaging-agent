@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import type { InboxRow } from "@messaging-agent/core";
+import { listSenderRules, senderKey, type InboxRow, type Wants } from "@messaging-agent/core";
+import { core } from "@/lib/core";
 import { ListKeys } from "./ListKeys";
 import { FOLDER_TITLES, LIST_PAGE, threadPath, viewHref, type FolderKey, type ViewParams } from "@/lib/folders";
 import { formatTime, relativeTime, shortAccount, cleanSnippet } from "@/lib/format";
@@ -120,6 +121,16 @@ export function InboxList(props: {
   // quiet while the gate holds the thread.
   // Every row is keyed by its message, the newest one included: ThreadGroup
   // lays them out as one array, and React asks for a key on each.
+  // The standing rules, read once for the whole list rather than per row:
+  // the checkbox on a row's Move menu has to show whether this sender is
+  // already ruled on (operator, 2026-09-20: it "is automatically off even
+  // though I turned it on"). sender_rules holds one row per ruled sender, so
+  // this is a small read however long the list is.
+  const ruled = new Map<string, Wants>(listSenderRules(core().db).map((r) => [r.fromAddress, r.wants]));
+  // senderKey, not a local lowercase: a rule is written under that key, and a
+  // From with a display name in it would otherwise miss the rule it has.
+  const ruleFor = (from: string) => ruled.get(senderKey(from)) ?? null;
+
   const row = (r: InboxRow) => {
     const key = r.message.id;
     const link = <Row row={r} folder={folder} params={params} listKey={listKey} {...(selectedThreadId ? { selectedThreadId } : {})} />;
@@ -133,7 +144,7 @@ export function InboxList(props: {
     }
     if (!props.deletable) return <Fragment key={key}>{link}</Fragment>;
     return (
-      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]}>
+      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]} ruled={r.message.isFromOperator ? null : ruleFor(r.message.fromAddress)}>
         {link}
       </TrashRow>
     );

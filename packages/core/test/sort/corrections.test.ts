@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb } from "../helpers/db";
 import { accounts, messages, senderRules, sorts, threads } from "../../src/db/schema";
-import { OPERATOR, clearSenderRule, correctThread, listSenderRules, senderRuleFor, sendersOf, setSenderRule, withSenderRules } from "../../src/sort/corrections";
+import { OPERATOR, clearSenderRule, correctThread, listSenderRules, senderRuleFor, sendersOf, senderKey, setSenderRule, withSenderRules } from "../../src/sort/corrections";
 import { resortWindow } from "../../src/sort/run";
 import { NO_PROJECT, type Sorter, type SortResult } from "../../src/sort/types";
 
@@ -188,5 +188,20 @@ describe("the sorter that reads the rules first", () => {
 
   it("keeps the model's name, because the rule says where, not who judged", () => {
     expect(withSenderRules(seed(testDb()), counting).model).toBe("some:model");
+  });
+});
+
+/**
+ * The key a rule is stored under is the key a list has to look it up by
+ * (operator, 2026-09-20: the box "is automatically off even though I turned
+ * it on"). A From that carries a display name still has to find its rule.
+ */
+describe("the key a rule is filed under", () => {
+  it("is what the row's own From address resolves to", () => {
+    const db = seed(testDb());
+    setSenderRule(db, '"Zillow" <Alerts@Zillow.test>', "bin", () => 5);
+    const stored = new Map(listSenderRules(db).map((r) => [r.fromAddress, r.wants]));
+    expect(stored.get(senderKey('"Zillow" <alerts@zillow.test>'))).toBe("bin");
+    expect(stored.get(senderKey("alerts@zillow.test"))).toBe("bin");
   });
 });
