@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { now as nowMs, type Db } from "../db/client";
 import { messages, senderRules, sorts, type SenderRuleRow, type Wants } from "../db/schema";
 import { assignedProjectName } from "../projects/projects";
@@ -58,14 +58,39 @@ export function clearSenderRule(db: Db, fromAddress: string): void {
  * Returns how many verdicts changed, so a caller can tell a correction that
  * did something from one that was already true.
  */
-export function correctThread(db: Db, threadId: string, wants: Wants): number {
+export function correctThread(db: Db, threadId: string, wants: Wants, clock: () => number = nowMs): number {
   const ids = db.select({ id: messages.id }).from(messages).where(eq(messages.threadId, threadId)).all().map((r) => r.id);
   if (ids.length === 0) return 0;
-  return db
-    .update(sorts)
-    .set({ wants, model: OPERATOR, reason: "You put this here.", ...(wants === "bin" ? { category: null } : {}) })
-    .where(inArray(sorts.messageId, ids))
-    .run().changes;
+
+  // Written, not merely updated. Mail the sorter has not reached yet carries
+  // no verdict row at all, and an update against nothing changed nothing:
+  // the row slid away, the server said it had worked, and the message came
+  // back on the next paint (operator, 2026-09-20: "safe to delete does not
+  // show up that new email"). Correcting a message the machine has not
+  // judged is exactly when a person is most likely to want to.
+  const at = clock();
+  let changed = 0;
+  for (const id of ids) {
+    changed += db
+      .insert(sorts)
+      .values({
+        messageId: id,
+        wants,
+        scheduling: false,
+        category: null,
+        finance: "none",
+        reason: "You put this here.",
+        model: OPERATOR,
+        labeledAt: null,
+        createdAt: at,
+      })
+      .onConflictDoUpdate({
+        target: sorts.messageId,
+        set: { wants, model: OPERATOR, reason: "You put this here.", ...(wants === "bin" ? { category: null } : {}) },
+      })
+      .run().changes;
+  }
+  return changed;
 }
 
 /** Everyone who wrote in this thread, other than the operator: who a sender rule would be about. */

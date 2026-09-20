@@ -77,6 +77,10 @@ export function MoveControl({ threadId, subject, wants, senders, onMoving, onFai
         onFailed(r.error);
         return;
       }
+      if (r.moved === 0) {
+        onFailed("Nothing moved. This thread has no message to put anywhere.");
+        return;
+      }
       router.refresh();
     });
   }

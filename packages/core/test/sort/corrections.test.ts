@@ -57,6 +57,31 @@ describe("correcting a thread", () => {
     expect(correctThread(seed(testDb()), "a1:nope", "bin")).toBe(0);
   });
 
+  /**
+   * The failure this shipped with (operator, 2026-09-20: "safe to delete
+   * does not show up that new email"). Mail the sorter has not reached yet
+   * carries no verdict row, an update against nothing changed nothing, and
+   * the row slid away over a write that never happened. Correcting a
+   * message the machine has not judged is exactly when a person most wants
+   * to.
+   */
+  it("writes a verdict for a message the sorter has never judged", () => {
+    const db = seed(testDb());
+    db.delete(sorts).run();
+    expect(correctThread(db, "a1:t1", "bin", () => 9)).toBe(2);
+    const rows = verdicts(db);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((v) => v.wants === "bin" && v.model === OPERATOR)).toBe(true);
+    expect(rows.every((v) => v.reason === "You put this here.")).toBe(true);
+  });
+
+  it("writes one where there is none and updates the one beside it, in the same thread", () => {
+    const db = seed(testDb());
+    db.delete(sorts).where(eq(sorts.messageId, "a1:m1")).run();
+    expect(correctThread(db, "a1:t1", "knowing", () => 9)).toBe(2);
+    expect(verdicts(db).every((v) => v.wants === "knowing")).toBe(true);
+  });
+
   it("names who a rule would be about, leaving the operator out of it", () => {
     expect(sendersOf(seed(testDb()), "a1:t1")).toEqual(["alerts@zillow.test"]);
   });
