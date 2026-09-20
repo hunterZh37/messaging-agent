@@ -4,7 +4,7 @@ export type FolderKey = "inbox" | "sent" | "trash" | "junk" | "messages";
 
 /** The child rows: four under Inbox, two under Sent. */
 // No need to reply was removed (operator, 2026-09-15: "remove no need to reply").
-export type FolderStatus = "needs_reply" | "action" | "knowing" | "disposable" | "unopened" | "waiting" | "not_waiting" | "hidden";
+export type FolderStatus = "needs_reply" | "action" | "owed" | "knowing" | "disposable" | "unopened" | "waiting" | "not_waiting" | "hidden";
 
 /** Where each folder lives. "Deleted items" reads better in a URL as `/deleted`. */
 export const FOLDER_PATHS: Record<FolderKey, string> = {
@@ -27,6 +27,8 @@ export const STATUS_LABELS: Record<FolderStatus, string> = {
   // The ladder, in its own order (operator, 2026-09-19).
   needs_reply: "Reply",
   action: "Action Required",
+  // The two of them under one row (operator, 2026-09-19).
+  owed: "Reply / Action Required",
   knowing: "Worth Knowing",
   disposable: "Safe to Delete",
   unopened: "Unopened",
@@ -40,7 +42,7 @@ export const STATUS_LABELS: Record<FolderStatus, string> = {
 const STATUSES: Record<FolderKey, FolderStatus[]> = {
   // Unopened sits above the ladder: it is what has not been looked at yet,
   // and it flows into one of the four rungs rather than being one of them.
-  inbox: ["unopened", "needs_reply", "action", "knowing", "disposable", "hidden"],
+  inbox: ["unopened", "owed", "needs_reply", "action", "knowing", "disposable", "hidden"],
   sent: ["waiting", "not_waiting"],
   trash: [],
   junk: [],
@@ -147,7 +149,7 @@ export interface TreeRow {
  * the operator is in, which every row carries along.
  */
 export function treeRows(
-  counts: { inbox: number; drafts: number; needsReply: number; action: number; knowing: number; unopened: number; disposable: number; waiting: number; hidden?: number; texts?: { needsReply: number; unopened: number; disposable: number; hidden?: number } },
+  counts: { inbox: number; drafts: number; needsReply: number; action: number; owed: number; knowing: number; unopened: number; disposable: number; waiting: number; hidden?: number; texts?: { needsReply: number; unopened: number; disposable: number; hidden?: number } },
   p: ViewParams = {},
 ): TreeRow[] {
   // A tree row changes the folder and the child row and nothing else: the
@@ -170,21 +172,12 @@ export function treeRows(
       counted: true,
     },
     {
-      key: "inbox:needs_reply",
-      label: STATUS_LABELS.needs_reply,
-      href: to("inbox", "needs_reply"),
+      key: "inbox:owed",
+      label: STATUS_LABELS.owed,
+      href: to("inbox", "owed"),
       icon: null,
       child: true,
-      count: counts.needsReply,
-      counted: true,
-    },
-    {
-      key: "inbox:action",
-      label: STATUS_LABELS.action,
-      href: to("inbox", "action"),
-      icon: null,
-      child: true,
-      count: counts.action,
+      count: counts.owed,
       counted: true,
     },
     {

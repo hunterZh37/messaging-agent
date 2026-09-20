@@ -23,7 +23,7 @@ describe("parseFolder", () => {
   });
 });
 
-const COUNTS = { inbox: 0, action: 0, knowing: 0, drafts: 2, needsReply: 5, unopened: 4, disposable: 6, waiting: 3 };
+const COUNTS = { inbox: 0, action: 0, owed: 7, knowing: 0, drafts: 2, needsReply: 5, unopened: 4, disposable: 6, waiting: 3 };
 
 describe("treeRows", () => {
   it("lists Drafts, Inbox, Sent, Deleted items and Junk, with their children", () => {
@@ -32,8 +32,7 @@ describe("treeRows", () => {
       "Drafts",
       "Inbox",
       "Unopened",
-      "Reply",
-      "Action Required",
+      "Reply / Action Required",
       "Worth Knowing",
       "Safe to Delete",
       "Sent",
@@ -45,8 +44,7 @@ describe("treeRows", () => {
     ]);
     expect(rows.filter((r) => r.child).map((r) => r.key)).toEqual([
       "inbox:unopened",
-      "inbox:needs_reply",
-      "inbox:action",
+      "inbox:owed",
       "inbox:knowing",
       "inbox:disposable",
       "sent:waiting",
@@ -57,7 +55,7 @@ describe("treeRows", () => {
 
   it("carries the three counts and leaves the other rows at zero", () => {
     const byKey = Object.fromEntries(treeRows(COUNTS).map((r) => [r.key, r.count]));
-    expect(byKey).toMatchObject({ drafts: 2, "inbox:needs_reply": 5, "inbox:unopened": 4, "inbox:disposable": 6, "sent:waiting": 3, inbox: 0, sent: 0, trash: 0, junk: 0 });
+    expect(byKey).toMatchObject({ drafts: 2, "inbox:owed": 7, "inbox:unopened": 4, "inbox:disposable": 6, "sent:waiting": 3, inbox: 0, sent: 0, trash: 0, junk: 0 });
   });
 
   it("takes the whole view with it, so a folder or a child row changes only itself", () => {
@@ -203,7 +201,7 @@ describe("the Mail / Messages toggle", () => {
 
   it("splits the tree: mail folders on one side, the chat rows on the other", () => {
     const rows = treeRows(WITH_TEXTS);
-    expect(rowsForSide(rows, "mail").map((r) => r.key)).toEqual(["drafts", "inbox", "inbox:unopened", "inbox:needs_reply", "inbox:action", "inbox:knowing", "inbox:disposable", "sent", "sent:waiting", "sent:not_waiting", "trash", "hidden", "junk"]);
+    expect(rowsForSide(rows, "mail").map((r) => r.key)).toEqual(["drafts", "inbox", "inbox:unopened", "inbox:owed", "inbox:knowing", "inbox:disposable", "sent", "sent:waiting", "sent:not_waiting", "trash", "hidden", "junk"]);
     expect(rowsForSide(rows, "messages").map((r) => r.key)).toEqual(["messages", "messages:needs_reply", "messages:unopened", "messages:disposable", "messages:hidden"]);
   });
 

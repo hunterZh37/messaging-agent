@@ -56,6 +56,8 @@ export type FolderStatus =
   /** The four rungs of the ladder (operator, 2026-09-19), in its own order. */
   | "needs_reply"
   | "action"
+  /** Both rungs that claim the operator, under one row (operator, 2026-09-19). */
+  | "owed"
   | "knowing"
   | "disposable"
   /** Orthogonal to the ladder: read state, the operator's own archiving, and the two sent rows. */
@@ -250,6 +252,7 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   const sorting =
     opts.status === "needs_reply" ||
     opts.status === "action" ||
+    opts.status === "owed" ||
     opts.status === "knowing" ||
     opts.status === "unopened" ||
     opts.status === "no_reply" ||
@@ -344,6 +347,13 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // does not because clearing out old junk is the point of that row.
   if (folder === "inbox" && opts.status === "action") {
     conditions.push(latestInThread(), eq(sorts.wants, "action"), isNull(handledActions.id), liveOnly());
+  }
+  // The two rungs that claim the operator, read as one list (operator,
+  // 2026-09-19: "put Reply/Action Required the same tab"). They stay apart
+  // in the data — the difference between owing words and owing a signature
+  // is real — and come together only where the operator looks.
+  if (folder === "inbox" && opts.status === "owed") {
+    conditions.push(latestInThread(), inArray(sorts.wants, ["reply", "action"]), isNull(handledActions.id), liveOnly());
   }
   if (folder === "inbox" && opts.status === "knowing") {
     conditions.push(latestInThread(), eq(sorts.wants, "knowing"), liveOnly());
@@ -453,7 +463,7 @@ export type TreeScope = Omit<CountScope, "folder" | "status" | "limit" | "before
  * exactly as the Sent list ignores it. Drafts are the whole approval queue,
  * which has no window and no filters of its own.
  */
-export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; drafts: number; needsReply: number; action: number; knowing: number; unopened: number; disposable: number; waiting: number; hidden: number; texts: { needsReply: number; unopened: number; disposable: number; hidden: number } } {
+export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; drafts: number; needsReply: number; action: number; owed: number; knowing: number; unopened: number; disposable: number; waiting: number; hidden: number; texts: { needsReply: number; unopened: number; disposable: number; hidden: number } } {
   const drafts = listPendingDrafts(db, opts.accountId ? { accountId: opts.accountId } : {}).length;
 
   // What the Inbox list itself holds (operator, 2026-09-18: "need an inbox
@@ -499,7 +509,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .get()?.count ?? 0;
 
   // The two middle rungs, counted exactly as the two either side of them.
-  const rungCount = (status: "action" | "knowing") =>
+  const rungCount = (status: "action" | "knowing" | "owed") =>
     db
       .select({ count: sql<number>`count(*)` })
       .from(messages)
@@ -510,6 +520,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status })))
       .get()?.count ?? 0;
   const action = rungCount("action");
+  const owed = rungCount("owed");
   const knowing = rungCount("knowing");
 
   const unopened =
@@ -563,7 +574,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status: "hidden" })))
       .get()?.count ?? 0;
 
-  return { inbox, drafts, needsReply, action, knowing, unopened, disposable, hidden, waiting: applyWaiting(sentRows, sent).length, texts };
+  return { inbox, drafts, needsReply, action, owed, knowing, unopened, disposable, hidden, waiting: applyWaiting(sentRows, sent).length, texts };
 }
 
 /**

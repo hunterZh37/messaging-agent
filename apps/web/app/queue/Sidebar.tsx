@@ -139,6 +139,8 @@ export interface TreeCounts {
   needsReply: number;
   /** The two middle rungs of the ladder (operator, 2026-09-19). */
   action: number;
+  /** Both of those under one row, which is what the tree shows. */
+  owed: number;
   knowing: number;
   /** Inbox threads holding something the operator has not opened (spec 10a). */
   unopened: number;

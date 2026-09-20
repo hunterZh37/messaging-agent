@@ -193,15 +193,15 @@ describe("folderCounts", () => {
       })
       .run();
 
-    expect(folderCounts(db, { since: 0 })).toEqual({ inbox: 3, action: expect.any(Number), knowing: expect.any(Number), drafts: 1, needsReply: 1, unopened: expect.any(Number), disposable: 0, waiting: 1, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
-    expect(folderCounts(db, { accountId: "a1", since: 0 })).toEqual({ inbox: 3, action: expect.any(Number), knowing: expect.any(Number), drafts: 1, needsReply: 1, unopened: expect.any(Number), disposable: 0, waiting: 1, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
+    expect(folderCounts(db, { since: 0 })).toEqual({ inbox: 3, action: expect.any(Number), owed: expect.any(Number), knowing: expect.any(Number), drafts: 1, needsReply: 1, unopened: expect.any(Number), disposable: 0, waiting: 1, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
+    expect(folderCounts(db, { accountId: "a1", since: 0 })).toEqual({ inbox: 3, action: expect.any(Number), owed: expect.any(Number), knowing: expect.any(Number), drafts: 1, needsReply: 1, unopened: expect.any(Number), disposable: 0, waiting: 1, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
   });
 
   it("counts nothing outside the window, and nothing for another inbox", () => {
     const db = testDb();
     seed(db);
-    expect(folderCounts(db, { since: 1_000 })).toEqual({ inbox: 0, action: expect.any(Number), knowing: expect.any(Number), drafts: 0, needsReply: 0, unopened: expect.any(Number), disposable: 0, waiting: 0, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
-    expect(folderCounts(db, { accountId: "a2", since: 0 })).toEqual({ inbox: 0, action: expect.any(Number), knowing: expect.any(Number), drafts: 0, needsReply: 0, unopened: expect.any(Number), disposable: 0, waiting: 0, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
+    expect(folderCounts(db, { since: 1_000 })).toEqual({ inbox: 0, action: expect.any(Number), owed: expect.any(Number), knowing: expect.any(Number), drafts: 0, needsReply: 0, unopened: expect.any(Number), disposable: 0, waiting: 0, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
+    expect(folderCounts(db, { accountId: "a2", since: 0 })).toEqual({ inbox: 0, action: expect.any(Number), owed: expect.any(Number), knowing: expect.any(Number), drafts: 0, needsReply: 0, unopened: expect.any(Number), disposable: 0, waiting: 0, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
   });
 });
 
@@ -351,7 +351,7 @@ describe("the tree's counts agree with the lists they open", () => {
     expect(folderCounts(db, { accountId: "a1" }).needsReply).toBe(
       listInboxMessages(db, { folder: "inbox", status: "needs_reply", accountId: "a1" }).length,
     );
-    expect(folderCounts(db, { accountId: "a2" })).toEqual({ inbox: 0, action: expect.any(Number), knowing: expect.any(Number), drafts: 0, needsReply: 0, unopened: 0, disposable: 0, waiting: 0, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
+    expect(folderCounts(db, { accountId: "a2" })).toEqual({ inbox: 0, action: expect.any(Number), owed: expect.any(Number), knowing: expect.any(Number), drafts: 0, needsReply: 0, unopened: 0, disposable: 0, waiting: 0, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
   });
 });
 
