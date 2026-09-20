@@ -6,7 +6,7 @@ import { attachments, messages, threads, type AccountRow } from "../db/schema";
 import { isOperatorMessage, operatorAddresses } from "../accounts/aliases";
 import { indexMessageForSearch } from "../chat/search";
 import type { NormalizedAttachment, NormalizedMessage } from "./types";
-import { deletedSenderBefore, hiddenFrom, markHidden, markTrashed, restoreHidden } from "../queue/trash";
+import { hiddenFrom, markTrashed, restoreHidden } from "../queue/trash";
 import { markThreadOpenedUpTo } from "../queue/inbox";
 
 export function attachmentRowId(messageId: string, index: number): string {
@@ -186,17 +186,24 @@ export async function storeNormalizedMessage(
     .run();
   if (inserted.changes === 0) return false;
 
-  // A sender deleted before and never answered stays deleted (operator,
-  // 2026-09-14): their new message goes to Deleted items on arrival, here
-  // alone, marked as hidden by the app so Put back still brings it out.
-  // Otherwise a hidden thread comes back when the other side writes again
-  // (operator, 2026-09-11): what was hidden returns to the folder it came
-  // from, so the new message is read with what led to it.
-  let autoHidden = false;
-  if (!isFromOperator && (n.folder === "inbox" || n.folder === "messages") && deletedSenderBefore(db, account.id, n.fromAddress)) {
-    markHidden(db, [id], () => receivedAt, { auto: true });
-    autoHidden = true;
-  } else if (!isFromOperator && (n.folder === "inbox" || n.folder === "messages")) {
+  // Mail arrives where the operator reads it (operator, 2026-09-20:
+  // "everything should appear inside inbox or unopened").
+  //
+  // There used to be a rule here: a sender whose mail had ever been deleted,
+  // and who had never been answered, had their next message put straight into
+  // Deleted items. It was written for one sender at a time and then fed by
+  // Delete all, which marks every sender in a sweep at once. 285 senders had
+  // been silenced that way and 316 messages went to Deleted items on arrival,
+  // including a delivery notice and a calendar summary the operator wanted.
+  //
+  // It was also invisible: the mail was gone from the inbox with nothing
+  // saying so, and unstable besides, because hiding files a message under
+  // trash locally while the provider still has it in the inbox, so the next
+  // sync pulled it back and which one the operator saw depended on timing.
+  //
+  // Safe to Delete already answers this question, in a list the operator can
+  // see and argue with.
+  if (!isFromOperator && (n.folder === "inbox" || n.folder === "messages")) {
     // A hidden thread comes back to the sorting lists when they write again (2026-09-15).
     db.update(threads).set({ hiddenAt: null }).where(and(eq(threads.id, threadId), isNotNull(threads.hiddenAt))).run();
     // Only a message that arrived where the operator reads counts as the
@@ -233,7 +240,7 @@ export async function storeNormalizedMessage(
   // phone, or years ago in Gmail, is not unopened here. The thread is opened
   // up to this message, once the thread row is there to hang it on. Their
   // own mail says nothing about what they have read.
-  if ((n.read === true || autoHidden) && !isFromOperator) markThreadOpenedUpTo(db, threadId, n.sentAt);
+  if (n.read === true && !isFromOperator) markThreadOpenedUpTo(db, threadId, n.sentAt);
   // Their own message is proof they read the thread up to then (operator,
   // 2026-09-14: a chat answered from the phone is not unopened here).
   if (isFromOperator) markThreadOpenedUpTo(db, threadId, n.sentAt);

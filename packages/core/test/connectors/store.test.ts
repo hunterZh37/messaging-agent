@@ -305,24 +305,28 @@ describe("storeNormalizedMessage: read elsewhere", () => {
 });
 
 /**
- * A sender deleted before and never answered stays deleted (operator,
- * 2026-09-14): the next message from them lands in Deleted items on arrival.
+ * Mail arrives where the operator reads it (operator, 2026-09-20:
+ * "everything should appear inside inbox or unopened").
+ *
+ * There used to be a rule that put mail from a previously-deleted, never-
+ * answered sender straight into Deleted items. Delete all marks every sender
+ * in a sweep at once, so it silenced 285 of them and swallowed 316 messages,
+ * invisibly. Safe to Delete already answers this, in a list that can be seen.
  */
-describe("storeNormalizedMessage: a deleted sender stays deleted", () => {
+describe("storeNormalizedMessage: nothing is hidden on arrival", () => {
   const folderOf = (db: ReturnType<typeof testDb>, id: string) => db.select({ folder: messages.folder }).from(messages).where(eq(messages.id, id)).get()?.folder;
 
-  it("moves a new message from a sender the operator deleted and never answered to Deleted items, as hidden by the app", async () => {
+  it("puts a new message in the inbox even when that sender's mail was deleted before", async () => {
     const db = testDb();
     const acct = seedAccount(db);
     await storeNormalizedMessage(db, cfg, acct, n({ providerMessageId: "m1", providerThreadId: "t1", rfcMessageId: "<c1@x>", fromAddress: "codes@shortcode.test" }), 500);
     markTrashed(db, ["a1:m1"], () => 600);
     expect(await storeNormalizedMessage(db, cfg, acct, n({ providerMessageId: "m2", providerThreadId: "t2", rfcMessageId: "<c2@x>", fromAddress: "Codes@shortcode.test", sentAt: 700 }), 700)).toBe(true);
-    expect(folderOf(db, "a1:m2")).toBe("trash");
-    const hide = db.select().from(actions).where(eq(actions.messageId, "a1:m2")).all();
-    expect(hide).toHaveLength(1);
-    expect(hide[0]).toMatchObject({ kind: "hide", payload: { from: "inbox", auto: true } });
-    // Nothing to open: it never showed.
-    expect(db.select().from(threadOpens).all().map((o) => o.threadId)).toEqual(["a1:t2"]);
+    expect(folderOf(db, "a1:m2")).toBe("inbox");
+    // Nothing hid it, so nothing recorded hiding it.
+    expect(db.select().from(actions).where(eq(actions.messageId, "a1:m2")).all()).toEqual([]);
+    // And it is unopened: it arrived where the operator reads, unread.
+    expect(db.select().from(threadOpens).all()).toEqual([]);
   });
 
   it("leaves a sender the operator has written to alone, and one they only hid", async () => {

@@ -62,32 +62,6 @@ export function markHidden(db: Db, messageIds: string[], clock: () => number = n
   });
 }
 
-/**
- * A sender the operator has deleted before and never written to (operator,
- * 2026-09-14: "the deleted emails should not reappear"): a `trash` action
- * on one of their earlier messages in this inbox, and no message from the
- * operator in any thread they wrote in. Their next message goes to Deleted
- * items on arrival instead of back into Safe to delete. A hide is not a
- * delete: a hidden thread is meant to come back when they write again.
- */
-export function deletedSenderBefore(db: Db, accountId: string, fromAddress: string): boolean {
-  const address = fromAddress.trim().toLowerCase();
-  if (address === "") return false;
-  const deleted = db.$client
-    .prepare(
-      `select 1 from actions a join messages m on m.id = a.message_id
-       where a.kind = 'trash' and m.account_id = ? and lower(m.from_address) = ? limit 1`,
-    )
-    .get(accountId, address);
-  if (!deleted) return false;
-  const answered = db.$client
-    .prepare(
-      `select 1 from messages o where o.account_id = ? and o.is_from_operator = 1 and o.thread_id in
-         (select m.thread_id from messages m where m.account_id = ? and lower(m.from_address) = ?) limit 1`,
-    )
-    .get(accountId, accountId, address);
-  return !answered;
-}
 
 /** Which of these trashed messages were hidden rather than deleted: those whose last trash-or-hide action is a hide, with the folder each came from. */
 export function hiddenFrom(db: Db, messageIds: string[]): Map<string, MailFolder> {
