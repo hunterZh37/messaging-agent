@@ -810,6 +810,7 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 /* On, meaning the words under the cursor already carry it. */
 .mark-btn.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .draft-marks-hint { font-size: 11.5px; color: var(--muted); }
+.draft-field { resize: none; overflow: hidden; min-height: 0; }
 @media (max-width: 560px) { .draft-marks-hint { display: none; } }
 /* Drawn in the card the moment the editing stops, and in the send preview. */
 .draft strong, .mail-body strong { font-weight: 650; }

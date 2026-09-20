@@ -43,8 +43,9 @@ export function Queue(props: {
   const explicit = q.items.some((i) => i.draft.id === props.selected) ? props.selected! : null;
   const current = q.items.find((i) => i.draft.id === explicit) ?? q.items[0] ?? null;
 
-  // Minimal shortcuts (spec 10a): s send, x skip, e edit, Esc back, and j/k
-  // or the arrows down and up the list. Never while typing.
+  // Minimal shortcuts (spec 10a): s send, x skip, Esc back, and j/k or the
+  // arrows down and up the list. Never while typing, which is most of the
+  // time now that the draft body is always a field (operator, 2026-09-20).
   useEffect(() => {
     function onKey(ev: KeyboardEvent) {
       const t = ev.target as HTMLElement | null;
@@ -52,7 +53,6 @@ export function Queue(props: {
       if (ev.key === "Escape") { setMode("view"); return; }
       if (typing || !current) return;
       if (ev.key === "s" && mode !== "confirm") setMode("confirm");
-      if (ev.key === "e" && mode === "view") setMode("edit");
       if (ev.key === "x" && mode !== "confirm") q.skip(current.draft.id);
       // Down and up the list, the way every mail client reads them. Only
       // while the card is being read: inside the gate the arrows are the

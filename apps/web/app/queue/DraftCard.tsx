@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type DragEvent as ReactDragEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from "react";
 import type { DraftView } from "@messaging-agent/core";
 import { markupSpans } from "@messaging-agent/core/text";
 import { CelesteMark } from "./CelesteMark";
@@ -55,6 +55,21 @@ export function DraftCard(props: {
   // with it, unless it is held here (mousedown is prevented too).
   const body = useRef<HTMLTextAreaElement>(null);
   const [picked, setPicked] = useState<[number, number]>([0, 0]);
+
+  /**
+   * The field is as tall as the draft (operator, 2026-09-20). A fixed box was
+   * fine while editing was a thing you stepped into; now that the body is
+   * always the field, a fixed box would crop every draft by default and hide
+   * the sign off behind a scrollbar.
+   */
+  const grow = useCallback((el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, []);
+  useEffect(() => {
+    grow(body.current);
+  }, [grow, text]);
   const activeMark = (mark: Mark) => marked(text, picked[0], picked[1], mark);
   function applyMark(mark: Mark) {
     const el = body.current;
@@ -331,7 +346,7 @@ export function DraftCard(props: {
             </>
           )}
         </label>
-        {mode === "edit" ? (
+        {mode !== "confirm" ? (
           <>
           {/* Bold and underline, on the text rather than in a second column:
               the draft stays one string, so revise, the undo stack and the
@@ -348,8 +363,7 @@ export function DraftCard(props: {
             <span className="draft-marks-hint">Select a word, then bold it</span>
           </div>
           <textarea
-            className="field"
-            autoFocus
+            className="field draft-field"
             ref={body}
             onSelect={(e) => setPicked([e.currentTarget.selectionStart, e.currentTarget.selectionEnd])}
             value={text}
@@ -357,10 +371,10 @@ export function DraftCard(props: {
               setText(e.target.value);
               setRevisedFrom(null);
             }}
-            // Leaving the field ends the edit (operator, 2026-09-11: no Done
-            // button): the text stays whatever was typed, and on a phone,
-            // where there is no Esc, a tap anywhere else is the way out.
-            onBlur={() => setMode("view")}
+            // Nothing to leave: the field is the draft, and clicking away
+            // puts the cursor somewhere else rather than putting the field
+            // away (operator, 2026-09-20: "the input box itself should just
+            // be editable").
             onKeyDown={(e) => {
               if (e.key === "Escape") e.currentTarget.blur();
               // The shortcuts every mail client has. Without them the buttons
@@ -374,7 +388,7 @@ export function DraftCard(props: {
           />
           </>
         ) : (
-          <div className="draft" onClick={() => mode === "view" && setMode("edit")}>
+          <div className="draft">
             {revision
               ? revision.parts.map((p, i) =>
                   p.kind === "same" ? <span key={i}>{p.text}</span> : p.kind === "ins" ? <mark key={i} className="rev-ins">{p.text}</mark> : <del key={i} className="rev-del">{p.text}</del>,
@@ -393,10 +407,10 @@ export function DraftCard(props: {
             <button type="button" className="btn primary" onClick={() => setMode("confirm")} disabled={sendBlock !== undefined} title={sendBlock}>
               {edited ? "Send edited" : "Send"}<kbd>s</kbd>
             </button>
-            {sendBlock && mode === "edit" && <span className="send-block">{sendBlock}</span>}
-            {/* No Done while editing (operator, 2026-09-11): the text is the
-                draft as it stands, Send takes it and Esc puts the field away. */}
-            {mode === "view" ? <button type="button" className="btn" onClick={() => setMode("edit")}>Edit<kbd>e</kbd></button> : null}
+            {sendBlock && <span className="send-block">{sendBlock}</span>}
+            {/* No Edit and no Done (operator, 2026-09-11, then 2026-09-20):
+                the body is editable where it stands, so the text is the draft
+                as it is, and Send takes it. */}
             {/* "Delete draft", not Skip (operator, 2026-09-14): the same act,
                 named for what it does. Not a bare "Delete": on a thread the
                 row below has one, and it deletes the whole thread. */}
