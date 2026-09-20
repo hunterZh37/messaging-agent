@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { listSenderRules, senderKey, type InboxRow, type Wants } from "@messaging-agent/core";
+import { listProjects, listSenderRules, senderKey, UNFILED, type InboxRow, type ProjectRow, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 import { ListKeys } from "./ListKeys";
 import { FOLDER_TITLES, LIST_PAGE, parseStatus, threadPath, viewHref, type FolderKey, type ViewParams } from "@/lib/folders";
@@ -146,6 +146,19 @@ export function InboxList(props: {
   // From with a display name in it would otherwise miss the rule it has.
   const ruleFor = (from: string) => ruled.get(senderKey(from)) ?? null;
 
+  // A project belongs to one inbox, so a row can only be filed among its own
+  // inbox's projects. Read once per inbox on the page rather than per row:
+  // under All inboxes a list can hold mail from several.
+  const projectsByAccount = new Map<string, ProjectRow[]>();
+  const projectsFor = (accountId: string) => {
+    let found = projectsByAccount.get(accountId);
+    if (!found) {
+      found = listProjects(core().db, accountId);
+      projectsByAccount.set(accountId, found);
+    }
+    return found;
+  };
+
   const row = (r: InboxRow) => {
     const key = r.message.id;
     const link = <Row row={r} folder={folder} params={params} listKey={listKey} {...(selectedThreadId ? { selectedThreadId } : {})} />;
@@ -159,7 +172,7 @@ export function InboxList(props: {
     }
     if (!props.deletable) return <Fragment key={key}>{link}</Fragment>;
     return (
-      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]} ruled={r.message.isFromOperator ? null : ruleFor(r.message.fromAddress)}>
+      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]} ruled={r.message.isFromOperator ? null : ruleFor(r.message.fromAddress)} projects={folder === "inbox" ? projectsFor(r.account.id) : []} projectId={r.project?.id ?? null} unfiledLabel={UNFILED}>
         {link}
       </TrashRow>
     );

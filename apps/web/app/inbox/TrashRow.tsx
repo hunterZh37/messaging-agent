@@ -8,6 +8,7 @@ import { useSendGate } from "../queue/SendProvider";
 /** The × on a row: the same glyph the History rows and the file chips wear. */
 import { EyeOffIcon, TrashIcon } from "./icons";
 import { MoveControl } from "./MoveControl";
+import { FileControl } from "./FileControl";
 
 /**
  * One row of the Safe-to-delete list, with an × at its right (spec 10a,
@@ -36,6 +37,9 @@ export function TrashRow({
   wants,
   senders,
   ruled,
+  projects,
+  projectId = null,
+  unfiledLabel,
 }: {
   threadId: string;
   subject: string;
@@ -54,10 +58,18 @@ export function TrashRow({
   senders?: string[];
   /** The rung a standing rule already puts this sender on, if there is one. */
   ruled?: import("@messaging-agent/core").Wants | null;
+  /** The projects of this row's own inbox; no projects, no File button. */
+  projects?: import("@messaging-agent/core").ProjectRow[];
+  /** The project it is filed under now, marked in the menu. */
+  projectId?: string | null;
+  /** Core's reserved name for no project (operator, 2026-09-20). */
+  unfiledLabel?: string;
 }) {
   const { trash, leavingThreads, deletingThreads, returningThreads, handledThreads } = useSendGate();
   const [going, setGoing] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [openMenus, setOpenMenus] = useState(0);
+  const menuOpen = openMenus > 0;
+  const noteMenu = (open: boolean) => setOpenMenus((n) => Math.max(0, n + (open ? 1 : -1)));
   const [kept, setKept] = useState(false);
   const [keepError, setKeepError] = useState<string | null>(null);
   const [drag, setDrag] = useState(0);
@@ -115,7 +127,7 @@ export function TrashRow({
 
   return (
     <div
-      className={`${going || kept ? "inbox-row-item going" : back ? "inbox-row-item arriving" : "inbox-row-item"}${drag < 0 ? " swiping" : ""}${hideable ? " hideable" : ""}${keepable ? " keepable" : ""}${menuOpen ? " tools-open" : ""}`}
+      className={`${going || kept ? "inbox-row-item going" : back ? "inbox-row-item arriving" : "inbox-row-item"}${drag < 0 ? " swiping" : ""}${hideable ? " hideable" : ""}${keepable ? " keepable" : ""}${keepable && projects && projects.length > 0 ? " filable" : ""}${menuOpen ? " tools-open" : ""}`}
       style={drag < 0 ? { transform: `translateX(${drag}px)` } : undefined}
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
@@ -124,6 +136,16 @@ export function TrashRow({
     >
       {children}
       <div className="row-tools">
+      {keepable && projects && projects.length > 0 ? (
+        <FileControl
+          threadId={threadId}
+          subject={subject}
+          projects={projects}
+          currentId={projectId}
+          unfiledLabel={unfiledLabel ?? "Unfiled"}
+          onOpenChange={noteMenu}
+        />
+      ) : null}
       {keepable ? (
         <MoveControl
           threadId={threadId}
@@ -131,7 +153,7 @@ export function TrashRow({
           wants={wants}
           senders={senders}
           ruled={ruled}
-          onOpenChange={setMenuOpen}
+          onOpenChange={noteMenu}
           onMoving={() => {
             setKeepError(null);
             setKept(true);

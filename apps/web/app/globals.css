@@ -752,8 +752,15 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 }
 .keep-btn svg { width: 11px; height: 11px; }
 .keep-btn:hover, .keep-btn[aria-expanded="true"] { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
-/* Room for three controls rather than one, so a long subject never runs under them. */
+/* Room for the controls rather than one, so a long subject never runs under
+   them. File joins Move on an inbox that has projects (operator, 2026-09-20). */
 .inbox-row-item.keepable > .inbox-row { padding-right: 148px; }
+.inbox-row-item.keepable.filable > .inbox-row { padding-right: 196px; }
+/* A project list is as long as the operator's projects, so it scrolls rather
+   than running off the bottom of the window. One line per project: the name
+   is the whole of what there is to say. */
+.keep-menu.projects { max-height: min(340px, 60vh); overflow-y: auto; min-width: 200px; }
+.keep-menu.projects .keep-row { padding: 7px 10px; }
 /* The row lifts while its menu is down, or the rows beneath paint over it. */
 .inbox-row-item.tools-open { z-index: 40; }
 .keep-menu {
