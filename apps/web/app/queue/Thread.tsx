@@ -11,6 +11,7 @@ import { fileKind } from "@/lib/attachments";
 import { formatTime, initials, recipientsLine } from "@/lib/format";
 import { linkSegments } from "@/lib/linkify";
 import { AttachmentPreview, ClipIcon } from "./AttachmentPreview";
+import { FittedHtml } from "./FittedHtml";
 
 function DownloadIcon() {
   return (
@@ -194,7 +195,7 @@ export function Thread({
                   <AttachmentPreview key={a.id} href={attachmentHref(a.id, false)} filename={a.filename} mimeType={a.mimeType} />
                 ))}
                 {html ? (
-                  <div className="msg-html" dangerouslySetInnerHTML={{ __html: m.bodyHtml ?? "" }} />
+                  <FittedHtml html={m.bodyHtml ?? ""} />
                 ) : (
                   <div className="body">
                     <PlainBody text={folded ? own : m.bodyText} />
