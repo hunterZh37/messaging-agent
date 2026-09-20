@@ -19,13 +19,15 @@ import { ChevronIcon } from "./icons";
  * The row stays where it is. Filing says what a message is about, not whether
  * it is dealt with, which is Move's question.
  */
-export function FileControl({ threadId, subject, accountId, projects, currentId, unfiledLabel, onOpenChange }: {
+export function FileControl({ threadId, subject, accountId, projects, groups, currentId, unfiledLabel, onOpenChange }: {
   threadId: string;
   subject: string;
   /** Whose inbox this row belongs to; a new project is made in that inbox. */
   accountId: string;
   /** The projects of this row's own inbox, which is the only place it can be filed. */
   projects: ProjectRow[];
+  /** Group names by id: the bigger thing a project sits under, named under it. */
+  groups?: Record<string, string>;
   currentId: string | null;
   /** Core's reserved name for no project, passed in so this stays free of server-only imports. */
   unfiledLabel: string;
@@ -99,7 +101,10 @@ export function FileControl({ threadId, subject, accountId, projects, currentId,
     });
   }
 
-  const rows = [...projects.map((p) => ({ id: p.id as string | null, name: p.name })), { id: null, name: unfiledLabel }];
+  const rows = [
+    ...projects.map((p) => ({ id: p.id as string | null, name: p.name, group: (p.groupId ? groups?.[p.groupId] : null) ?? null })),
+    { id: null, name: unfiledLabel, group: null },
+  ];
   return (
     <div className="inbox-row-keep" ref={wrap}>
       <button
@@ -131,6 +136,7 @@ export function FileControl({ threadId, subject, accountId, projects, currentId,
                   {p.name}
                   {currentId === p.id ? <span className="keep-now"> · where it is now</span> : null}
                 </span>
+                {p.group ? <span className="picker-desc">{p.group}</span> : null}
               </button>
             ))}
           </div>

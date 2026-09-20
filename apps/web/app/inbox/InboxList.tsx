@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import Link from "next/link";
-import { listProjects, listSenderRules, listsOfMessages, senderKey, UNFILED, type InboxRow, type ProjectRow, type TreeScope, type Wants } from "@messaging-agent/core";
+import { listProjectGroups, listProjects, listSenderRules, listsOfMessages, senderKey, UNFILED, type InboxRow, type ProjectRow, type TreeScope, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 import { ListKeys } from "./ListKeys";
 import { FOLDER_TITLES, LIST_PAGE, parseStatus, threadPath, viewHref, type FolderKey, type ViewParams } from "@/lib/folders";
@@ -161,6 +161,18 @@ export function InboxList(props: {
     }
     return found;
   };
+  // The bigger thing a project sits under (operator, 2026-09-20), so a name
+  // that means little on its own says which part of the operator's life it
+  // belongs to.
+  const groupsByAccount = new Map<string, Record<string, string>>();
+  const groupsFor = (accountId: string) => {
+    let found = groupsByAccount.get(accountId);
+    if (!found) {
+      found = Object.fromEntries(listProjectGroups(core().db, accountId).map((g) => [g.id, g.name]));
+      groupsByAccount.set(accountId, found);
+    }
+    return found;
+  };
 
   const row = (r: InboxRow) => {
     const key = r.message.id;
@@ -175,7 +187,7 @@ export function InboxList(props: {
     }
     if (!props.deletable) return <Fragment key={key}>{link}</Fragment>;
     return (
-      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]} ruled={r.message.isFromOperator ? null : ruleFor(r.message.fromAddress)} projects={folder === "inbox" ? projectsFor(r.account.id) : []} accountId={r.account.id} projectId={r.project?.id ?? null} unfiledLabel={UNFILED}>
+      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]} ruled={r.message.isFromOperator ? null : ruleFor(r.message.fromAddress)} projects={folder === "inbox" ? projectsFor(r.account.id) : []} groups={folder === "inbox" ? groupsFor(r.account.id) : {}} accountId={r.account.id} projectId={r.project?.id ?? null} unfiledLabel={UNFILED}>
         {link}
       </TrashRow>
     );
