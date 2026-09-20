@@ -194,11 +194,11 @@ export function ContentHeader(props: {
           the money side, then the actions and refresh on one row. */}
       <div className="head-row first">
         <span className="head-title">{FOLDER_TITLES[folder]}</span>
-        {status ? (
+        {STATUS_MENU[folder].length > 0 ? (
           <StatusPicker
-            label={STATUS_LABELS[status]}
+            label={status ? STATUS_LABELS[status] : "All"}
             options={[
-              { key: "all", name: `All of ${FOLDER_TITLES[folder]}`, href: href({ status: undefined }), on: false },
+              { key: "all", name: "All", href: href({ status: undefined }), on: !status },
               ...STATUS_MENU[folder].map((s) => ({ key: s, name: STATUS_LABELS[s], href: href({ status: s }), on: s === status })),
             ]}
           />
