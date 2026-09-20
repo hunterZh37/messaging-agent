@@ -3,10 +3,11 @@ import Link from "next/link";
 import { listSenderRules, senderKey, type InboxRow, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 import { ListKeys } from "./ListKeys";
-import { FOLDER_TITLES, LIST_PAGE, threadPath, viewHref, type FolderKey, type ViewParams } from "@/lib/folders";
+import { FOLDER_TITLES, LIST_PAGE, parseStatus, threadPath, viewHref, type FolderKey, type ViewParams } from "@/lib/folders";
 import { formatTime, relativeTime, shortAccount, cleanSnippet } from "@/lib/format";
 import type { WindowKey } from "@/lib/selection";
 import { groupByThread } from "@/lib/threads";
+import { rowTags } from "@/lib/rowTags";
 import { ChannelIcon } from "./icons";
 import { ThreadGroup } from "./ThreadGroup";
 import { TrashRow } from "./TrashRow";
@@ -29,6 +30,9 @@ function Row(props: { row: InboxRow; folder: FolderKey; params: ViewParams; sele
   // (stress loop, 2026-09-11: a deleted chat's row showed the operator's own
   // handle as its sender).
   const chat = folder === "messages" || r.account.provider === "imessage" || r.account.provider === "whatsapp";
+  // Only the inbox proper carries them: Sent, Deleted items and the chat list
+  // are not sorted mail, and a rung on one of those rows would say nothing.
+  const tags = folder === "inbox" ? rowTags(r, { status: parseStatus(folder, params.status) ?? null, project: params.project ?? null }) : [];
   return (
     <RowLink
       href={viewHref(threadPath(r.thread.id), { ...params, folder })}
@@ -46,6 +50,17 @@ function Row(props: { row: InboxRow; folder: FolderKey; params: ViewParams; sele
         {r.thread.hiddenAt ? <span className="hidden-tag">Hidden</span> : null}
         <span style={{ marginLeft: "auto" }}>{formatTime(r.message.sentAt)}</span>
       </div>
+      {/* Where this one stands and what it is about (operator, 2026-09-20),
+          minus whatever the list the operator is standing in already says.
+          On their own row rather than among the meta: a project can be named
+          anything, and in the meta a long one pushed the clock off its line. */}
+      {tags.length > 0 ? (
+        <div className="row-tags">
+          {tags.map((t) => (
+            <span key={`${t.kind}:${t.name}`} className={`row-tag ${t.kind}`}>{t.name}</span>
+          ))}
+        </div>
+      ) : null}
       <div className="inbox-sender">
         {/* Sent mail is read by who it went to, not who wrote it. */}
         <span>{folder === "sent" ? `to ${r.message.toAddresses[0] ?? "(no recipient)"}` : chat ? r.message.subject : (r.message.fromName ?? r.message.fromAddress)}</span>

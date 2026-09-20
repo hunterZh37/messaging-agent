@@ -307,6 +307,21 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 /* A thread hidden from the sorting lists, as it reads in Inbox and Messages (2026-09-15). */
 .hidden-tag { font-size: 11px; padding: 1px 6px; border-radius: 999px; color: var(--muted); background: color-mix(in srgb, var(--fg) 7%, transparent); }
 
+/* Where a row stands and what it is about, across its top (operator,
+   2026-09-20). Quiet by default: the row's own sender and subject are what
+   the eye reads, and a wall of colour would fight them. The project is the
+   one that carries a tint, because it is the label that varies. */
+.row-tag { font-size: 10.5px; line-height: 1.5; padding: 1px 6px; border-radius: 999px; white-space: nowrap; letter-spacing: 0.02em; }
+.row-tag.state { color: var(--muted); background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.row-tag.project { color: var(--fg); background: color-mix(in srgb, var(--accent) 26%, transparent); }
+/* Their own row, under the meta and above the sender: a project can be named
+   anything, and among the meta a long one pushed the clock onto a line of its
+   own. One line, no wrapping; a name too long for the pane is cut. */
+.row-tags { display: flex; gap: 6px; align-items: center; margin: 3px 0 1px; min-width: 0; }
+.row-tags .row-tag { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.row-tags .row-tag.state { flex: none; }
+.row-tags .row-tag.project { flex: 0 1 auto; }
+
 /* Notifications on this phone (2026-09-14). */
 .notify-hint { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; padding: 0 8px; font-size: 12.5px; color: var(--muted); }
 .notify-hint svg { width: 14px; height: 14px; margin-top: 2px; flex-shrink: 0; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
