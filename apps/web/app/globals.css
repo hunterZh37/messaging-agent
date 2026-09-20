@@ -497,6 +497,20 @@ main.inbox-page { max-width: none; margin: 0; padding: 0; }
    delete" broke into three words stacked when the Ask panel narrowed the
    header); the project pills beside them give way instead. */
 .head-row.first > .head-title, .head-row.first > .head-sub { white-space: nowrap; flex-shrink: 0; }
+/* The child row in the breadcrumb, which changes it (operator, 2026-09-20).
+   It reads as the same word it replaced until the pointer is on it: a
+   breadcrumb that looked like a button would claim more of the eye than the
+   folder name above it. */
+.head-row.first > .head-sub-menu { flex: none; position: relative; }
+.head-row.first > .head-sub-menu::before { content: "› "; color: var(--muted); font-size: 13px; }
+.head-sub-btn {
+  display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; margin-left: -2px;
+  font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap;
+  color: color-mix(in srgb, var(--fg) 75%, var(--muted));
+  background: none; border: 0; border-radius: 7px; cursor: pointer; transition: color 120ms, background-color 120ms;
+}
+.head-sub-btn svg { width: 10px; height: 10px; opacity: 0.7; }
+.head-sub-btn:hover, .head-sub-btn[aria-expanded="true"] { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); }
 /* Pushes the refresh control to the far right of the first row. */
 .head-spacer { flex: 1 1 auto; }
 /* The filter row is the only thing in this header that gives way. Everything

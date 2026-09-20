@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { listProjects, type CategoryRow, type Db, type ProjectRow } from "@messaging-agent/core";
-import { FOLDER_TITLES, STATUS_LABELS, viewHref, type FolderKey, type FolderStatus, type ViewParams } from "@/lib/folders";
+import { FOLDER_TITLES, STATUS_LABELS, STATUS_MENU, viewHref, type FolderKey, type FolderStatus, type ViewParams } from "@/lib/folders";
 import { allTab, ALL_TAB, groupRow, projectTabs, projectTabsByInbox, type GroupLike, type InboxTabs, type Tab } from "@/lib/tabs";
 import {
   PROJECT_COOKIE,
@@ -24,6 +24,7 @@ import { MarkAllOpened } from "./MarkAllOpened";
 import { ProjectStrip } from "./ProjectStrip";
 import { ProjectPicker } from "./ProjectPicker";
 import { PeriodPicker } from "./PeriodPicker";
+import { StatusPicker } from "./StatusPicker";
 
 /** The window chips, in the order they sit in (spec 5). */
 const WINDOW_LABELS: Record<WindowKey, string> = { today: "Today", "7d": "7 days", "30d": "30 days", all: "All" };
@@ -193,7 +194,15 @@ export function ContentHeader(props: {
           the money side, then the actions and refresh on one row. */}
       <div className="head-row first">
         <span className="head-title">{FOLDER_TITLES[folder]}</span>
-        {status ? <span className="head-sub">{STATUS_LABELS[status]}</span> : null}
+        {status ? (
+          <StatusPicker
+            label={STATUS_LABELS[status]}
+            options={[
+              { key: "all", name: `All of ${FOLDER_TITLES[folder]}`, href: href({ status: undefined }), on: false },
+              ...STATUS_MENU[folder].map((s) => ({ key: s, name: STATUS_LABELS[s], href: href({ status: s }), on: s === status })),
+            ]}
+          />
+        ) : null}
         <span className="head-div" />
         <div className="head-filters">
           {/* Chats belong to no inbox (spec 10f), so Messages has no INBOX chip. */}

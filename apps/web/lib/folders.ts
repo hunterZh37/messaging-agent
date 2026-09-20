@@ -49,6 +49,22 @@ const STATUSES: Record<FolderKey, FolderStatus[]> = {
   messages: ["unopened", "needs_reply", "disposable", "hidden"],
 };
 
+/**
+ * The child rows a folder offers in its own breadcrumb (operator, 2026-09-20:
+ * "the word unopened should be clickable and a dropdown should appear").
+ *
+ * Not STATUSES: that list still carries `needs_reply` and `action` so links
+ * made before the two shared a row keep working, and offering all three would
+ * put the same mail behind three names.
+ */
+export const STATUS_MENU: Record<FolderKey, FolderStatus[]> = {
+  inbox: ["unopened", "owed", "knowing", "disposable", "hidden"],
+  sent: ["waiting", "not_waiting"],
+  trash: [],
+  junk: [],
+  messages: ["unopened", "needs_reply", "disposable", "hidden"],
+};
+
 /** The `?status=` param, ignored when it names something this folder does not have. */
 export function parseStatus(folder: FolderKey, param: string | undefined): FolderStatus | undefined {
   return STATUSES[folder].find((s) => s === param);

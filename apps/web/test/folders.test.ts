@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { activeTreeKey, hasProjectBar, messagesLanding, parseFolder, parseStatus, rowsForSide, sideHref, sideOfPath, threadPath, treeRows, viewHref } from "../lib/folders";
+import { STATUS_MENU, activeTreeKey, hasProjectBar, messagesLanding, parseFolder, parseStatus, rowsForSide, sideHref, sideOfPath, threadPath, treeRows, viewHref } from "../lib/folders";
 
 describe("parseStatus", () => {
   it("takes only the statuses its folder has", () => {
@@ -263,5 +263,32 @@ describe("messagesLanding", () => {
     expect(messagesLanding({ unopened: 0, needsReply: 1 })).toBe("needs_reply");
     expect(messagesLanding({ unopened: 0, needsReply: 0 })).toBeUndefined();
     expect(messagesLanding(undefined)).toBeUndefined();
+  });
+});
+
+/**
+ * The breadcrumb's own dropdown (operator, 2026-09-20: "the word unopened
+ * should be clickable"). It offers the rows the tree draws, not every status
+ * a link may carry.
+ */
+describe("the child rows a folder offers", () => {
+  it("offers the ladder as the tree draws it, Reply and Action Required as one", () => {
+    expect(STATUS_MENU.inbox).toEqual(["unopened", "owed", "knowing", "disposable", "hidden"]);
+  });
+
+  it("leaves out the two names that only keep older links working", () => {
+    expect(STATUS_MENU.inbox).not.toContain("needs_reply");
+    expect(STATUS_MENU.inbox).not.toContain("action");
+  });
+
+  it("offers nothing where there is nothing to choose", () => {
+    expect(STATUS_MENU.trash).toEqual([]);
+    expect(STATUS_MENU.junk).toEqual([]);
+  });
+
+  it("offers only what its own folder has", () => {
+    for (const [folder, list] of Object.entries(STATUS_MENU)) {
+      for (const status of list) expect(parseStatus(folder as keyof typeof STATUS_MENU, status)).toBe(status);
+    }
   });
 });
