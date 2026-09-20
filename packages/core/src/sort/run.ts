@@ -271,7 +271,7 @@ export async function resortImportant(
   for (const m of rows) {
     try {
       const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
-      db.update(sorts).set({ category: r.category, finance: r.finance, reason: r.reason }).where(eq(sorts.messageId, m.id)).run();
+      db.update(sorts).set({ category: r.category, finance: r.finance, reason: r.reason, model: sorter.model }).where(eq(sorts.messageId, m.id)).run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());
       resorted++;
     } catch (err) {
@@ -323,7 +323,7 @@ export async function resortWindow(
     try {
       const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
       db.update(sorts)
-        .set({ wants: r.wants, category: r.wants === "bin" ? null : r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason })
+        .set({ wants: r.wants, category: r.wants === "bin" ? null : r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason, model: sorter.model })
         .where(eq(sorts.messageId, m.id))
         .run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());
@@ -389,7 +389,7 @@ export async function resortNeedsReply(
         // the bin. Nothing was asked about whether it is worth keeping, and
         // quietly moving mail that was recently owed an answer into Safe to
         // delete is the wrong direction to be wrong in.
-        .set({ wants: r.wants === "reply" ? "reply" : "knowing", category: r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason })
+        .set({ wants: r.wants === "reply" ? "reply" : "knowing", category: r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason, model: sorter.model })
         .where(eq(sorts.messageId, m.id))
         .run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());
