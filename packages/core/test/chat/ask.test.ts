@@ -51,6 +51,45 @@ describe("askCeleste", () => {
     expect(JSON.stringify(client.requests[1]!.messages.at(-1)!.content)).toContain("No message matched");
   });
 
+  /**
+   * A thread id that names nothing used to become a button, and the failure
+   * waited until the operator pressed it (operator, 2026-09-19: "the draft
+   * is on your screen now" followed by "thread not found"). The model had
+   * passed the half of the id before the colon, which is the account.
+   */
+  it("refuses a proposal whose thread id names nothing, and says what the shape is", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "Invoice", bodyText: "Please confirm." }]);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "propose_action", input: { kind: "draft_reply", thread_id: "a1" } }]),
+      textResponse("Let me look again."),
+    ]);
+
+    const turn = await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "Reply to that", contextThreadId: "a1:t-m1" });
+
+    expect(turn.actions).toEqual([]);
+    const said = JSON.stringify(client.requests[1]!.messages.at(-1)!.content);
+    expect(said).toContain("No thread has the id");
+    expect(said).toContain("colon");
+  });
+
+  it("keeps the good threads out of a proposal when one of them is wrong", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "Invoice", bodyText: "Please confirm." }]);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "propose_action", input: { kind: "file_to_project", thread_ids: ["a1:t-m1", "a1:t-nope"], project_name: "Acme" } }]),
+      textResponse("One of those is not a thread."),
+    ]);
+
+    const turn = await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "File those", contextThreadId: "a1:t-m1" });
+
+    // Half a proposal is worse than none: the operator would press it and
+    // get one of the two things they asked for, with nothing saying so.
+    expect(turn.actions).toEqual([]);
+  });
+
   it("captures proposals as buttons and executes none of them", async () => {
     const db = testDb();
     seedMail(db, [{ id: "m1", subject: "Invoice", bodyText: "Please confirm." }]);

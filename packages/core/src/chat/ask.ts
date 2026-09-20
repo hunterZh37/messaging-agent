@@ -1,7 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { operatorAddresses } from "../accounts/aliases";
 import { now, type Db } from "../db/client";
-import { drafts, messages, projects, type ChatMessageRow } from "../db/schema";
+import { drafts, messages, projects, threads, type ChatMessageRow } from "../db/schema";
 import { listProjects } from "../projects/projects";
 import { HUMAN_STYLE_RULE, humanizePunctuation } from "../draft/style";
 import { describeThreads, renderChatFiles, renderContextDraft, renderThread } from "./context";
@@ -126,7 +126,7 @@ const TOOLS: ChatToolDef[] = [
       type: "object",
       properties: {
         kind: { type: "string", enum: PROPOSED_ACTION_KINDS, description: "draft_reply, draft_follow_up, file_to_project, mark_handled, open_thread or apply_draft." },
-        thread_ids: { type: "array", items: { type: "string" }, description: `Every thread this action covers, up to ${MAX_PROPOSAL_THREADS}.` },
+        thread_ids: { type: "array", items: { type: "string" }, description: `Every thread this action covers, up to ${MAX_PROPOSAL_THREADS}. Each id is the whole string a citation carries, "<account>:<thread>", colon included.` },
         thread_id: { type: "string", description: "One thread, when that is all it covers." },
         project_name: { type: "string", description: "For file_to_project: the project to file the threads under." },
         create_project: { type: "boolean", description: "For file_to_project: the project does not exist yet and the operator's click should make it." },
@@ -216,7 +216,7 @@ function historyMessages(rows: ChatMessageRow[]): ChatApiMessage[] {
  * `apply_draft` then has nothing to land on and is refused rather than
  * offered as a button that could not work.
  */
-function proposalFrom(input: Record<string, unknown>, draftThreadId: string | null): ProposedAction | string {
+function proposalFrom(db: Db, input: Record<string, unknown>, draftThreadId: string | null): ProposedAction | string {
   const kind = input.kind;
   if (typeof kind !== "string" || !(PROPOSED_ACTION_KINDS as string[]).includes(kind)) return `Unknown action kind: ${String(kind)}`;
   const note = typeof input.note === "string" && input.note !== "" ? input.note : undefined;
@@ -238,6 +238,28 @@ function proposalFrom(input: Record<string, unknown>, draftThreadId: string | nu
   }
   if (threadIds.length === 0) return "propose_action needs a thread id in thread_ids.";
   if (threadIds.length > MAX_PROPOSAL_THREADS) return `A proposal covers at most ${MAX_PROPOSAL_THREADS} threads; that one names ${threadIds.length}.`;
+
+  // The ids are checked here rather than when the button is pressed
+  // (operator, 2026-09-19). A thread id that names nothing used to sail
+  // through, and the operator was offered a button that could not work: it
+  // said "the draft is on your screen now" and then "thread not found". The
+  // model gets the sentence instead, in the same turn, and can look again.
+  //
+  // The mistake that prompted this was passing the half of a thread id
+  // before the colon, which is the account, so the reply says what the shape
+  // is rather than only that the id was wrong.
+  const known = new Set(
+    db
+      .select({ id: threads.id })
+      .from(threads)
+      .where(inArray(threads.id, threadIds))
+      .all()
+      .map((r) => r.id),
+  );
+  const missing = threadIds.filter((id) => !known.has(id));
+  if (missing.length > 0) {
+    return `No thread has the id ${missing.map((id) => `"${id}"`).join(", ")}. A thread id is the whole string from a citation, "<account>:<thread>", colon included; the part before the colon is the account on its own and names no thread.`;
+  }
 
   const projectName = typeof input.project_name === "string" && input.project_name !== "" ? input.project_name : undefined;
   // The operator's own words about what the draft should say, kept for the
@@ -426,7 +448,7 @@ export async function askCeleste(db: Db, deps: AskDeps, input: AskInput): Promis
           if (rendered) for (const id of rendered.messageIds) toolIds.add(id);
           content = rendered ? rendered.text : "No thread with that id.";
         } else if (use.name === "propose_action") {
-          const proposal = proposalFrom(args, draftThreadId);
+          const proposal = proposalFrom(db, args, draftThreadId);
           if (typeof proposal === "string") {
             content = proposal;
           } else {
