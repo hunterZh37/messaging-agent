@@ -4,6 +4,7 @@ import { accounts, messages, projectAssignments, sorts, type MessageRow } from "
 import { listProjects } from "../projects/projects";
 import { listCategories, type Category } from "./categories";
 import { NO_PROJECT, type Sorter, type SortInput, type SortProject } from "./types";
+import { OPERATOR } from "./corrections";
 
 /**
  * One stored message as the sorter reads it. The id and the inbox ride along
@@ -260,7 +261,7 @@ export async function resortImportant(
     .select({ m: messages })
     .from(messages)
     .innerJoin(sorts, eq(sorts.messageId, messages.id))
-    .where(and(ne(sorts.wants, "bin"), eq(messages.folder, "inbox")))
+    .where(and(ne(sorts.wants, "bin"), ne(sorts.model, OPERATOR), eq(messages.folder, "inbox")))
     .orderBy(messages.sentAt)
     .limit(opts.limit ?? 500)
     .all()
@@ -301,7 +302,10 @@ export async function resortWindow(
   const categories = operatorCategories(db);
   const projectCache = new Map<string, SortProject[]>();
   const addressCache = new Map<string, string | null>();
-  const conditions = [eq(messages.isFromOperator, false), eq(messages.folder, "inbox"), gte(messages.sentAt, opts.since)];
+  // A verdict the operator set by hand is theirs. A pass that quietly
+  // overwrote it would teach them not to trust the ones that stuck
+  // (operator, 2026-09-20).
+  const conditions = [eq(messages.isFromOperator, false), eq(messages.folder, "inbox"), ne(sorts.model, OPERATOR), gte(messages.sentAt, opts.since)];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
   // Mail the sorter has not filed yet goes first, then the longest-ago filed,
   // so repeated presses of Re-file walk the whole window instead of re-reading
@@ -359,6 +363,7 @@ export async function resortNeedsReply(
     eq(messages.isFromOperator, false),
     eq(messages.folder, "inbox"),
     eq(sorts.wants, "reply"),
+    ne(sorts.model, OPERATOR),
     sql`${messages.id} = (
       select m.id from messages m
       where m.thread_id = ${messages.threadId}

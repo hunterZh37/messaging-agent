@@ -635,6 +635,27 @@ export type NewMessageRow = typeof messages.$inferInsert;
 export type AttachmentRow = typeof attachments.$inferSelect;
 export type ThreadRow = typeof threads.$inferSelect;
 export type SortRow = typeof sorts.$inferSelect;
+
+/**
+ * A standing instruction from the operator about one sender (operator,
+ * 2026-09-20: "and always from Zillow").
+ *
+ * Read before the model is asked, so a sender the operator has ruled on
+ * costs no call and cannot drift: four Zillow alerts arrived in one morning
+ * and correcting the fourth should settle the fifth. Keyed by address alone
+ * rather than by address and inbox, because "never show me this sender" is
+ * a fact about the sender, not about which of the operator's mailboxes they
+ * happened to write to.
+ */
+export const senderRules = sqliteTable("sender_rules", {
+  /** Lowercased, so one rule covers Codes@x and codes@x. */
+  fromAddress: text("from_address").primaryKey(),
+  wants: text("wants", { enum: WANTS }).notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export type SenderRuleRow = typeof senderRules.$inferSelect;
+
 export type CategoryRow = typeof categories.$inferSelect;
 export type ProjectRow = typeof projects.$inferSelect;
 export type ProjectGroupRow = typeof projectGroups.$inferSelect;

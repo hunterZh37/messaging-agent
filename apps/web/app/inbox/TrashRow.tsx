@@ -7,7 +7,7 @@ import { useSendGate } from "../queue/SendProvider";
 
 /** The × on a row: the same glyph the History rows and the file chips wear. */
 import { EyeOffIcon, TrashIcon } from "./icons";
-import { KeepControl } from "./KeepControl";
+import { MoveControl } from "./MoveControl";
 
 /**
  * One row of the Safe-to-delete list, with an × at its right (spec 10a,
@@ -33,6 +33,8 @@ export function TrashRow({
   hideable = false,
   statusList = false,
   keepable = false,
+  wants,
+  senders,
 }: {
   threadId: string;
   subject: string;
@@ -43,8 +45,12 @@ export function TrashRow({
   hideable?: boolean;
   /** One of the four sorting lists, which a hidden thread leaves; Inbox and Messages themselves keep it (2026-09-15). */
   statusList?: boolean;
-  /** Safe to delete, where the row can also be rescued rather than thrown away (operator, 2026-09-18). */
+  /** Every row can be put where it belongs (operator, 2026-09-20). */
   keepable?: boolean;
+  /** The rung it is on now, so the menu can mark it. */
+  wants?: import("@messaging-agent/core").Wants | null;
+  /** Who a standing rule would be about. */
+  senders?: string[];
 }) {
   const { trash, leavingThreads, deletingThreads, returningThreads, handledThreads } = useSendGate();
   const [going, setGoing] = useState(false);
@@ -116,11 +122,13 @@ export function TrashRow({
       {children}
       <div className="row-tools">
       {keepable ? (
-        <KeepControl
+        <MoveControl
           threadId={threadId}
           subject={subject}
+          wants={wants}
+          senders={senders}
           onOpenChange={setMenuOpen}
-          onKeeping={() => {
+          onMoving={() => {
             setKeepError(null);
             setKept(true);
           }}

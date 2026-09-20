@@ -267,6 +267,13 @@
       "when": 1789872000000,
       "tag": "0037_the_ladder",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "6",
+      "when": 1789934000000,
+      "tag": "0038_sender_rules",
+      "breakpoints": true
     }
   ]
 }

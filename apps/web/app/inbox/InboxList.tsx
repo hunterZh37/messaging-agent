@@ -133,7 +133,7 @@ export function InboxList(props: {
     }
     if (!props.deletable) return <Fragment key={key}>{link}</Fragment>;
     return (
-      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox" && params.status === "disposable"}>
+      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]}>
         {link}
       </TrashRow>
     );

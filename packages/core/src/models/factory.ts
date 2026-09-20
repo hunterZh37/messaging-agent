@@ -7,6 +7,7 @@ import { createOllamaEmbedder } from "../projects/embedder";
 import { findExamples } from "../sort/examples";
 import { distillRules, MIN_TRUSTED_VERDICTS, readRules } from "../sort/rules";
 import { createSorterFor } from "../sort/sorter";
+import { withSenderRules } from "../sort/corrections";
 import type { Sorter } from "../sort/types";
 import type { ChatClient } from "../chat/types";
 import { createAnthropicProvider } from "./anthropic";
@@ -90,7 +91,10 @@ export function createLearningSorter(cfg: Config, db: Db): Sorter {
 }
 
 export function createSorter(cfg: Config, db: Db, kind: SorterKind = "trickle"): Sorter {
-  return kind === "backlog" ? createSorterFor(providerForRole("sorter_backlog", cfg, db)) : createLearningSorter(cfg, db);
+  const model = kind === "backlog" ? createSorterFor(providerForRole("sorter_backlog", cfg, db)) : createLearningSorter(cfg, db);
+  // The operator's standing instructions are read before any model is asked,
+  // whichever model that is (operator, 2026-09-20).
+  return withSenderRules(db, model);
 }
 
 /** The database is optional only so a caller with no database still builds; give it one and the drafting is counted. */

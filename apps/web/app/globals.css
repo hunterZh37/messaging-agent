@@ -748,6 +748,15 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 }
 .keep-row { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 8px 10px; border: 0; border-radius: 8px; background: none; font: inherit; color: var(--fg); text-align: left; cursor: pointer; }
 .keep-row:hover, .keep-row:focus-visible { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+/* The rung it is on now, marked rather than hidden: the menu says where the
+   message stands as well as offering to move it (operator, 2026-09-20). */
+.keep-row.on { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.keep-now { color: var(--accent); font-weight: 500; }
+/* The second half of the ask, which modifies the choice above rather than
+   being another choice, so it is a checkbox and not a menu item. */
+.keep-always { display: flex; align-items: flex-start; gap: 8px; margin-top: 4px; padding: 9px 10px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); cursor: pointer; }
+.keep-always input { margin: 2px 0 0; flex: none; accent-color: var(--accent); }
+.keep-always b { color: var(--fg); font-weight: 550; word-break: break-all; }
 .inbox-row-keep-error { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); font-size: 12px; color: #d97706; background: var(--bg-elev); padding: 2px 8px; border-radius: 7px; border: 1px solid var(--line); }
 /* By touch there is no hover, so the strip is simply there. */
 @media (hover: none) {

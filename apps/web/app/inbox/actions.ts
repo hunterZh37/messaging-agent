@@ -42,7 +42,7 @@ import {
   type AlexItem,
   type AlexItemRow,
   type AlexSlot,
-  setThreadWaiting, hideThreads, keepThread, hiddenThreadIds, type KeepDestination } from "@messaging-agent/core";
+  setThreadWaiting, hideThreads, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 
 type StepError = { error: string };
@@ -425,6 +425,40 @@ export async function trashThreadsAction(threadIds: string[]): Promise<{ moved: 
  * "No reply needed" on a thread the operator sent last: it leaves Waiting for
  * reply at once (spec 10a). `waiting: true` puts it back.
  */
+/**
+ * Putting a thread where it belongs, because the model got it wrong
+ * (operator, 2026-09-20). Optionally standing for every future message from
+ * the same sender, which is the half that stops the same four alerts being
+ * corrected again tomorrow.
+ *
+ * Nothing is re-judged and nothing is sent. The verdict is stamped as the
+ * operator's, so no later pass rewrites it.
+ */
+export async function correctThreadAction(
+  threadId: string,
+  wants: Wants,
+  alsoSender: boolean,
+): Promise<{ ok: true; moved: number; senders: string[] } | StepError> {
+  try {
+    const { db } = core();
+    const senders = alsoSender ? sendersOf(db, threadId) : [];
+    const moved = correctThread(db, threadId, wants);
+    for (const address of senders) setSenderRule(db, address, wants);
+    revalidatePath("/inbox");
+    revalidatePath("/messages");
+    revalidatePath(`/inbox/${threadId}`);
+    return { ok: true, moved, senders };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
+
+/** Who a "and always from them" would be about, for the menu to name. */
+export async function threadSendersAction(threadId: string): Promise<string[]> {
+  const { db } = core();
+  return sendersOf(db, threadId);
+}
+
 /**
  * Take a thread out of Safe to delete (operator, 2026-09-18: "move a mail
  * from Safe to delete"), and say where it goes instead.
