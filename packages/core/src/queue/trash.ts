@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, or } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import type { MailConnector } from "../connectors/types";
 import { now as nowMs, type Db } from "../db/client";
 import { accounts, actions, messages, threads, type AccountRow, type MailFolder } from "../db/schema";
@@ -108,11 +108,23 @@ export function restoreHidden(db: Db, from: Map<string, MailFolder>, clock: () =
 export function hideThreads(db: Db, threadIds: string[], clock: () => number = nowMs): TrashResult {
   const ids = [...new Set(threadIds)];
   if (ids.length === 0) return { moved: 0, failed: 0 };
+  // Only what is not already there (operator, 2026-09-20: "archive should be
+  // the place that stores all the archived files, you cannot further hide an
+  // email"). Archiving an archived thread used to re-stamp it, which moved it
+  // in the list and rewrote when it was put away, and the row slid out of the
+  // list it was already in as if it had gone somewhere.
+  const fresh = db
+    .select({ id: threads.id })
+    .from(threads)
+    .where(and(inArray(threads.id, ids), isNull(threads.hiddenAt)))
+    .all()
+    .map((r) => r.id);
+  if (fresh.length === 0) return { moved: 0, failed: 0 };
   const at = clock();
   db.transaction((tx) => {
-    tx.update(threads).set({ hiddenAt: at }).where(inArray(threads.id, ids)).run();
+    tx.update(threads).set({ hiddenAt: at }).where(inArray(threads.id, fresh)).run();
   });
-  return { moved: ids.length, failed: 0 };
+  return { moved: fresh.length, failed: 0 };
 }
 
 /** Unhide (2026-09-15): the threads are back on every list they belong to. */

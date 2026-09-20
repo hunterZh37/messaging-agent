@@ -675,3 +675,41 @@ describe("a hidden thread and a new message", () => {
     expect(folderOf(db, "a1:m1")).toBe("trash");
   });
 });
+
+/**
+ * Archive is where archived mail lives, not a thing that can be done twice
+ * (operator, 2026-09-20: "you cannot further hide an email"). Re-stamping it
+ * moved the thread in the list and rewrote when it was put away, and the row
+ * slid out of the list it was already in as if it had gone somewhere.
+ */
+describe("archiving what is already archived", () => {
+  const archived = (db: ReturnType<typeof testDb>, id: string) =>
+    db.select({ at: threads.hiddenAt }).from(threads).where(eq(threads.id, id)).get()?.at ?? null;
+
+  it("says nothing moved, and leaves the date it was put away alone", () => {
+    const db = testDb();
+    seed(db);
+    expect(hideThreads(db, ["a1:t1"], () => 100).moved).toBe(1);
+    expect(archived(db, "a1:t1")).toBe(100);
+    expect(hideThreads(db, ["a1:t1"], () => 500).moved).toBe(0);
+    expect(archived(db, "a1:t1")).toBe(100);
+  });
+
+  it("still archives the ones that are not, when asked about a mixture", () => {
+    const db = testDb();
+    seed(db);
+    hideThreads(db, ["a1:t1"], () => 100);
+    expect(hideThreads(db, ["a1:t1", "a1:t2"], () => 500).moved).toBe(1);
+    expect(archived(db, "a1:t1")).toBe(100);
+    expect(archived(db, "a1:t2")).toBe(500);
+  });
+
+  it("can be put away again once it has been taken out", () => {
+    const db = testDb();
+    seed(db);
+    hideThreads(db, ["a1:t1"], () => 100);
+    unhideThreads(db, ["a1:t1"]);
+    expect(hideThreads(db, ["a1:t1"], () => 500).moved).toBe(1);
+    expect(archived(db, "a1:t1")).toBe(500);
+  });
+});
