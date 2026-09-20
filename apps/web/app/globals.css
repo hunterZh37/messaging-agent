@@ -752,10 +752,23 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 }
 .keep-btn svg { width: 11px; height: 11px; }
 .keep-btn:hover, .keep-btn[aria-expanded="true"] { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
-/* Room for the controls rather than one, so a long subject never runs under
-   them. File joins Move on an inbox that has projects (operator, 2026-09-20). */
-.inbox-row-item.keepable > .inbox-row { padding-right: 148px; }
-.inbox-row-item.keepable.filable > .inbox-row { padding-right: 196px; }
+/* No gutter held open for the controls (operator, 2026-09-20: the spacing).
+   Holding one cost 196px of a 399px row, so 175px was left for the sender,
+   the subject and the snippet, and the account and the clock no longer fit on
+   one line between them. The strip appears only while the pointer is on the
+   row, which is when the operator is aiming at it rather than reading, so it
+   simply floats over the right end and the text keeps the whole width. */
+.row-tools::before {
+  content: ""; position: absolute; right: calc(100% - 1px); top: 0; bottom: 0; width: 44px; border-radius: 10px 0 0 10px;
+  background: linear-gradient(to right, transparent, var(--bg-elev)); pointer-events: none;
+}
+/* By touch the strip is always there, with no hover to summon it, so by touch
+   the gutter is still held open. */
+@media (hover: none) {
+  .row-tools::before { content: none; }
+  .inbox-row-item.keepable > .inbox-row { padding-right: 148px; }
+  .inbox-row-item.keepable.filable > .inbox-row { padding-right: 196px; }
+}
 /* A project list is as long as the operator's projects, so it scrolls rather
    than running off the bottom of the window. One line per project: the name
    is the whole of what there is to say. */
