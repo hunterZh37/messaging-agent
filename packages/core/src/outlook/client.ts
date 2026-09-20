@@ -200,7 +200,10 @@ export function createOutlookClient(getAccessToken: () => Promise<string>): Outl
       const res = await request(`${BASE}/me/messages/${draftId}`, {
         method: "PATCH",
         body: JSON.stringify({
-          body: { contentType: "text", content: p.body },
+          // Graph carries one body, not two, so a marked reply goes as HTML
+          // and a plain one stays text rather than being wrapped in tags it
+          // never needed (operator, 2026-09-20).
+          body: p.html ? { contentType: "html", content: p.html } : { contentType: "text", content: p.body },
           toRecipients: p.to.map((address) => ({ emailAddress: { address } })),
           ccRecipients: p.cc.map((address) => ({ emailAddress: { address } })),
         }),

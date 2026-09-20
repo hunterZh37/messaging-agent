@@ -4,4 +4,5 @@
  * database, the mail clients and the model SDK coming along for the ride.
  */
 export * from "./quoted";
+export * from "./markup";
 export * from "./html";

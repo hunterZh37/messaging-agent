@@ -80,7 +80,7 @@ export interface OutlookClient {
    */
   listAttachments(messageId: string): Promise<{ id: string; name: string; size: number }[]>;
   createReply(messageId: string): Promise<{ draftId: string }>;
-  updateDraft(draftId: string, p: { body: string; to: string[]; cc: string[] }): Promise<void>;
+  updateDraft(draftId: string, p: { body: string; html?: string; to: string[]; cc: string[] }): Promise<void>;
   /**
    * One outgoing file onto a draft that has not been sent yet (spec 8,
    * 2026-09-10). Small files go inline as base64; larger ones go through an

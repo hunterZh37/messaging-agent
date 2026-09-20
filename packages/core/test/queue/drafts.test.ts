@@ -242,3 +242,35 @@ describe("restoreDraft", () => {
     expect(() => restoreDraft(db, "d1")).toThrow("newer draft");
   });
 });
+
+/**
+ * Emphasis on the way out (operator, 2026-09-20). The one thing that must
+ * hold: nobody is ever shown the asterisks. A reader on HTML gets the mark,
+ * a reader on plain text gets the words, and a chat gets the words.
+ */
+describe("a marked draft on the way out", () => {
+  it("sends the words as text and the marks as HTML, in one mail", async () => {
+    const db = testDb();
+    seed(db);
+    const smtp = new FakeSmtpClient();
+    await sendDraft(db, imapSender(smtp), { draftId: "d1", finalText: "Send the **signed** copy.", to: ["bob@x.com"], cc: [] });
+    expect(smtp.sent[0]?.text).toBe("Send the signed copy.");
+    expect(smtp.sent[0]?.html).toBe("<p>Send the <strong>signed</strong> copy.</p>");
+  });
+
+  it("sends no HTML at all when nothing is marked", async () => {
+    const db = testDb();
+    seed(db);
+    const smtp = new FakeSmtpClient();
+    await sendDraft(db, imapSender(smtp), { draftId: "d1", finalText: "Yes, Friday.", to: ["bob@x.com"], cc: [] });
+    expect(smtp.sent[0]?.html).toBeUndefined();
+  });
+
+  /** The card draws the marks and a revise reads them, so the row keeps them. */
+  it("keeps the marks on the draft row, which is what the card draws", async () => {
+    const db = testDb();
+    seed(db);
+    await sendDraft(db, imapSender(new FakeSmtpClient()), { draftId: "d1", finalText: "The **signed** copy.", to: ["bob@x.com"], cc: [] });
+    expect(db.select().from(drafts).where(eq(drafts.id, "d1")).get()?.finalText).toBe("The **signed** copy.");
+  });
+});

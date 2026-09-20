@@ -5,6 +5,7 @@ import { now, type Db } from "../db/client";
 import { accounts, drafts, messages, sorts, threads, type AccountRow, type DraftAttachmentRow, type DraftRow, type MessageRow, type SortRow } from "../db/schema";
 import { replySubject, validateRecipients } from "../connectors/mime";
 import { listDraftAttachments } from "../draft/attachments";
+import { hasMarkup, markupToHtml, stripMarkup } from "../text/markup";
 import { recordAction } from "./actions";
 
 export interface DraftView {
@@ -114,6 +115,13 @@ export async function sendDraft(
     JSON.stringify(normalizedList(p.to)) !== JSON.stringify(normalizedList(v.draft.toAddresses)) ||
     JSON.stringify(normalizedList(p.cc)) !== JSON.stringify(normalizedList(v.draft.ccAddresses));
 
+  // The two halves of what goes out (operator, 2026-09-20). A chat has no
+  // HTML to put anywhere, so a marked reply going to Messages or WhatsApp is
+  // simply the words: the marks are the operator's note to the renderer, not
+  // something anyone should read.
+  const chat = v.account.provider === "imessage" || v.account.provider === "whatsapp";
+  const marked = !chat && hasMarkup(p.finalText);
+
   try {
     const sent = await sender.sendReply({
       replyToProviderMessageId: v.replyTo.providerMessageId,
@@ -123,7 +131,8 @@ export async function sendDraft(
       cc: p.cc,
       subject: v.replySubject,
       inReplyTo: v.replyTo.rfcMessageId,
-      body: p.finalText,
+      body: stripMarkup(p.finalText),
+      ...(marked ? { html: markupToHtml(p.finalText) } : {}),
       attachments,
     });
     const t = clock();

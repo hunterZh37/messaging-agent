@@ -12,6 +12,7 @@ export * from "./text/html";
 export * from "./text/sanitize";
 export * from "./text/addresses";
 export * from "./text/quoted";
+export * from "./text/markup";
 export * from "./attachments/blobs";
 export * from "./attachments/ingest";
 export * from "./attachments/fetch";

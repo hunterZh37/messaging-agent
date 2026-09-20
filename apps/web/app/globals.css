@@ -795,6 +795,25 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 .keep-row.add .picker-name { color: var(--muted); }
 .keep-row.add:hover .picker-name { color: var(--fg); }
 .keep-plus { display: inline-block; width: 13px; font-weight: 600; }
+
+/* Bold and underline over the draft body (operator, 2026-09-20). A strip
+   above the field rather than a floating bar: it appears only while the
+   draft is being edited, so it never sits over the text it formats. */
+.draft-marks { display: flex; align-items: center; gap: 4px; margin: 2px 0 4px; }
+.mark-btn {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  font: inherit; font-size: 13px; line-height: 1; color: var(--muted);
+  background: none; border: 1px solid var(--line); border-radius: 7px; cursor: pointer;
+  transition: color 120ms, background-color 120ms, border-color 120ms;
+}
+.mark-btn:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 8%, transparent); }
+/* On, meaning the words under the cursor already carry it. */
+.mark-btn.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.draft-marks-hint { font-size: 11.5px; color: var(--muted); }
+@media (max-width: 560px) { .draft-marks-hint { display: none; } }
+/* Drawn in the card the moment the editing stops, and in the send preview. */
+.draft strong, .mail-body strong { font-weight: 650; }
+.draft u, .mail-body u { text-decoration: underline; text-underline-offset: 2px; }
 /* Two levels: the bigger projects, then the ones inside the one picked
    (operator, 2026-09-20). The chevron says a row leads somewhere rather than
    files anything; the back row says which one is open. */

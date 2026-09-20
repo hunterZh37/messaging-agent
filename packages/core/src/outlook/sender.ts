@@ -11,7 +11,7 @@ export function outlookSender(client: OutlookClient): Sender {
   return {
     async sendReply(p) {
       const { draftId } = await client.createReply(p.replyToProviderMessageId);
-      await client.updateDraft(draftId, { body: p.body, to: p.to, cc: p.cc });
+      await client.updateDraft(draftId, { body: p.body, ...(p.html ? { html: p.html } : {}), to: p.to, cc: p.cc });
       // One at a time and in the operator's order, so the chips on the card
       // and the files on the mail read the same way round.
       for (const file of p.attachments ?? []) await client.addAttachment(draftId, file);

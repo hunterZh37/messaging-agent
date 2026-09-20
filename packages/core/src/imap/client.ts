@@ -182,6 +182,9 @@ export function createSmtpClient(settings: ImapSettings, creds: ImapCredentials)
         cc: msg.cc,
         subject: msg.subject,
         text: msg.text,
+        // Given both, nodemailer builds multipart/alternative and the reader's
+        // own client picks; given only text, it builds what it always built.
+        ...(msg.html ? { html: msg.html } : {}),
         ...(msg.inReplyTo ? { inReplyTo: msg.inReplyTo } : {}),
         ...(msg.references ? { references: msg.references } : {}),
         ...(msg.attachments && msg.attachments.length > 0 ? { attachments: msg.attachments } : {}),

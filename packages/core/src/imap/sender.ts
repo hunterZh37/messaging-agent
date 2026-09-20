@@ -18,6 +18,7 @@ export function imapSender(smtp: SmtpClient): Sender {
         cc: p.cc,
         subject: p.subject,
         text: p.body,
+        ...(p.html ? { html: p.html } : {}),
         inReplyTo: p.inReplyTo,
         references: p.inReplyTo,
         // Left off entirely when there are none: nodemailer reads an empty

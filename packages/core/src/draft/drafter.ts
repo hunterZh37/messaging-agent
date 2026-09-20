@@ -1,6 +1,7 @@
 import { formatModelRef, type ModelProvider } from "../models/types";
 import { renderDraftUserMessage } from "./context";
 import type { DraftContext, Drafter } from "./types";
+import { MARKUP_RULE } from "../text/markup";
 import { HUMAN_STYLE_RULE, humanizePunctuation } from "./style";
 
 const RULES = `You draft a reply on behalf of the operator. The operator will read, edit, and approve it before anything is sent. You cannot send anything.
@@ -62,7 +63,7 @@ ${HUMAN_STYLE_RULE}`;
 export const TEXT_RULES = `This is a text message conversation, not an email. Reply the way people text: one to three short sentences, no greeting, no sign-off, no subject line, plain text only, matching the tone of the chat. Never open with "Hi <name>" and never end with the operator's name.`;
 
 function channelRules(ctx: DraftContext): string {
-  return ctx.channel === "text" ? `\n${TEXT_RULES}` : "";
+  return ctx.channel === "text" ? `\n${TEXT_RULES}` : `\n${MARKUP_RULE}`;
 }
 
 const MAX_TOKENS = 4096;

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { DraftView } from "@messaging-agent/core";
+import { markupSpans } from "@messaging-agent/core/text";
 import { Dialog } from "../Dialog";
 import { diffLines } from "@/lib/diff";
 import { previewHeader } from "@/lib/preview";
@@ -79,7 +80,17 @@ export function SendPreviewDialog({
         </dl>
 
         <div className="mail-body">
-          <PlainBody text={text} />
+          {/* What the reader gets, not what was typed: the marks are drawn
+              rather than shown (operator, 2026-09-20). */}
+          {markupSpans(text).map((span, i) =>
+            span.bold ? (
+              <strong key={i}><PlainBody text={span.text} /></strong>
+            ) : span.underline ? (
+              <u key={i}><PlainBody text={span.text} /></u>
+            ) : (
+              <PlainBody key={i} text={span.text} />
+            ),
+          )}
         </div>
 
         <DraftAttachmentChips draftId={view.draft.id} files={files} showCount />

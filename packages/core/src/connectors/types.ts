@@ -118,6 +118,14 @@ export interface Sender {
     subject: string;
     inReplyTo: string | null;
     body: string;
+    /**
+     * The same reply as HTML, when it carries emphasis (operator, 2026-09-20).
+     * Absent when the draft is plain, so a reply with nothing marked goes out
+     * exactly as it always did rather than as HTML that happens to look plain.
+     * `body` is always the readable text, marks stripped, and both parts are
+     * sent: nobody is ever shown the asterisks.
+     */
+    html?: string;
     /** Files the operator put on the draft (spec 8, 2026-09-10). Empty, or absent, for a reply that carries none. */
     attachments?: OutgoingAttachment[];
   }): Promise<{ id: string }>;

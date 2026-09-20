@@ -8,6 +8,8 @@ import { indexMessageForSearch } from "../chat/search";
 import type { NormalizedAttachment, NormalizedMessage } from "./types";
 import { hiddenFrom, markTrashed, restoreHidden } from "../queue/trash";
 import { markThreadOpenedUpTo } from "../queue/inbox";
+import { hasMarkup, markupToHtml, stripMarkup } from "../text/markup";
+import { sanitizeHtml } from "../text/sanitize";
 
 export function attachmentRowId(messageId: string, index: number): string {
   return `${messageId}:${index}`;
@@ -287,9 +289,9 @@ export async function storeSentReply(
       toAddresses: input.to,
       ccAddresses: input.cc,
       subject: input.subject,
-      bodyText: input.text,
-      bodyHtml: null,
-      snippet: input.text.replace(/\s+/g, " ").trim().slice(0, 200),
+      bodyText: stripMarkup(input.text),
+      bodyHtml: hasMarkup(input.text) ? sanitizeHtml(markupToHtml(input.text)) : null,
+      snippet: stripMarkup(input.text).replace(/\s+/g, " ").trim().slice(0, 200),
       attachmentNames: input.attachmentNames,
       attachments: [],
       folder: "sent",

@@ -2,11 +2,13 @@
 
 import { useCallback, useRef, useState, type DragEvent as ReactDragEvent } from "react";
 import type { DraftView } from "@messaging-agent/core";
+import { markupSpans } from "@messaging-agent/core/text";
 import { CelesteMark } from "./CelesteMark";
 import { draggingFiles, dropTargetLabel } from "@/lib/attachments";
 import { formatTime, sendBlockFor, shortAccount } from "@/lib/format";
 import { popRevision, pushRevision } from "@/lib/queue";
 import { changeCount, wordDiff } from "@/lib/diff";
+import { marked, toggleMark, type Mark } from "@/lib/marks";
 import { listDraftAttachmentsAction } from "../actions";
 import { TrashIcon } from "../inbox/icons";
 import { ContextDraftCard, type AttachResult } from "../ask/AskProvider";
@@ -48,6 +50,27 @@ export function DraftCard(props: {
   const isText = view.account.provider === "imessage" || view.account.provider === "whatsapp";
   const showThread = props.showThread !== false;
   const [text, setText] = useState(props.initialEdit?.text ?? view.draft.originalText);
+  // What is selected in the body, kept so the B and U buttons act on it: a
+  // press on a button takes the focus off the textarea, and the selection
+  // with it, unless it is held here (mousedown is prevented too).
+  const body = useRef<HTMLTextAreaElement>(null);
+  const [picked, setPicked] = useState<[number, number]>([0, 0]);
+  const activeMark = (mark: Mark) => marked(text, picked[0], picked[1], mark);
+  function applyMark(mark: Mark) {
+    const el = body.current;
+    const [from, to] = el ? [el.selectionStart, el.selectionEnd] : picked;
+    const next = toggleMark(text, from, to, mark);
+    if (next.text === text) return;
+    setText(next.text);
+    setRevisedFrom(null);
+    setPicked([next.start, next.end]);
+    // After React has painted the new value, or the selection lands in the
+    // old string and the operator is left with the cursor somewhere else.
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(next.start, next.end);
+    });
+  }
   const [to, setTo] = useState((props.initialEdit?.to ?? view.draft.toAddresses).join(", "));
   const [cc, setCc] = useState((props.initialEdit?.cc ?? view.draft.ccAddresses).join(", "));
   // Celeste's rewrites land here from the Ask panel (spec 10c; the card's
@@ -309,9 +332,26 @@ export function DraftCard(props: {
           )}
         </label>
         {mode === "edit" ? (
+          <>
+          {/* Bold and underline, on the text rather than in a second column:
+              the draft stays one string, so revise, the undo stack and the
+              change diff go on reading it the way they always have. The
+              marks show while editing and the card draws them once the
+              editing stops (operator, 2026-09-20). */}
+          <div className="draft-marks">
+            <button type="button" className={`mark-btn${activeMark("bold") ? " on" : ""}`} title="Bold the selection" aria-label="Bold the selection" onMouseDown={(e) => e.preventDefault()} onClick={() => applyMark("bold")}>
+              <b>B</b>
+            </button>
+            <button type="button" className={`mark-btn${activeMark("underline") ? " on" : ""}`} title="Underline the selection" aria-label="Underline the selection" onMouseDown={(e) => e.preventDefault()} onClick={() => applyMark("underline")}>
+              <u>U</u>
+            </button>
+            <span className="draft-marks-hint">Select a word, then bold it</span>
+          </div>
           <textarea
             className="field"
             autoFocus
+            ref={body}
+            onSelect={(e) => setPicked([e.currentTarget.selectionStart, e.currentTarget.selectionEnd])}
             value={text}
             onChange={(e) => {
               setText(e.target.value);
@@ -323,15 +363,25 @@ export function DraftCard(props: {
             onBlur={() => setMode("view")}
             onKeyDown={(e) => {
               if (e.key === "Escape") e.currentTarget.blur();
+              // The shortcuts every mail client has. Without them the buttons
+              // would be the only way, and a hand already on the keyboard
+              // would have to reach for the mouse to bold one word.
+              if ((e.metaKey || e.ctrlKey) && (e.key === "b" || e.key === "u")) {
+                e.preventDefault();
+                applyMark(e.key === "b" ? "bold" : "underline");
+              }
             }}
           />
+          </>
         ) : (
           <div className="draft" onClick={() => mode === "view" && setMode("edit")}>
             {revision
               ? revision.parts.map((p, i) =>
                   p.kind === "same" ? <span key={i}>{p.text}</span> : p.kind === "ins" ? <mark key={i} className="rev-ins">{p.text}</mark> : <del key={i} className="rev-del">{p.text}</del>,
                 )
-              : text}
+              : markupSpans(text).map((span, i) =>
+                  span.bold ? <strong key={i}>{span.text}</strong> : span.underline ? <u key={i}>{span.text}</u> : <span key={i}>{span.text}</span>,
+                )}
           </div>
         )}
 

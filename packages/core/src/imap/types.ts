@@ -87,6 +87,8 @@ export interface SmtpClient {
     cc: string[];
     subject: string;
     text: string;
+    /** The HTML half of a multipart reply, absent when the draft is plain (operator, 2026-09-20). */
+    html?: string;
     inReplyTo: string | null;
     references: string | null;
     /** nodemailer's own shape, absent when the draft carried no files (spec 8, 2026-09-10). */
