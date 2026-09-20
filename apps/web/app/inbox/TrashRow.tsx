@@ -38,6 +38,7 @@ export function TrashRow({
   senders,
   ruled,
   projects,
+  accountId,
   projectId = null,
   unfiledLabel,
 }: {
@@ -60,6 +61,8 @@ export function TrashRow({
   ruled?: import("@messaging-agent/core").Wants | null;
   /** The projects of this row's own inbox; no projects, no File button. */
   projects?: import("@messaging-agent/core").ProjectRow[];
+  /** Whose inbox the row is in, so a new project is made in that one. */
+  accountId?: string;
   /** The project it is filed under now, marked in the menu. */
   projectId?: string | null;
   /** Core's reserved name for no project (operator, 2026-09-20). */
@@ -141,6 +144,7 @@ export function TrashRow({
           threadId={threadId}
           subject={subject}
           projects={projects}
+          accountId={accountId ?? ""}
           currentId={projectId}
           unfiledLabel={unfiledLabel ?? "Unfiled"}
           onOpenChange={noteMenu}

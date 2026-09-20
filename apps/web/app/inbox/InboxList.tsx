@@ -175,7 +175,7 @@ export function InboxList(props: {
     }
     if (!props.deletable) return <Fragment key={key}>{link}</Fragment>;
     return (
-      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]} ruled={r.message.isFromOperator ? null : ruleFor(r.message.fromAddress)} projects={folder === "inbox" ? projectsFor(r.account.id) : []} projectId={r.project?.id ?? null} unfiledLabel={UNFILED}>
+      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={folder === "messages" || folder === "inbox"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]} ruled={r.message.isFromOperator ? null : ruleFor(r.message.fromAddress)} projects={folder === "inbox" ? projectsFor(r.account.id) : []} accountId={r.account.id} projectId={r.project?.id ?? null} unfiledLabel={UNFILED}>
         {link}
       </TrashRow>
     );

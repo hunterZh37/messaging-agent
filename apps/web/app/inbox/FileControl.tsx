@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ProjectRow } from "@messaging-agent/core";
-import { fileThreadAction } from "./actions";
+import { createProjectAction, fileThreadAction } from "./actions";
 import { ChevronIcon } from "./icons";
 
 /**
@@ -19,9 +19,11 @@ import { ChevronIcon } from "./icons";
  * The row stays where it is. Filing says what a message is about, not whether
  * it is dealt with, which is Move's question.
  */
-export function FileControl({ threadId, subject, projects, currentId, unfiledLabel, onOpenChange }: {
+export function FileControl({ threadId, subject, accountId, projects, currentId, unfiledLabel, onOpenChange }: {
   threadId: string;
   subject: string;
+  /** Whose inbox this row belongs to; a new project is made in that inbox. */
+  accountId: string;
   /** The projects of this row's own inbox, which is the only place it can be filed. */
   projects: ProjectRow[];
   currentId: string | null;
@@ -30,6 +32,8 @@ export function FileControl({ threadId, subject, projects, currentId, unfiledLab
   onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const wrap = useRef<HTMLDivElement>(null);
@@ -42,11 +46,11 @@ export function FileControl({ threadId, subject, projects, currentId, unfiledLab
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") close();
     };
     const onDown = (e: Event) => {
       if (wrap.current?.contains(e.target as HTMLElement | null)) return;
-      setOpen(false);
+      close();
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("pointerdown", onDown);
@@ -56,8 +60,14 @@ export function FileControl({ threadId, subject, projects, currentId, unfiledLab
     };
   }, [open]);
 
-  function file(projectId: string | null) {
+  function close() {
     setOpen(false);
+    setNaming(false);
+    setName("");
+  }
+
+  function file(projectId: string | null) {
+    close();
     setError(null);
     startTransition(async () => {
       const r = await fileThreadAction(threadId, projectId);
@@ -65,6 +75,26 @@ export function FileControl({ threadId, subject, projects, currentId, unfiledLab
         setError(r.error);
         return;
       }
+      router.refresh();
+    });
+  }
+
+  /**
+   * A project the operator thinks of while looking at the mail that needs it.
+   * Made in this row's own inbox and the thread filed into it in one go, so
+   * naming it is the whole of the work.
+   */
+  function create() {
+    const named = name.trim();
+    if (!named) return;
+    setError(null);
+    startTransition(async () => {
+      const r = await createProjectAction(accountId, named, threadId);
+      if ("error" in r) {
+        setError(r.error);
+        return;
+      }
+      close();
       router.refresh();
     });
   }
@@ -79,28 +109,58 @@ export function FileControl({ threadId, subject, projects, currentId, unfiledLab
         aria-expanded={open}
         aria-label={`File the thread ${subject || "(no subject)"}`}
         title={error ?? "File this under a project"}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? close() : setOpen(true))}
       >
         <span>{pending ? "Filing…" : error ? "Not filed" : "File"}</span>
         <ChevronIcon />
       </button>
       {open ? (
         <div className="keep-menu projects" role="menu" aria-label="File this under">
-          {rows.map((p) => (
-            <button
-              key={p.id ?? "unfiled"}
-              type="button"
-              role="menuitemradio"
-              aria-checked={currentId === p.id}
-              className={currentId === p.id ? "keep-row on" : "keep-row"}
-              onClick={() => file(p.id)}
-            >
+          {/* The list scrolls; what is under it does not scroll away with it. */}
+          <div className="keep-scroll">
+            {rows.map((p) => (
+              <button
+                key={p.id ?? "unfiled"}
+                type="button"
+                role="menuitemradio"
+                aria-checked={currentId === p.id}
+                className={currentId === p.id ? "keep-row on" : "keep-row"}
+                onClick={() => file(p.id)}
+              >
+                <span className="picker-name">
+                  {p.name}
+                  {currentId === p.id ? <span className="keep-now"> · where it is now</span> : null}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="keep-hairline" />
+          {naming ? (
+            <div className="keep-new">
+              <input
+                className="field"
+                autoFocus
+                maxLength={40}
+                value={name}
+                placeholder="Project name"
+                aria-label="New project name"
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") create();
+                }}
+              />
+              <button type="button" className="btn primary" onClick={create} disabled={pending || !name.trim()}>
+                Create
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="keep-row add" role="menuitem" onClick={() => setNaming(true)}>
               <span className="picker-name">
-                {p.name}
-                {currentId === p.id ? <span className="keep-now"> · where it is now</span> : null}
+                <span className="keep-plus" aria-hidden="true">+</span> New project
               </span>
             </button>
-          ))}
+          )}
+          {error ? <div className="keep-error">{error}</div> : null}
         </div>
       ) : null}
     </div>

@@ -771,9 +771,20 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 }
 /* A project list is as long as the operator's projects, so it scrolls rather
    than running off the bottom of the window. One line per project: the name
-   is the whole of what there is to say. */
-.keep-menu.projects { max-height: min(340px, 60vh); overflow-y: auto; min-width: 200px; }
+   is the whole of what there is to say. The list scrolls inside the menu
+   rather than the menu scrolling, so New project stays under it instead of
+   scrolling away with the names (operator, 2026-09-20). */
+.keep-menu.projects { min-width: 248px; max-height: min(400px, 70vh); }
+.keep-menu.projects .keep-scroll { max-height: min(300px, 50vh); overflow-y: auto; display: flex; flex-direction: column; }
 .keep-menu.projects .keep-row { padding: 7px 10px; }
+.keep-hairline { height: 1px; margin: 5px 4px; background: var(--line); flex: none; }
+.keep-row.add .picker-name { color: var(--muted); }
+.keep-row.add:hover .picker-name { color: var(--fg); }
+.keep-plus { display: inline-block; width: 13px; font-weight: 600; }
+.keep-new { display: flex; align-items: center; gap: 6px; padding: 3px; }
+.keep-new .field { min-height: 32px; min-width: 0; flex: 1 1 auto; font-size: 13px; }
+.keep-new .btn { flex: none; }
+.keep-error { padding: 6px 10px 2px; font-size: 12px; color: var(--danger); }
 /* The row lifts while its menu is down, or the rows beneath paint over it. */
 .inbox-row-item.tools-open { z-index: 40; }
 .keep-menu {
