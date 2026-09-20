@@ -234,10 +234,12 @@ export async function createProjectAction(
   accountId: string,
   name: string,
   threadId: string,
+  /** The bigger project it belongs inside, when one is open (operator, 2026-09-20). */
+  groupId: string | null = null,
 ): Promise<{ project: ProjectRow } | StepError> {
   try {
     const { db } = core();
-    const project = createProject(db, accountId, name, "");
+    const project = createProject(db, accountId, name, "", undefined, groupId);
     fileThread(db, threadId, project.id);
     revalidatePath("/inbox");
     revalidatePath(`/inbox/${threadId}`);

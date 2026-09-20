@@ -6,8 +6,10 @@ import {
   addStarterProjects,
   createProject,
   getProject,
+  listProjectGroups,
   listProjects,
   saveProjects,
+  saveProjectsWithGroups,
   STARTER_PROJECTS,
 } from "../../src/projects/projects";
 import { fileThread } from "../../src/projects/classify";
@@ -193,5 +195,35 @@ describe("getProject", () => {
     const created = createProject(db, "a1", "Consulting", "client work");
     expect(getProject(db, "a1", created.id)?.name).toBe("Consulting");
     expect(getProject(db, "a2", created.id)).toBeNull();
+  });
+});
+
+/**
+ * A project made from the File menu while a bigger one is open belongs inside
+ * it (operator, 2026-09-20). Made outside it, the operator would have to go
+ * and move it, which is the work the menu was meant to save.
+ */
+describe("a new project inside a bigger one", () => {
+  const withGroup = () => {
+    const db = testDb();
+    db.insert(accounts).values({ id: "a1", provider: "imap", email: "me@example.com", displayName: null, createdAt: 1 }).run();
+    saveProjectsWithGroups(db, "a1", [], [{ key: "g", name: "Work" }], () => 1);
+    return { db, groupId: listProjectGroups(db, "a1")[0]!.id };
+  };
+
+  it("is filed under the group it was made in", () => {
+    const { db, groupId } = withGroup();
+    expect(createProject(db, "a1", "Tutoring", "", () => 2, groupId).groupId).toBe(groupId);
+  });
+
+  it("belongs to no group when none was named, as before", () => {
+    const { db } = withGroup();
+    expect(createProject(db, "a1", "Loose", "", () => 2).groupId).toBeNull();
+  });
+
+  /** A stale id from a menu open while the groups were edited elsewhere. */
+  it("belongs to no group when the one named is not this inbox's", () => {
+    const { db } = withGroup();
+    expect(createProject(db, "a1", "Stray", "", () => 2, "not-a-group").groupId).toBeNull();
   });
 });

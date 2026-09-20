@@ -87,15 +87,16 @@ export function FileControl({ threadId, subject, accountId, projects, groups, cu
 
   /**
    * A project the operator thinks of while looking at the mail that needs it.
-   * Made in this row's own inbox and the thread filed into it in one go, so
-   * naming it is the whole of the work.
+   * Made in this row's own inbox, inside the bigger project open at the time,
+   * and the thread filed into it in one go, so naming it is the whole of the
+   * work.
    */
   function create() {
     const named = name.trim();
     if (!named) return;
     setError(null);
     startTransition(async () => {
-      const r = await createProjectAction(accountId, named, threadId);
+      const r = await createProjectAction(accountId, named, threadId, openGroup?.id ?? null);
       if ("error" in r) {
         setError(r.error);
         return;
@@ -175,7 +176,7 @@ export function FileControl({ threadId, subject, accountId, projects, groups, cu
             ))}
           </div>
           <div className="keep-hairline" />
-          {openGroup ? null : naming ? (
+          {naming ? (
             <div className="keep-new">
               <input
                 className="field"
@@ -196,7 +197,7 @@ export function FileControl({ threadId, subject, accountId, projects, groups, cu
           ) : (
             <button type="button" className="keep-row add" role="menuitem" onClick={() => setNaming(true)}>
               <span className="picker-name">
-                <span className="keep-plus" aria-hidden="true">+</span> New project
+                <span className="keep-plus" aria-hidden="true">+</span> New project{openGroup ? ` in ${openGroup.name}` : ""}
               </span>
             </button>
           )}

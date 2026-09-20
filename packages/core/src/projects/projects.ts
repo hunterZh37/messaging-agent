@@ -164,7 +164,19 @@ function writeProjects(tx: Tx, accountId: string, items: ProjectInput[], at: num
 }
 
 /** The thread picker's "New project…": one project, appended to the end of this inbox's list. */
-export function createProject(db: Db, accountId: string, name: string, description: string, clock: () => number = now): ProjectRow {
+/**
+ * A new project, optionally inside one of the bigger ones (operator,
+ * 2026-09-20: "make New project create inside the open group"). A group the
+ * inbox does not have is no group at all rather than a dangling reference.
+ */
+export function createProject(
+  db: Db,
+  accountId: string,
+  name: string,
+  description: string,
+  clock: () => number = now,
+  groupId: string | null = null,
+): ProjectRow {
   const cleaned = { name: name.trim(), description: description.trim() };
   const existing = listProjects(db, accountId);
   validate([...existing.map((p) => ({ id: p.id, name: p.name, description: p.description })), cleaned]);
@@ -176,7 +188,7 @@ export function createProject(db: Db, accountId: string, name: string, descripti
     description: cleaned.description,
     position: existing.length,
     createdAt: clock(),
-    groupId: null,
+    groupId: groupId && listProjectGroups(db, accountId).some((g) => g.id === groupId) ? groupId : null,
   };
   db.insert(projects).values(row).run();
   return row;
