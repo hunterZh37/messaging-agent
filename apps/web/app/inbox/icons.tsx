@@ -20,6 +20,32 @@ export function ChevronIcon() {
   );
 }
 
+/**
+ * The two row controls, for a phone (operator, 2026-09-21). There the strip
+ * is always on screen, so the words File and Move cost 42% of a 390px row
+ * before a subject gets a character. The glyph says the same thing in a
+ * quarter of the space, and the words come back wherever there is a pointer.
+ */
+export function FolderIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 7a2 2 0 012-2h4l2 2.5h8a2 2 0 012 2V17a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+    </svg>
+  );
+}
+
+/** Up or down the ladder: what Move asks. */
+export function LadderIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8 4v16" />
+      <path d="M5 7l3-3 3 3" />
+      <path d="M16 20V4" />
+      <path d="M13 17l3 3 3-3" />
+    </svg>
+  );
+}
+
 /** A trash can for Delete (operator, 2026-09-11). */
 export function TrashIcon() {
   return (

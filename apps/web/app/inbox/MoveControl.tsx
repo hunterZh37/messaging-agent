@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { Wants } from "@messaging-agent/core";
 import { correctThreadAction, ruleSenderAction } from "./actions";
-import { ChevronIcon } from "./icons";
+import { ChevronIcon, LadderIcon } from "./icons";
 
 /**
  * "Move this to" on a row (operator, 2026-09-20: "where Jev sorts wrong, I
@@ -125,7 +125,8 @@ export function MoveControl({ threadId, subject, wants, ruled, senders, onMoving
         title="Put this where it belongs"
         onClick={() => setOpen((v) => !v)}
       >
-        <span>Move</span>
+        <LadderIcon />
+        <span className="keep-word">Move</span>
         <ChevronIcon />
       </button>
       {open ? (

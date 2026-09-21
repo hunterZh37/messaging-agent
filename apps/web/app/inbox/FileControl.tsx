@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ProjectRow } from "@messaging-agent/core";
 import { createProjectAction, fileThreadAction } from "./actions";
-import { ChevronIcon } from "./icons";
+import { ChevronIcon, FolderIcon } from "./icons";
 
 /**
  * "File" on a row (operator, 2026-09-20: "for some email card I want to be
@@ -143,7 +143,8 @@ export function FileControl({ threadId, subject, accountId, projects, groups, cu
         title={error ?? "File this under a project"}
         onClick={() => (open ? close() : setOpen(true))}
       >
-        <span>{pending ? "Filing…" : error ? "Not filed" : "File"}</span>
+        <FolderIcon />
+        <span className="keep-word">{pending ? "Filing…" : error ? "Not filed" : "File"}</span>
         <ChevronIcon />
       </button>
       {open ? (

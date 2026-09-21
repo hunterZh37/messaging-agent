@@ -802,7 +802,13 @@ button.chip:disabled { cursor: default; color: var(--muted); }
   font: inherit; font-size: 12px; font-weight: 500; color: var(--muted);
   background: none; border: 0; border-radius: 7px; cursor: pointer; transition: color 120ms, background-color 120ms;
 }
-.keep-btn svg { width: 11px; height: 11px; }
+.keep-btn svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.keep-btn > svg:first-child { width: 13px; height: 13px; }
+/* The glyph is for the phone, where the word does not fit. Where there is a
+   pointer the word says it better, and the strip stays the width it was. */
+@media (hover: hover) {
+  .keep-btn > svg:first-child { display: none; }
+}
 .keep-btn:hover, .keep-btn[aria-expanded="true"] { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
 /* No gutter held open for the controls (operator, 2026-09-20: the spacing).
    Holding one cost 196px of a 399px row, so 175px was left for the sender,
@@ -814,12 +820,11 @@ button.chip:disabled { cursor: default; color: var(--muted); }
   content: ""; position: absolute; right: calc(100% - 1px); top: 0; bottom: 0; width: 44px; border-radius: 10px 0 0 10px;
   background: linear-gradient(to right, transparent, var(--bg-elev)); pointer-events: none;
 }
-/* By touch the strip is always there, with no hover to summon it, so by touch
-   the gutter is still held open. */
+/* By touch the strip is always there, with no hover to summon it, so there is
+   nothing to fade into: it holds a gutter instead, set with the rest of the
+   touch rules further down. */
 @media (hover: none) {
   .row-tools::before { content: none; }
-  .inbox-row-item.keepable > .inbox-row { padding-right: 148px; }
-  .inbox-row-item.keepable.filable > .inbox-row { padding-right: 196px; }
 }
 /* A project list is as long as the operator's projects, so it scrolls rather
    than running off the bottom of the window. One line per project: the name
@@ -883,9 +888,22 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 .keep-always input { margin: 2px 0 0; flex: none; accent-color: var(--accent); }
 .keep-always b { color: var(--fg); font-weight: 550; word-break: break-all; }
 .inbox-row-keep-error { position: absolute; top: 50%; right: 10px; transform: translateY(-50%); font-size: 12px; color: #d97706; background: var(--bg-elev); padding: 2px 8px; border-radius: 7px; border: 1px solid var(--line); }
-/* By touch there is no hover, so the strip is simply there. */
+/* By touch there is no hover, so the strip is simply there. Being always
+   there is what makes its width expensive: measured on a 390px phone, the
+   gutter it held open was 196px, so a sender, a subject and a snippet shared
+   164px between them (operator, 2026-09-21). The words go and the glyphs
+   stay, which says the same thing in a quarter of the room. */
 @media (hover: none) {
   .row-tools { opacity: 1; }
+  .keep-btn .keep-word, .keep-btn .chevron { display: none; }
+  .keep-btn { width: 30px; padding: 0; justify-content: center; }
+  .keep-btn svg { width: 15px; height: 15px; }
+  .row-tools { gap: 1px; padding: 3px 4px; }
+  .inbox-row-item.keepable > .inbox-row { padding-right: 104px; }
+  .inbox-row-item.keepable.filable > .inbox-row { padding-right: 138px; }
+  /* Inside Archive there is no archive button, so the row holds one control
+     less open and the subject gets the room back. */
+  .inbox-row-item.keepable.filable:not(.hideable) > .inbox-row { padding-right: 106px; }
 }
 /* Restore on a Deleted items row shows without a hover: it is the one thing that list is for (2026-09-15). */
 .inbox-row-item.restorable > .inbox-row { padding-right: 44px; }
@@ -1381,7 +1399,7 @@ textarea.field.ask-input { resize: none; font-size: 14px; min-height: 40px; heig
      stop short of it instead of running underneath (operator, 2026-09-11:
      "the x buttons are overlying"). */
   .inbox-row-item > .inbox-row { padding-right: 52px; }
-  .inbox-row-item.hideable > .inbox-row { padding-right: 90px; }
+  .inbox-row-item.hideable:not(.keepable) > .inbox-row { padding-right: 76px; }
   /* The eye sits left of the bin: the rule above moved every row button to
      the same edge, so Hide covered Delete (operator, 2026-09-15). */
   .inbox-row-hide { right: 46px; }
