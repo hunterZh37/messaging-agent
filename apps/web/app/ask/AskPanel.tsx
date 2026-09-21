@@ -51,7 +51,7 @@ import {
   isPreviewable,
 } from "@/lib/attachments";
 import { relativeTime } from "@/lib/format";
-import { AttachmentPreview, ClipIcon } from "../queue/AttachmentPreview";
+import { AttachmentPreview, ClipIcon, DownloadIcon } from "../queue/AttachmentPreview";
 import { CelesteMark } from "../queue/CelesteMark";
 import { recordAppliedRevisionAction, reviseAction } from "../actions";
 import {
@@ -572,6 +572,14 @@ function AskFiles({
               ) : (
                 <a className="att-open" href={chatFileHref(chatId, f.id, true)} download={f.filename}>
                   {label}
+                </a>
+              )}
+              {/* The same arrow the thread's chips carry: a file that
+                  previews could be looked at and never saved (operator,
+                  2026-09-21). */}
+              {!f.uploading && (
+                <a className="att-dl" href={chatFileHref(chatId, f.id, true)} download={f.filename} aria-label={`Download ${f.filename}`}>
+                  <DownloadIcon />
                 </a>
               )}
               {attach && !f.uploading && (

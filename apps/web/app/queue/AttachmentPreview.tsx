@@ -11,6 +11,17 @@ export function ClipIcon() {
   );
 }
 
+/** The arrow on every chip: the way to keep a file, wherever the chip is. */
+export function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 4v11" />
+      <path d="M8 12l4 4 4-4" />
+      <path d="M5 19h14" />
+    </svg>
+  );
+}
+
 /**
  * One attachment shown in place, under the chip that opened it: a PDF in an
  * iframe, an image as an image. Only the five allowlisted types ever get

@@ -565,7 +565,7 @@ export function trashJob(threadIds: string[], now: number, id = `trash-${now}-${
 export function hiddenToastLabel(threadIds: string[]): string {
   const chats = allChats(threadIds);
   // Out of the sorting lists, still in the folder (2026-09-15).
-  return `Hid ${threadCountLabel(threadIds.length, chats)} · still in ${chats ? "Messages" : "Inbox"}`;
+  return `Archived ${threadCountLabel(threadIds.length, chats)} · still in ${chats ? "Messages" : "Inbox"}`;
 }
 
 /** The deletes that are due, minus any already on their way. */

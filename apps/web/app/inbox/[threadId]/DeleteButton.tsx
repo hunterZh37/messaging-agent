@@ -109,9 +109,9 @@ export function DeleteButton({
   });
 
   return (
-    <button type="button" className="btn quiet" onClick={onDelete} title={hide ? "Hide from Need to reply, Unopened and Safe to delete; it stays in Inbox" : undefined}>
+    <button type="button" className="btn quiet" onClick={onDelete} title={hide ? "Archive: out of the sorting lists, still in Inbox" : undefined}>
       {hide ? <EyeOffIcon /> : <TrashIcon />}
-      {hide ? "Hide" : "Delete"}
+      {hide ? "Archive" : "Delete"}
       <kbd>{hide ? "=" : "⌫"}</kbd>
     </button>
   );

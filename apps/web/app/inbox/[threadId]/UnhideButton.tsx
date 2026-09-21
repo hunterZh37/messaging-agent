@@ -21,16 +21,16 @@ export function UnhideButton({ threadId, chat = false }: { threadId: string; cha
     startTransition(async () => {
       const r = await unhideThreadsAction([threadId]);
       if ("error" in r) return setError(r.error);
-      gate.say(chat ? "Unhidden · back on the chat lists" : "Unhidden · back on the sorting lists");
+      gate.say(chat ? "Out of Archive · back on the chat lists" : "Out of Archive · back on the sorting lists");
       router.refresh();
     });
   }
 
   return (
     <>
-      <button type="button" className="btn quiet" onClick={onClick} disabled={pending} title="Show it again under Need to reply, Unopened and Safe to delete">
+      <button type="button" className="btn quiet" onClick={onClick} disabled={pending} title="Out of Archive, back on the sorting lists">
         <EyeOffIcon />
-        Unhide
+        Unarchive
       </button>
       {error ? <span className="error">{error}</span> : null}
     </>

@@ -10,18 +10,8 @@ import { formatSize, isPreviewable } from "@/lib/attachments";
 import { fileKind } from "@/lib/attachments";
 import { formatTime, initials, recipientsLine } from "@/lib/format";
 import { linkSegments } from "@/lib/linkify";
-import { AttachmentPreview, ClipIcon } from "./AttachmentPreview";
+import { AttachmentPreview, ClipIcon, DownloadIcon } from "./AttachmentPreview";
 import { FittedHtml } from "./FittedHtml";
-
-function DownloadIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 4v11" />
-      <path d="M8 12l4 4 4-4" />
-      <path d="M5 19h14" />
-    </svg>
-  );
-}
 
 /**
  * Plain text with its links clickable and their URLs out of sight: the label

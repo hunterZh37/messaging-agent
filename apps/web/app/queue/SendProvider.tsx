@@ -216,7 +216,7 @@ export function SendProvider({ children }: { children: ReactNode }) {
         // "Deleted 1 thread" toasts piling up were not wanted); the row is
         // gone and Cmd-Z is the way back. One that failed has to say so, or
         // it reads exactly like one that worked.
-        if ("error" in r) dispatch({ type: "trashed", id: job.id, label: `Could not ${job.hide ? "hide" : "delete"}: ${r.error}`, now: Date.now() });
+        if ("error" in r) dispatch({ type: "trashed", id: job.id, label: `Could not ${job.hide ? "archive" : "delete"}: ${r.error}`, now: Date.now() });
         else {
           // What the provider kept comes back on screen, and is said
           // (2026-09-11: two chats Messages.app would not delete sat hidden

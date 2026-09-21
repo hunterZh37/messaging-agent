@@ -291,7 +291,7 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 
 .tree { display: flex; flex-direction: column; }
 .tree a, .side-bottom a, .side-bottom button {
-  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; font-size: 13.5px; width: 100%; text-align: left;
+  position: relative; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; font-size: 13.5px; width: 100%; text-align: left;
 }
 .tree a.child { padding-left: 30px; }
 .tree a:hover, .side-bottom a:hover, .side-bottom button:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, transparent); }
@@ -358,6 +358,25 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 /* On the corner, not in the row: the word always fits the 220px column. */
 .side-toggle-count { position: absolute; top: -5px; right: -3px; font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: var(--accent-ink); box-shadow: 0 0 0 2px var(--card); }
 .side-toggle a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* A row that has been pressed says so while the folder is read (operator,
+   2026-09-20: "why all chat tab not openable?"). It was openable: reading a
+   folder takes a third to half a second here, and in that time nothing moved,
+   which reads as a click that missed. The row lights the moment it is pressed
+   and a thread creeps across its foot until the list arrives. */
+.tree a:has(.link-pending), .side-toggle a:has(.link-pending) { color: var(--fg); background: color-mix(in srgb, var(--fg) 7%, transparent); }
+.link-pending { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; overflow: hidden; border-radius: 999px; pointer-events: none; }
+.link-pending::after {
+  content: ""; position: absolute; inset: 0; width: 40%; border-radius: 999px;
+  background: var(--accent); animation: link-pending 900ms ease-in-out infinite;
+}
+@keyframes link-pending {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .link-pending::after { animation: none; width: 100%; opacity: 0.5; }
+}
 /* The phone's top bar (2026-09-14): the same switch, centred between the menu and Ask. */
 .switchbar .side-toggle { flex: 1 1 auto; max-width: 260px; margin: 0 auto; }
 .switchbar .side-toggle a { position: relative; display: flex; align-items: center; justify-content: center; height: 32px; border-radius: 8px; font-size: 14px; color: var(--muted); text-decoration: none; }

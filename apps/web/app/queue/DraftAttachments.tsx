@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import { draftAttachmentHref, draftAttachmentSizeLabel, isPreviewable } from "@/lib/attachments";
 import { fileKind } from "@/lib/attachments";
-import { AttachmentPreview, ClipIcon } from "./AttachmentPreview";
+import { AttachmentPreview, ClipIcon, DownloadIcon } from "./AttachmentPreview";
 
 /**
  * One file on the card. A chip appears the moment the operator drops it, with
@@ -90,6 +90,14 @@ export function DraftAttachmentChips({
               ) : (
                 <a className="att-open" href={draftAttachmentHref(draftId, f.id, true)} download={f.filename}>
                   {label}
+                </a>
+              )}
+              {/* A file that previews had no way to be saved: the chip only
+                  opened it, and the preview asks Chrome's viewer for the page
+                  without its toolbar (operator, 2026-09-21). */}
+              {!f.uploading && (
+                <a className="att-dl" href={draftAttachmentHref(draftId, f.id, true)} download={f.filename} aria-label={`Download ${f.filename}`}>
+                  <DownloadIcon />
                 </a>
               )}
               {onRemove && !f.uploading && (

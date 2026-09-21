@@ -47,8 +47,10 @@ function Row(props: { row: InboxRow; folder: FolderKey; params: ViewParams; sele
         <span>{shortAccount(r.account.email)}</span>
         {/* Your own last word is not news to you. */}
         {r.message.isFromOperator ? null : <NewBadge listKey={listKey} threadId={r.thread.id} receivedAt={r.message.receivedAt} selected={r.thread.id === selectedThreadId} />}
-        {/* Hidden from the sorting lists, still here (2026-09-15). */}
-        {r.thread.hiddenAt ? <span className="hidden-tag">Hidden</span> : null}
+        {/* Archived: out of the sorting lists, still in the folder
+            (2026-09-15). Not said inside Archive itself, where every row is
+            (operator, 2026-09-20). */}
+        {r.thread.hiddenAt && params.status !== "hidden" ? <span className="hidden-tag">Archived</span> : null}
         <span style={{ marginLeft: "auto" }}>{formatTime(r.message.sentAt)}</span>
       </div>
       {/* Where this one stands and what it is about (operator, 2026-09-20),

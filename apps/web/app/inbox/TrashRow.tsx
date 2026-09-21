@@ -180,8 +180,8 @@ export function TrashRow({
           type="button"
           className="applied-clear inbox-row-del inbox-row-hide"
           onClick={() => remove(true)}
-          aria-label={`Hide ${subject || "(no subject)"}`}
-          title="Hide here only (it stays in the mailbox or app)"
+          aria-label={`Archive ${subject || "(no subject)"}`}
+          title="Archive here only (it stays in the mailbox or app)"
         >
           <EyeOffIcon />
         </button>

@@ -660,9 +660,9 @@ describe("hide", () => {
   it("is a trash job marked hide, and says so once done", () => {
     expect(trashJob(["a1:t1"], 1, "j1", true, true)).toEqual({ id: "j1", threadIds: ["a1:t1"], endsAt: 1, undo: true, hide: true });
     expect(trashJob(["a1:t1"], 1, "j1").hide).toBeUndefined();
-    expect(hiddenToastLabel(["a1:t1"])).toBe("Hid 1 thread · still in Inbox");
-    expect(hiddenToastLabel(["a", "b"])).toBe("Hid 2 threads · still in Inbox");
-    expect(hiddenToastLabel(["acc:any;-;+1", "acc:1@s.whatsapp.net"])).toBe("Hid 2 chats · still in Messages");
+    expect(hiddenToastLabel(["a1:t1"])).toBe("Archived 1 thread · still in Inbox");
+    expect(hiddenToastLabel(["a", "b"])).toBe("Archived 2 threads · still in Inbox");
+    expect(hiddenToastLabel(["acc:any;-;+1", "acc:1@s.whatsapp.net"])).toBe("Archived 2 chats · still in Messages");
   });
 });
 

@@ -8,6 +8,7 @@ import { activeTreeKey, rowsForSide, sideHref, sideOfPath, treeRows, type TreeIc
 import { useAsk } from "../ask/AskProvider";
 import { ThemeToggle } from "./ThemeToggle";
 import { NotifyToggle } from "./NotifyToggle";
+import { LinkPending } from "./LinkPending";
 import { useListAdjustVersion } from "./useListAdjust";
 import { lessGone, listAdjust } from "@/lib/listAdjust";
 
@@ -242,6 +243,7 @@ function SideToggle(props: { side: TreeSide; counts: TreeCounts; params: ViewPar
           >
             <span className="side-toggle-label">{label}</span>
             {count > 0 ? <span className="side-toggle-count">{count}</span> : null}
+            <LinkPending />
           </Link>
         );
       })}
@@ -271,6 +273,7 @@ function Tree(props: { counts: TreeCounts; activeKey: string; params: ViewParams
             {Glyph ? <Glyph /> : null}
             <span className="tree-label">{row.label}</span>
             {row.counted ? <span className="tree-count">{lessGone(row.count, listAdjust.get(row.key)?.rows)}</span> : null}
+            <LinkPending />
           </Link>
         );
       })}
