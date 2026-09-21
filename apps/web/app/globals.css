@@ -613,6 +613,25 @@ main.inbox-page { max-width: none; margin: 0; padding: 0; }
 }
 /* A mail read at editor width does not read like a mail. */
 .dialog-panel.send-preview { width: min(760px, calc(100vw - 32px)); }
+/* A file open over the page (operator, 2026-09-21). It takes the window
+   rather than the room left under a chip: a contract read inline was a
+   document scrolling inside a scrolling thread. */
+.dialog-panel.att-dialog {
+  width: min(1040px, calc(100vw - 32px)); height: min(92vh, 1100px);
+  max-height: none; overflow: hidden; display: flex; flex-direction: column; padding: 14px 14px 12px;
+}
+.att-dialog .dialog-title { flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-dialog-head { flex: none; display: flex; align-items: center; gap: 10px; padding: 2px 0 10px; }
+.att-dialog-head .att-size { color: var(--muted); font-size: 12.5px; }
+/* The one button, at the end of its own line, clear of the × above it. */
+.att-dialog-dl { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.att-dialog-dl svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.att-dialog-body { flex: 1 1 auto; min-height: 0; display: flex; border-radius: 10px; overflow: hidden; background: var(--bg); }
+.att-dialog-body iframe { flex: 1 1 auto; width: 100%; height: 100%; border: 0; }
+.att-dialog-body img { margin: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
+@media (max-width: 719px) {
+  .dialog-panel.att-dialog { height: 92vh; border-radius: 14px 14px 0 0; }
+}
 .dialog-panel:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .dialog-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; padding-right: 36px; }
 /* The editor inside brought its own frame when it was part of the header. */

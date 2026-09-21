@@ -3,7 +3,8 @@
 import { useState, type ReactNode } from "react";
 import { draftAttachmentHref, draftAttachmentSizeLabel, isPreviewable } from "@/lib/attachments";
 import { fileKind } from "@/lib/attachments";
-import { AttachmentPreview, ClipIcon, DownloadIcon } from "./AttachmentPreview";
+import { ClipIcon, DownloadIcon } from "./AttachmentPreview";
+import { AttachmentDialog, type OpenAttachment } from "./AttachmentDialog";
 
 /**
  * One file on the card. A chip appears the moment the operator drops it, with
@@ -52,16 +53,8 @@ export function DraftAttachmentChips({
   /** The Attach button, on the end of the row where the card wants one. */
   children?: ReactNode;
 }) {
-  const [previewing, setPreviewing] = useState<Set<string>>(new Set());
-
-  function toggle(id: string) {
-    setPreviewing((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+  // Over the page, not under the chip (operator, 2026-09-21).
+  const [open, setOpen] = useState<OpenAttachment | null>(null);
 
   if (files.length === 0 && !children) return null;
 
@@ -70,7 +63,6 @@ export function DraftAttachmentChips({
       <div className="att-row draft-atts">
         {showCount && files.length > 1 && <span className="att-count">{files.length} files</span>}
         {files.map((f) => {
-          const shown = previewing.has(f.id);
           const label = (
             <>
               <span className="att-kind">{fileKind(f.filename)}</span>
@@ -79,12 +71,25 @@ export function DraftAttachmentChips({
             </>
           );
           return (
-            <span key={f.id} className={`chip att-chip${f.uploading ? " dim" : ""}${shown ? " on" : ""}`}>
+            <span key={f.id} className={`chip att-chip${f.uploading ? " dim" : ""}`}>
               {f.uploading ? (
                 // Nothing to open yet: the server has not said the file is there.
                 <span className="att-open">{label}</span>
               ) : isPreviewable(f.mimeType) ? (
-                <button type="button" className="att-open" onClick={() => toggle(f.id)} aria-expanded={shown}>
+                <button
+                  type="button"
+                  className="att-open"
+                  aria-haspopup="dialog"
+                  onClick={() =>
+                    setOpen({
+                      href: draftAttachmentHref(draftId, f.id, false),
+                      downloadHref: draftAttachmentHref(draftId, f.id, true),
+                      filename: f.filename,
+                      mimeType: f.mimeType,
+                      ...(f.size === undefined ? {} : { size: f.size }),
+                    })
+                  }
+                >
                   {label}
                 </button>
               ) : (
@@ -110,11 +115,7 @@ export function DraftAttachmentChips({
         })}
         {children}
       </div>
-      {files
-        .filter((f) => previewing.has(f.id) && !f.uploading)
-        .map((f) => (
-          <AttachmentPreview key={f.id} href={draftAttachmentHref(draftId, f.id, false)} filename={f.filename} mimeType={f.mimeType} />
-        ))}
+      {open ? <AttachmentDialog file={open} onClose={() => setOpen(null)} /> : null}
     </>
   );
 }

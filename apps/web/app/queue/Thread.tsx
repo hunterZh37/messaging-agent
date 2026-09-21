@@ -10,7 +10,8 @@ import { formatSize, isPreviewable } from "@/lib/attachments";
 import { fileKind } from "@/lib/attachments";
 import { formatTime, initials, recipientsLine } from "@/lib/format";
 import { linkSegments } from "@/lib/linkify";
-import { AttachmentPreview, ClipIcon, DownloadIcon } from "./AttachmentPreview";
+import { ClipIcon, DownloadIcon } from "./AttachmentPreview";
+import { AttachmentDialog, type OpenAttachment } from "./AttachmentDialog";
 import { FittedHtml } from "./FittedHtml";
 
 /**
@@ -61,7 +62,8 @@ export function Thread({
   const [showPlain, setShowPlain] = useState<Set<string>>(new Set());
   const [showQuoted, setShowQuoted] = useState<Set<string>>(new Set());
 
-  const [previewing, setPreviewing] = useState<Set<string>>(new Set());
+  // One file open at a time, over the page rather than under its chip.
+  const [open, setOpen] = useState<OpenAttachment | null>(null);
   // A chat with its whole history is thousands of bubbles (stress loop,
   // 2026-09-11: 6,354 for one person). The newest page shows; each press
   // of "Show earlier" reveals another page above it.
@@ -99,6 +101,7 @@ export function Thread({
 
   return (
     <div className="thread" ref={root}>
+      {open ? <AttachmentDialog file={open} onClose={() => setOpen(null)} /> : null}
       {hidden > 0 ? (
         <button type="button" className="btn quiet thread-earlier" onClick={reveal}>
           {`Show earlier · ${hidden.toLocaleString()} more`}
@@ -124,7 +127,6 @@ export function Thread({
         const folded = hasQuoted && !quotedOpen;
         const html = Boolean(m.bodyHtml) && !plain && !folded;
         const atts = attachments?.[m.id] ?? [];
-        const previews = atts.filter((a) => previewing.has(a.id));
         return (
           <div key={m.id} className={`bubble-row ${me ? "me" : "them"}`}>
             {!me && (
@@ -148,7 +150,6 @@ export function Thread({
                 {atts.length > 0 && (
                   <div className="att-row">
                     {atts.map((a) => {
-                      const shown = previewing.has(a.id);
                       const label = (
                         <>
                           <span className="att-kind">{fileKind(a.filename)}</span>
@@ -157,13 +158,21 @@ export function Thread({
                         </>
                       );
                       return (
-                        <span key={a.id} className={`chip att-chip${shown ? " on" : ""}`}>
+                        <span key={a.id} className="chip att-chip">
                           {isPreviewable(a.mimeType) ? (
                             <button
                               type="button"
                               className="att-open"
-                              onClick={() => toggle(previewing, a.id, setPreviewing)}
-                              aria-expanded={shown}
+                              aria-haspopup="dialog"
+                              onClick={() =>
+                                setOpen({
+                                  href: attachmentHref(a.id, false),
+                                  downloadHref: attachmentHref(a.id, true),
+                                  filename: a.filename,
+                                  mimeType: a.mimeType,
+                                  size: a.size,
+                                })
+                              }
                             >
                               {label}
                             </button>
@@ -181,9 +190,6 @@ export function Thread({
                     })}
                   </div>
                 )}
-                {previews.map((a) => (
-                  <AttachmentPreview key={a.id} href={attachmentHref(a.id, false)} filename={a.filename} mimeType={a.mimeType} />
-                ))}
                 {html ? (
                   <FittedHtml html={m.bodyHtml ?? ""} />
                 ) : (

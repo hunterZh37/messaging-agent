@@ -51,7 +51,8 @@ import {
   isPreviewable,
 } from "@/lib/attachments";
 import { relativeTime } from "@/lib/format";
-import { AttachmentPreview, ClipIcon, DownloadIcon } from "../queue/AttachmentPreview";
+import { ClipIcon, DownloadIcon } from "../queue/AttachmentPreview";
+import { AttachmentDialog, type OpenAttachment } from "../queue/AttachmentDialog";
 import { CelesteMark } from "../queue/CelesteMark";
 import { recordAppliedRevisionAction, reviseAction } from "../actions";
 import {
@@ -534,17 +535,9 @@ function AskFiles({
   onRemove: (id: string) => void;
   onAttach: (file: PanelFile) => void;
 }) {
-  const [previewing, setPreviewing] = useState<Set<string>>(new Set());
+  // Over the page, not under the chip (operator, 2026-09-21).
+  const [open, setOpen] = useState<OpenAttachment | null>(null);
   const attach = attachToDraftLabel(draft);
-
-  function toggle(id: string) {
-    setPreviewing((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
 
   if (files.length === 0) return null;
 
@@ -552,7 +545,6 @@ function AskFiles({
     <div className="ask-files">
       <div className="att-row">
         {files.map((f) => {
-          const shown = previewing.has(f.id);
           const label = (
             <>
               <ClipIcon />
@@ -561,12 +553,25 @@ function AskFiles({
             </>
           );
           return (
-            <span key={f.id} className={`chip att-chip${f.uploading ? " dim" : ""}${shown ? " on" : ""}`}>
+            <span key={f.id} className={`chip att-chip${f.uploading ? " dim" : ""}`}>
               {f.uploading ? (
                 // Nothing to open yet: the server has not said the file is there.
                 <span className="att-open">{label}</span>
               ) : isPreviewable(f.mimeType) ? (
-                <button type="button" className="att-open" onClick={() => toggle(f.id)} aria-expanded={shown}>
+                <button
+                  type="button"
+                  className="att-open"
+                  aria-haspopup="dialog"
+                  onClick={() =>
+                    setOpen({
+                      href: chatFileHref(chatId, f.id, false),
+                      downloadHref: chatFileHref(chatId, f.id, true),
+                      filename: f.filename,
+                      mimeType: f.mimeType,
+                      ...(f.size === undefined ? {} : { size: f.size }),
+                    })
+                  }
+                >
                   {label}
                 </button>
               ) : (
@@ -596,11 +601,7 @@ function AskFiles({
           );
         })}
       </div>
-      {files
-        .filter((f) => previewing.has(f.id) && !f.uploading)
-        .map((f) => (
-          <AttachmentPreview key={f.id} href={chatFileHref(chatId, f.id, false)} filename={f.filename} mimeType={f.mimeType} />
-        ))}
+      {open ? <AttachmentDialog file={open} onClose={() => setOpen(null)} /> : null}
     </div>
   );
 }
