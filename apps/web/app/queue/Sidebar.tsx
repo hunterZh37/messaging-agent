@@ -94,6 +94,17 @@ function UsageIcon() {
   );
 }
 
+/** Boxes joined by a line: the system drawn as a picture. */
+function ArchitectureIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="6" rx="1.5" />
+      <rect x="14" y="15" width="7" height="6" rx="1.5" />
+      <path d="M6.5 9v6a3 3 0 0 0 3 3H14" />
+    </svg>
+  );
+}
+
 function MenuIcon() {
   return (
     <svg viewBox="0 0 24 24">
@@ -301,6 +312,7 @@ export function Nav(props: { counts: TreeCounts; params?: ViewParams }) {
   const inboxesOn = activeKey === "inboxes";
   const usageOn = pathname.startsWith("/usage");
   const statsOn = pathname.startsWith("/stats");
+  const archOn = pathname.startsWith("/architecture");
 
   // The side the page is on, or on a page that is neither, the side last
   // chosen. Remembered in the browser; a page read on the server starts on
@@ -409,6 +421,11 @@ export function Nav(props: { counts: TreeCounts; params?: ViewParams }) {
         <Link href="/usage" className={usageOn ? "on" : undefined} aria-current={usageOn ? "page" : undefined}>
           <UsageIcon />
           <span className="tree-label">Usage</span>
+        </Link>
+        {/* The system diagram, where the operator reads the app (2026-09-22). */}
+        <Link href="/architecture" className={archOn ? "on" : undefined} aria-current={archOn ? "page" : undefined}>
+          <ArchitectureIcon />
+          <span className="tree-label">Architecture</span>
         </Link>
         <NotifyToggle />
         <ThemeToggle withLabel />

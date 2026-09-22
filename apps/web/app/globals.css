@@ -1645,3 +1645,11 @@ main.stats-page { max-width: 1040px; margin: 0 auto; padding: 0 22px 60px; }
 .habit b .vs { font-size: 16px; color: var(--muted); font-weight: 500; }
 .habit > span { font-size: 13.5px; }
 .habit .meta { font-size: 12px; }
+
+/* The system diagram, framed inside the app (2026-09-22). The archify page
+   brings its own theme, views and export, so it is given the room it needs
+   and nothing else: no card, no second scrollbar. */
+main.architecture-page { display: flex; flex-direction: column; height: 100vh; max-width: none; margin: 0; padding: 0 22px 22px; }
+.architecture-frame { flex: 1; width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.architecture-missing { color: var(--muted); font-size: 13.5px; max-width: 46ch; }
+.architecture-missing code { font-family: ui-monospace, Menlo, monospace; color: var(--fg); }
