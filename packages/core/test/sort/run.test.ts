@@ -1,9 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, ne } from "drizzle-orm";
 import { testDb } from "../helpers/db";
-import { accounts, messages, sorts } from "../../src/db/schema";
+import { accounts, messages, projectAssignments, sorts } from "../../src/db/schema";
 import { countUnsortedBefore, resortImportant, resortNeedsReply, resortWindow, sortOlder, sortPending } from "../../src/sort/run";
-import { projectAssignments } from "../../src/db/schema";
 import { createProject } from "../../src/projects/projects";
 import { fileThread } from "../../src/projects/classify";
 import { saveCategories, type Category } from "../../src/sort/categories";
@@ -361,15 +360,16 @@ describe("resortWindow", () => {
     expect(rows.every((r) => r.wants !== "bin")).toBe(true);
   });
 
-  it("walks the window across presses: mail the sorter has not filed yet comes before mail it has", async () => {
+  it("walks the window across presses: longest since a sorter looked goes first", async () => {
     const db = testDb();
     seed(db);
     seedCategories(db);
-    const sorter = new ScriptedSorter(() => ({ wants: "knowing", scheduling: false, category: "FYI", reason: "ok" }));
-    await sortPending(db, sorter, "c");
-    // Pretend the newer message was filed a moment ago and the older one never was.
-    const older = db.select().from(messages).where(eq(messages.isFromOperator, false)).orderBy(asc(messages.sentAt)).all()[0]!;
-    db.delete(projectAssignments).where(eq(projectAssignments.messageId, older.id)).run();
+    await sortPending(db, new ScriptedSorter(() => ({ wants: "knowing", scheduling: false, category: "FYI", reason: "ok" })), "c");
+    const inbound = db.select().from(messages).where(eq(messages.isFromOperator, false)).orderBy(asc(messages.sentAt)).all();
+    const older = inbound[0]!;
+    // One was looked at long ago, the other a moment ago.
+    db.update(sorts).set({ sortedAt: 1 }).where(eq(sorts.messageId, older.id)).run();
+    db.update(sorts).set({ sortedAt: 9_000_000_000_000 }).where(ne(sorts.messageId, older.id)).run();
 
     const seen: string[] = [];
     const spy = new ScriptedSorter((input) => {
@@ -378,6 +378,39 @@ describe("resortWindow", () => {
     });
     expect(await resortWindow(db, spy, "c", { since: 0, limit: 1 })).toEqual({ resorted: 1, failed: 0 });
     expect(seen).toEqual([older.subject]);
+  });
+
+  /**
+   * The failure this shipped with (operator, 2026-09-21: "Re-sort re-read the
+   * same two hundred and never reached the rest"). The window used to be
+   * walked by the project filing's date, which does not move for a message
+   * filed by hand, so hand-filed mail sat at the front of the queue for ever
+   * and everything behind it was unreachable however many times the button
+   * was pressed.
+   */
+  it("does not stall on mail the operator filed by hand", async () => {
+    const db = testDb();
+    seed(db);
+    seedCategories(db);
+    await sortPending(db, new ScriptedSorter(() => ({ wants: "knowing", scheduling: false, category: "FYI", reason: "ok" })), "c");
+    const inbound = db.select().from(messages).where(eq(messages.isFromOperator, false)).orderBy(asc(messages.sentAt)).all();
+    expect(inbound.length).toBeGreaterThan(1);
+    // Every one filed by hand, long ago: nothing a re-sort does moves that date.
+    for (const m of inbound) {
+      db.update(projectAssignments).set({ source: "manual", assignedAt: 1 }).where(eq(projectAssignments.messageId, m.id)).run();
+      db.update(sorts).set({ sortedAt: m.sentAt }).where(eq(sorts.messageId, m.id)).run();
+    }
+
+    const seen: string[] = [];
+    const spy = new ScriptedSorter((input) => {
+      seen.push(input.subject);
+      return { wants: "knowing", scheduling: false, category: "FYI", reason: "ok" };
+    });
+    // One at a time, a press each: every press must bring up a different one.
+    for (let press = 0; press < inbound.length; press++) await resortWindow(db, spy, "c", { since: 0, limit: 1 });
+    expect(new Set(seen).size).toBe(inbound.length);
+    // And the hand filing is still the operator's.
+    expect(db.select().from(projectAssignments).all().every((a) => a.source === "manual")).toBe(true);
   });
 
   it("stays inside the window and the inbox, and counts a per-message failure", async () => {

@@ -99,6 +99,7 @@ export async function sortPending(
           reason: r.reason,
           model: sorter.model,
           labeledAt: null,
+          sortedAt: clock(),
           createdAt: clock(),
         })
         // Two passes can meet on one message: the trickle sort after a sync
@@ -175,6 +176,7 @@ export async function sortOlder(
           reason: r.reason,
           model: sorter.model,
           labeledAt: null,
+          sortedAt: clock(),
           createdAt: clock(),
         })
         // Two passes can meet on one message: the trickle sort after a sync
@@ -272,7 +274,7 @@ export async function resortImportant(
   for (const m of rows) {
     try {
       const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
-      db.update(sorts).set({ category: r.category, finance: r.finance, reason: r.reason, model: sorter.model }).where(eq(sorts.messageId, m.id)).run();
+      db.update(sorts).set({ category: r.category, finance: r.finance, reason: r.reason, model: sorter.model, sortedAt: now() }).where(eq(sorts.messageId, m.id)).run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());
       resorted++;
     } catch (err) {
@@ -307,16 +309,20 @@ export async function resortWindow(
   // (operator, 2026-09-20).
   const conditions = [eq(messages.isFromOperator, false), eq(messages.folder, "inbox"), ne(sorts.model, OPERATOR), gte(messages.sentAt, opts.since)];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
-  // Mail the sorter has not filed yet goes first, then the longest-ago filed,
-  // so repeated presses of Re-file walk the whole window instead of re-reading
-  // the newest batch every time.
+  // Longest since a sorter looked at it goes first, so repeated presses walk
+  // the whole window instead of re-reading the same batch every time.
+  //
+  // This used to walk by the project filing's date, which does not move for a
+  // message filed by hand: `fileFromSorter` leaves those alone on purpose, so
+  // 421 hand-filed messages sat at the front of this queue permanently and
+  // the 1,225 behind them were never reached, however many times the button
+  // was pressed (operator, 2026-09-21).
   const rows = db
     .select({ m: messages })
     .from(messages)
     .innerJoin(sorts, eq(sorts.messageId, messages.id))
-    .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
     .where(and(...conditions))
-    .orderBy(sql`case when ${projectAssignments.messageId} is null then 0 else 1 end`, asc(projectAssignments.assignedAt), desc(messages.sentAt))
+    .orderBy(sql`case when ${sorts.sortedAt} is null then 0 else 1 end`, asc(sorts.sortedAt), desc(messages.sentAt))
     .limit(opts.limit ?? 200)
     .all()
     .map((r) => r.m);
@@ -327,7 +333,7 @@ export async function resortWindow(
     try {
       const r = await sorter.sort(criteria, categories, projectsFor(db, projectCache, m.accountId), sortInputFor(m, addressOf(db, addressCache, m.accountId)));
       db.update(sorts)
-        .set({ wants: r.wants, category: r.wants === "bin" ? null : r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason, model: sorter.model })
+        .set({ wants: r.wants, category: r.wants === "bin" ? null : r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason, model: sorter.model, sortedAt: now() })
         .where(eq(sorts.messageId, m.id))
         .run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());
@@ -394,7 +400,7 @@ export async function resortNeedsReply(
         // the bin. Nothing was asked about whether it is worth keeping, and
         // quietly moving mail that was recently owed an answer into Safe to
         // delete is the wrong direction to be wrong in.
-        .set({ wants: r.wants === "reply" ? "reply" : "knowing", category: r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason, model: sorter.model })
+        .set({ wants: r.wants === "reply" ? "reply" : "knowing", category: r.category, finance: r.finance, scheduling: r.scheduling, reason: r.reason, model: sorter.model, sortedAt: now() })
         .where(eq(sorts.messageId, m.id))
         .run();
       fileFromSorter(db, m.id, projectsFor(db, projectCache, m.accountId), r.project, projectIdsByName(db, m.accountId), now());

@@ -187,6 +187,16 @@ export const sorts = sqliteTable("sorts", {
   reason: text("reason").notNull(),
   model: text("model").notNull(),
   labeledAt: integer("labeled_at"),
+  /**
+   * When a sorter last judged this message, which is what a re-sort walks by
+   * (operator, 2026-09-21: Re-sort re-read the same two hundred messages and
+   * never reached the rest).
+   *
+   * It used to walk by the project filing's date, and a message filed by hand
+   * keeps that date forever, so every hand-filed message sat at the front of
+   * the queue permanently. This moves on every pass, whatever the filing did.
+   */
+  sortedAt: integer("sorted_at"),
   createdAt: integer("created_at").notNull(),
 });
 
