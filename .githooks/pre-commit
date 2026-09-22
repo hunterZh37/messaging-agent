@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Refuse a Claude Code commit that changes the system's shape without the diagram.
+# Enable per clone: git config core.hooksPath .githooks
+# Spec: docs/superpowers/specs/2026-09-21-live-diagram-design.md
+#
+# Only inside Claude Code (CLAUDECODE=1): the session making the change already
+# holds the context, so it updates docs/diagrams/system-architecture.json itself.
+# A commit made anywhere else goes through, and post-commit hands it to the
+# background sync agent instead.
+# Looked and nothing to draw: DIAGRAM_UNCHANGED=1 git commit ...
+
+[ "$CLAUDECODE" = "1" ] || exit 0
+[ -n "$ARCHIFY_HOOK" ] && exit 0
+[ "$DIAGRAM_UNCHANGED" = "1" ] && exit 0
+root=$(git rev-parse --show-toplevel) || exit 0
+drift="$root/tools/diagram-drift.mjs"
+[ -f "$drift" ] || exit 0
+
+reasons=$(node "$drift" --staged)
+[ $? -eq 1 ] || exit 0
+
+cat >&2 <<EOF
+Commit refused: this change can redraw the system diagram, but
+docs/diagrams/system-architecture.json is not staged.
+
+$(printf '%s\n' "$reasons" | sed 's/^/  - /')
+
+Update the JSON for these changes, render it, stage both, and commit again:
+  node ~/.claude/skills/archify/bin/archify.mjs deliver architecture docs/diagrams/system-architecture.json docs/diagrams/system-architecture.html --quality showcase --json
+If you looked and the diagram is unaffected: DIAGRAM_UNCHANGED=1 git commit ...
+EOF
+exit 1

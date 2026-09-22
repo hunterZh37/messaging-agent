@@ -12,6 +12,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "db:generate": "pnpm --filter @messaging-agent/core db:generate",
     "agent": "pnpm --filter @messaging-agent/cli start",
-    "web": "pnpm --filter @messaging-agent/web dev"
+    "web": "pnpm --filter @messaging-agent/web dev",
+    "diagram": "node tools/diagram-live.mjs"
   }
 }
