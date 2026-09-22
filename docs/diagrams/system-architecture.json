@@ -407,6 +407,34 @@
    ]
   },
   {
+   "id": "statsp",
+   "type": "frontend",
+   "label": "Stats page",
+   "sublabel": "how you message",
+   "pos": [
+    825,
+    960
+   ],
+   "size": [
+    140,
+    64
+   ]
+  },
+  {
+   "id": "usagep",
+   "type": "frontend",
+   "label": "Usage page",
+   "sublabel": "calls, tokens, cost",
+   "pos": [
+    985,
+    960
+   ],
+   "size": [
+    140,
+    64
+   ]
+  },
+  {
    "id": "messages",
    "type": "external",
    "label": "Messages.app + chat.db",
@@ -556,6 +584,8 @@
     "askp",
     "editors",
     "inboxes",
+    "statsp",
+    "usagep",
     "lock",
     "watcher",
     "mailclock",
@@ -572,7 +602,9 @@
     "drafts",
     "askp",
     "editors",
-    "inboxes"
+    "inboxes",
+    "statsp",
+    "usagep"
    ]
   },
   {
@@ -1140,6 +1172,22 @@
     930,
     112
    ]
+  },
+  {
+   "id": "ui-stats",
+   "from": "statsp",
+   "to": "thread",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "variant": "dashed"
+  },
+  {
+   "id": "ui-usage",
+   "from": "usagep",
+   "to": "drafts",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "variant": "dashed"
   }
  ],
  "cards": [
