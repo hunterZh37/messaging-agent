@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { createJevSorter, jevQuestions, jevReason, jevState } from "../../src/models/jev";
 import { NO_PROJECT, type SortInput } from "../../src/sort/types";
 import type { Category } from "../../src/sort/categories";
+import { testDb } from "../helpers/db";
+import { modelCalls } from "../../src/db/schema";
 
 const CATEGORIES: Category[] = [
   { name: "Needs reply", description: "a real person is waiting on my answer." },
@@ -152,5 +154,65 @@ describe("the reason, read on its own", () => {
 
   it("still says something when no probabilities came back", () => {
     expect(jevReason(undefined, "knowing")).toBe("Jev read this as knowing.");
+  });
+});
+
+/**
+ * What Jev cost and how long it took (operator, 2026-09-21: "wire Jev into
+ * the usage ledger"). It is not a ModelProvider, so `withLedger` has nothing
+ * to wrap and it writes its own row. Before this, the one sorter worth
+ * measuring was the only one leaving no trace.
+ */
+describe("what the ledger is told", () => {
+  const withUsage = (usage: Record<string, number>, status = 200): typeof fetch =>
+    (async () =>
+      ({
+        ok: status === 200,
+        status,
+        json: async () => ({ answers: { wants: { choice: "knowing", confidence: 0.9 } }, usage }),
+        text: async () => "boom",
+      }) as unknown as Response) as unknown as typeof fetch;
+
+  it("writes one row a call, with the tokens the answer reported", async () => {
+    const db = testDb();
+    const sorter = createJevSorter({ apiKey: "k", fetchImpl: withUsage({ input_tokens: 900, output_tokens: 12 }), ledger: { db, ctx: { role: "sorter" } } });
+    await sorter.sort("c", CATEGORIES, PROJECTS, mail);
+    const rows = db.select().from(modelCalls).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ role: "sorter", provider: "typesafe", model: "jev-latest", inputTokens: 900, outputTokens: 12, error: null });
+    expect(rows[0]!.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  /** TypeSafe's prices are not in the table, and a guess would be worse than a blank. */
+  it("leaves the money unknown rather than guessing it", async () => {
+    const db = testDb();
+    await createJevSorter({ apiKey: "k", fetchImpl: withUsage({ input_tokens: 900, output_tokens: 12 }), ledger: { db, ctx: { role: "sorter" } } }).sort("c", CATEGORIES, PROJECTS, mail);
+    expect(db.select().from(modelCalls).all()[0]?.costUsd).toBeNull();
+  });
+
+  it("writes the row for a call that failed, with no tokens on it", async () => {
+    const db = testDb();
+    const sorter = createJevSorter({ apiKey: "k", fetchImpl: withUsage({}, 429), ledger: { db, ctx: { role: "sorter" } } });
+    await expect(sorter.sort("c", CATEGORIES, PROJECTS, mail)).rejects.toThrow(/jev 429/);
+    const rows = db.select().from(modelCalls).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ inputTokens: 0, outputTokens: 0 });
+    expect(rows[0]?.error).toMatch(/jev 429/);
+  });
+
+  it("writes a row when the network itself refused", async () => {
+    const db = testDb();
+    const dead = (async () => {
+      throw new Error("offline");
+    }) as unknown as typeof fetch;
+    const sorter = createJevSorter({ apiKey: "k", fetchImpl: dead, ledger: { db, ctx: { role: "sorter" } } });
+    await expect(sorter.sort("c", CATEGORIES, PROJECTS, mail)).rejects.toThrow("offline");
+    expect(db.select().from(modelCalls).all()[0]?.error).toBe("offline");
+  });
+
+  it("records nothing when nobody asked it to, which is what a test wants", async () => {
+    const db = testDb();
+    await createJevSorter({ apiKey: "k", fetchImpl: withUsage({ input_tokens: 1, output_tokens: 1 }) }).sort("c", CATEGORIES, PROJECTS, mail);
+    expect(db.select().from(modelCalls).all()).toHaveLength(0);
   });
 });

@@ -10,7 +10,7 @@ import type { ChatClient } from "../chat/types";
  * eval harness can all lean on it without a cycle.
  */
 
-export const MODEL_PROVIDERS = ["anthropic", "ollama"] as const;
+export const MODEL_PROVIDERS = ["anthropic", "ollama", "typesafe"] as const;
 export type ModelProviderName = (typeof MODEL_PROVIDERS)[number];
 
 export interface ModelRef {

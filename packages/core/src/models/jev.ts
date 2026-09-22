@@ -2,6 +2,8 @@ import type { Category } from "../sort/categories";
 import { NO_PROJECT, type Sorter, type SortInput, type SortProject, type SortResult } from "../sort/types";
 import { WANTS, type Wants } from "../db/schema";
 import { isBroadcast } from "../sort/broadcast";
+import type { Db } from "../db/client";
+import { recordModelCall, type LedgerContext } from "./ledger";
 
 /**
  * The sorter on TypeSafe's Jev (operator, 2026-09-19: "resort and use jev").
@@ -137,21 +139,59 @@ export interface JevOptions {
   /** Swapped in tests; the real one is global fetch. */
   fetchImpl?: typeof fetch;
   endpoint?: string;
+  /**
+   * Where the calls are written down (operator, 2026-09-21: "wire Jev into
+   * the usage ledger"). Jev is not a ModelProvider, so `withLedger` has
+   * nothing to wrap: it reaches the ledger by writing its own row.
+   *
+   * Left out and nothing is recorded, which is what a test wants.
+   */
+  ledger?: { db: Db; ctx: LedgerContext };
 }
 
 export function createJevSorter(opts: JevOptions): Sorter {
   const call = opts.fetchImpl ?? fetch;
   const endpoint = opts.endpoint ?? ENDPOINT;
+  const ref = { provider: "typesafe" as const, model: MODEL };
+  /** One row per call, answered or not. Writing it can never cost the answer. */
+  const record = (usage: { inputTokens: number; outputTokens: number }, latencyMs: number, error?: string): void => {
+    if (!opts.ledger) return;
+    recordModelCall(opts.ledger.db, {
+      ...opts.ledger.ctx,
+      modelRef: ref,
+      kind: "structured",
+      usage,
+      latencyMs,
+      ...(error ? { error } : {}),
+    });
+  };
+
   return {
     model: `typesafe:${MODEL}`,
     async sort(criteria, categories, projects, input): Promise<SortResult> {
-      const res = await call(endpoint, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: MODEL, state: jevState(input), questions: jevQuestions(criteria, categories, projects) }),
-      });
-      if (!res.ok) throw new Error(`jev ${res.status}: ${(await res.text()).slice(0, 200)}`);
-      const { answers } = (await res.json()) as JevResponse;
+      const startedAt = Date.now();
+      let res: Response;
+      try {
+        res = await call(endpoint, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${opts.apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ model: MODEL, state: jevState(input), questions: jevQuestions(criteria, categories, projects) }),
+        });
+      } catch (err) {
+        record({ inputTokens: 0, outputTokens: 0 }, Date.now() - startedAt, (err as Error).message);
+        throw err;
+      }
+      if (!res.ok) {
+        const message = `jev ${res.status}: ${(await res.text()).slice(0, 200)}`;
+        record({ inputTokens: 0, outputTokens: 0 }, Date.now() - startedAt, message);
+        throw new Error(message);
+      }
+      const body = (await res.json()) as JevResponse;
+      const { answers } = body;
+      record(
+        { inputTokens: body.usage?.input_tokens ?? 0, outputTokens: body.usage?.output_tokens ?? 0 },
+        Date.now() - startedAt,
+      );
 
       const wants = rungOf(answers.wants);
       // The one correction that is a fact about the envelope rather than a

@@ -11,6 +11,7 @@ import { withSenderRules } from "../sort/corrections";
 import type { Sorter } from "../sort/types";
 import type { ChatClient } from "../chat/types";
 import { createAnthropicProvider } from "./anthropic";
+import { createJevSorter } from "./jev";
 import { withLedger, type LedgerContext } from "./ledger";
 import { createOllamaProvider } from "./ollama";
 import { formatModelRef, type ModelProvider, type ModelRef } from "./types";
@@ -26,6 +27,10 @@ export function providerFor(ref: ModelRef, cfg: Config): ModelProvider {
       return createOllamaProvider(cfg.ollamaUrl, ref.model);
     case "anthropic":
       return createAnthropicProvider(cfg.anthropicApiKey, ref.model);
+    case "typesafe":
+      // Jev answers typed questions rather than prompts, so it has no
+      // ModelProvider to be: it is built straight into a sorter below.
+      throw new Error(`${ref.model} is a sorter, not a prompt model: name it as the sorter role, not as ${formatModelRef(ref)} for another role.`);
   }
 }
 
@@ -90,8 +95,23 @@ export function createLearningSorter(cfg: Config, db: Db): Sorter {
   });
 }
 
+/**
+ * Jev, when the role names it (operator, 2026-09-21). It is built here rather
+ * than behind `providerFor` because it is not a prompt model: it answers
+ * typed questions and hands back numbers, so it is a Sorter from the start
+ * and has no examples or rules to be given.
+ */
+function jevSorterFor(role: "sorter" | "sorter_backlog", cfg: Config, db: Db): Sorter | null {
+  if (cfg.models[role].provider !== "typesafe") return null;
+  if (!cfg.typesafeApiKey) throw new Error("the sorter is set to Jev but TYPESAFE_API_KEY is not set.");
+  return createJevSorter({ apiKey: cfg.typesafeApiKey, ledger: { db, ctx: { role } } });
+}
+
 export function createSorter(cfg: Config, db: Db, kind: SorterKind = "trickle"): Sorter {
-  const model = kind === "backlog" ? createSorterFor(providerForRole("sorter_backlog", cfg, db)) : createLearningSorter(cfg, db);
+  const role = kind === "backlog" ? "sorter_backlog" : "sorter";
+  const model =
+    jevSorterFor(role, cfg, db) ??
+    (kind === "backlog" ? createSorterFor(providerForRole("sorter_backlog", cfg, db)) : createLearningSorter(cfg, db));
   // The operator's standing instructions are read before any model is asked,
   // whichever model that is (operator, 2026-09-20).
   return withSenderRules(db, model);

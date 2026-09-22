@@ -42,3 +42,29 @@ describe("role factories", () => {
     expect(createSorter(cfg, testDb(), "backlog").model).toBe("ollama:qwen3:8b");
   });
 });
+
+/**
+ * Jev is built straight into a sorter (operator, 2026-09-21). It is not a
+ * prompt model, so there is no provider to wrap and nothing to hand it
+ * examples or rules.
+ */
+describe("the sorter when the role names Jev", () => {
+  const cfg = (env: NodeJS.ProcessEnv) => loadConfig(env, "/Users/test");
+
+  it("is Jev, and says so", () => {
+    expect(createSorter(cfg({ TYPESAFE_API_KEY: "k" }), testDb()).model).toBe("typesafe:jev-latest");
+  });
+
+  it("is Jev for the backlog too", () => {
+    expect(createSorter(cfg({ TYPESAFE_API_KEY: "k" }), testDb(), "backlog").model).toBe("typesafe:jev-latest");
+  });
+
+  it("says plainly when the model is named and the key is not there", () => {
+    expect(() => createSorter(cfg({ CELESTE_MODEL_SORTER: "typesafe:jev-latest" }), testDb())).toThrow(/TYPESAFE_API_KEY/);
+  });
+
+  /** Asked for as another role's prompt model, it says what it actually is. */
+  it("refuses to stand in as a prompt model", () => {
+    expect(() => providerFor({ provider: "typesafe", model: "jev-latest" }, cfg({}))).toThrow(/sorter, not a prompt model/);
+  });
+});

@@ -63,6 +63,8 @@ export interface Config {
   /** Sign in with Google (2026-09-11): the OAuth client that stands in for a Gmail app password. */
   google: { clientId: string | undefined; clientSecret: string | undefined };
   anthropicApiKey: string | undefined;
+  /** TypeSafe, for the Jev sorter (operator, 2026-09-21: make it the live one). */
+  typesafeApiKey: string | undefined;
   /**
    * What to call the operator in a prompt. Celeste answers about "their" mail
    * and signs replies, so a name helps; unset, she says "the operator" and
@@ -103,6 +105,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, homeDir: string
     microsoft: { clientId: env.MICROSOFT_CLIENT_ID },
     google: { clientId: env.GOOGLE_CLIENT_ID?.trim() || undefined, clientSecret: env.GOOGLE_CLIENT_SECRET?.trim() || undefined },
     anthropicApiKey: env.ANTHROPIC_API_KEY,
+    typesafeApiKey: env.TYPESAFE_API_KEY?.trim() || undefined,
     operatorName: env.CELESTE_OPERATOR_NAME?.trim() || undefined,
     ollamaUrl: env.OLLAMA_URL?.trim() || "http://127.0.0.1:11434",
     embedModel: EMBED_MODEL,
@@ -121,7 +124,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, homeDir: string
  * under them (spec 7a).
  */
 function models(env: NodeJS.ProcessEnv): Record<ModelRole, ModelRef> {
-  const sorter = parseModelRef(env[MODEL_ENV_VARS.sorter]?.trim() || MODELS.sorter);
+  // Jev sorts when there is a key for it (operator, 2026-09-21). It answers
+  // typed questions instead of writing prose, and on this mailbox it settled
+  // a message in 0.18s against the local model's 5.7s, so where it can be
+  // reached it is the one that should be doing this. Naming a sorter
+  // explicitly still wins, and with no key nothing changes.
+  const named = env[MODEL_ENV_VARS.sorter]?.trim();
+  const sorter = parseModelRef(named || (env.TYPESAFE_API_KEY?.trim() ? "typesafe:jev-latest" : MODELS.sorter));
   const backlog = env[MODEL_ENV_VARS.sorter_backlog]?.trim();
   return {
     sorter,

@@ -96,3 +96,34 @@ describe("ensureConfigFiles", () => {
     expect(await readTextFile(cfg.blocklistPath)).toContain("# One email");
   });
 });
+
+/**
+ * Jev sorts where it can be reached (operator, 2026-09-21: "make Jev the live
+ * sorter"). It settles a message in a fraction of the time the local model
+ * takes, so having a key for it and not using it is a choice nobody made on
+ * purpose. Naming a sorter still wins, and no key changes nothing.
+ */
+describe("which model sorts", () => {
+  it("is Jev once there is a key for it", () => {
+    const cfg = loadConfig({ TYPESAFE_API_KEY: "k" }, "/Users/test");
+    expect(cfg.models.sorter).toEqual({ provider: "typesafe", model: "jev-latest" });
+    expect(cfg.typesafeApiKey).toBe("k");
+  });
+
+  it("carries Jev to the backlog sorter too, which had no model of its own", () => {
+    expect(loadConfig({ TYPESAFE_API_KEY: "k" }, "/Users/test").models.sorter_backlog).toEqual({ provider: "typesafe", model: "jev-latest" });
+  });
+
+  it("is whatever the environment names, key or no key", () => {
+    const cfg = loadConfig({ TYPESAFE_API_KEY: "k", [MODEL_ENV_VARS.sorter]: "ollama:qwen3:8b" }, "/Users/test");
+    expect(cfg.models.sorter).toEqual({ provider: "ollama", model: "qwen3:8b" });
+  });
+
+  it("is what it always was with no key", () => {
+    expect(loadConfig({}, "/Users/test").models.sorter).toEqual({ provider: "anthropic", model: MODELS.sorter });
+  });
+
+  it("holds no key when the variable is blank", () => {
+    expect(loadConfig({ TYPESAFE_API_KEY: "   " }, "/Users/test").typesafeApiKey).toBeUndefined();
+  });
+});
