@@ -25,15 +25,16 @@
    },
    {
     "id": "sorting",
-    "label": "Sorting, two roles",
+    "label": "Sorting, three backends",
     "focus": [
      "db",
      "sorter",
+     "typesafe",
      "claude",
      "ollama",
      "files"
     ],
-    "note": "Backlog jobs on Haiku; the refresh trickle on local qwen3 with six trusted examples and the distilled rules."
+    "note": "Jev when keyed; else backlog on Haiku, trickle on local qwen3 with examples and rules. A corrected sender's standing rule answers first."
    },
    {
     "id": "assist",
@@ -193,10 +194,24 @@
    ]
   },
   {
+   "id": "typesafe",
+   "type": "external",
+   "label": "TypeSafe",
+   "sublabel": "Jev, typed answers",
+   "pos": [
+    800,
+    20
+   ],
+   "size": [
+    170,
+    64
+   ]
+  },
+  {
    "id": "sorter",
    "type": "backend",
    "label": "Sorter",
-   "sublabel": "qwen3 + haiku",
+   "sublabel": "Jev, or qwen3 + haiku",
    "pos": [
     910,
     180
@@ -1032,7 +1047,7 @@
    "id": "push-out",
    "from": "server",
    "to": "push",
-   "label": "Need to reply notices",
+   "label": "Reply notices",
    "variant": "dashed",
    "fromSide": "left",
    "toSide": "right",
@@ -1112,6 +1127,19 @@
    "label": "Add to Alex",
    "fromSide": "right",
    "toSide": "right"
+  },
+  {
+   "id": "jev-sort",
+   "from": "sorter",
+   "to": "typesafe",
+   "label": "typed sort, when keyed",
+   "variant": "emphasis",
+   "fromSide": "top",
+   "toSide": "left",
+   "labelAt": [
+    930,
+    112
+   ]
   }
  ],
  "cards": [
@@ -1133,8 +1161,9 @@
    "dot": "violet",
    "title": "Intelligence",
    "items": [
-    "Sorter fields: important, needs_reply, scheduling, sub-category, finance, project",
-    "Two roles: backlog on Haiku, trickle on qwen3:8b via Ollama",
+    "Sorter fields: wants (reply, action, knowing, bin; one rung, not three booleans), scheduling, category, finance, project",
+    "Three backends: Jev on TypeSafe is the default for both roles when TYPESAFE_API_KEY is set (naming a sorter still wins); otherwise backlog on Haiku, trickle on qwen3:8b via Ollama",
+    "Hand corrections become standing sender rules (sender_rules), read before any model is asked",
     "Trickle prompt carries six trusted verdicts (nomic vec0) and rules.md, rewritten after every backlog run",
     "Propose projects: Sonnet reads an inbox and drafts its project list for the editor",
     "Drafter, Ask Celeste, rules and proposals on Sonnet 5; one ModelProvider seam for any role"
@@ -1144,7 +1173,7 @@
    "dot": "emerald",
    "title": "The app (2026-09-10)",
    "items": [
-    "Folders: Drafts, Inbox (Need to reply, Unopened, No need to reply), Sent (Waiting, Not waiting), Deleted, Junk",
+    "Folders: Drafts, Inbox (Unopened; Reply / Action Required as one row, then each alone; Worth Knowing; Safe to Delete; Archive), Messages, Sent (Waiting, Not waiting), Deleted, Junk",
     "Project bar: tabs per inbox; under All inboxes one pill per mailbox that folds its row",
     "Thread: chat bubbles, quoted history folded, Draft with Celeste, Mark handled, No reply needed, Move to project",
     "Drafts: two panes, Skip or Send moves to the next, counts refresh; the Ask panel rewrites the draft from one line, with Undo on the card; drop a file on the card or the Ask panel to attach it, sent with the reply",
@@ -1179,7 +1208,7 @@
    "title": "Planned, not built",
    "items": [
     "iMessage group chats",
-    "Alex MCP + Obsidian context",
+    "Obsidian context for Alex",
     "Image OCR, personal model fine-tune"
    ]
   },
@@ -1191,7 +1220,7 @@
     "Both devices run the Tailscale app: one tailnet, WireGuard keys exchanged through Tailscale's control plane, traffic direct or via a DERP relay when NAT blocks it",
     "tailscale serve terminates HTTPS on the Mac's MagicDNS name (<mac>.<tailnet>.ts.net, Let's Encrypt cert from Tailscale) and proxies to 127.0.0.1:3100; no port is open to the internet",
     "The proxy adds Tailscale-User headers, which is how the lock tells a phone from this Mac's own browser; the phone types CELESTE_PASSCODE once for a 30-day session",
-    "Added to the home screen as an app; Web Push notices for what lands in Need to reply, one per thread, a flood as one line"
+    "Added to the home screen as an app; Web Push notices for what lands in Reply, one per thread, a flood as one line"
    ]
   }
  ]
