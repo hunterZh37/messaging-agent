@@ -1663,3 +1663,27 @@ main.architecture-page { display: flex; flex-direction: column; height: 100vh; m
 .architecture-frame { flex: 1; width: 100%; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
 .architecture-missing { color: var(--muted); font-size: 13.5px; max-width: 46ch; }
 .architecture-missing code { font-family: ui-monospace, Menlo, monospace; color: var(--fg); }
+
+/* The system diagram over the page (operator, 2026-09-22). It is a drawing
+   the size of a wall, so it takes nearly the whole window rather than the
+   usual dialog width, and the frame fills what is left under the title. The
+   panel itself does not scroll: the diagram scrolls and zooms inside its own
+   page, and two scrollbars would fight. */
+.dialog-panel.architecture-dialog {
+  width: calc(100vw - 48px);
+  max-width: none;
+  height: calc(100vh - 48px);
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 16px;
+}
+.dialog-panel.architecture-dialog .architecture-frame {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}

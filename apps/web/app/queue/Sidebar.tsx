@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { activeTreeKey, rowsForSide, sideHref, sideOfPath, treeRows, type TreeIcon, type TreeSide, type ViewParams } from "@/lib/folders";
 import { useAsk } from "../ask/AskProvider";
+import { ArchitectureDialog } from "./ArchitectureDialog";
 import { ThemeToggle } from "./ThemeToggle";
 import { NotifyToggle } from "./NotifyToggle";
 import { LinkPending } from "./LinkPending";
@@ -323,7 +324,6 @@ export function Nav(props: { counts: TreeCounts; params?: ViewParams }) {
   const composeOn = pathname.startsWith("/compose");
   const usageOn = pathname.startsWith("/usage");
   const statsOn = pathname.startsWith("/stats");
-  const archOn = pathname.startsWith("/architecture");
 
   // The side the page is on, or on a page that is neither, the side last
   // chosen. Remembered in the browser; a page read on the server starts on
@@ -441,11 +441,9 @@ export function Nav(props: { counts: TreeCounts; params?: ViewParams }) {
           <UsageIcon />
           <span className="tree-label">Usage</span>
         </Link>
-        {/* The system diagram, where the operator reads the app (2026-09-22). */}
-        <Link href="/architecture" className={archOn ? "on" : undefined} aria-current={archOn ? "page" : undefined}>
-          <ArchitectureIcon />
-          <span className="tree-label">Architecture</span>
-        </Link>
+        {/* The system diagram, over the page rather than instead of it
+            (operator, 2026-09-22). /architecture still serves it on its own. */}
+        <ArchitectureDialog icon={<ArchitectureIcon />} label="Architecture" />
         <NotifyToggle />
         <ThemeToggle withLabel />
       </div>
