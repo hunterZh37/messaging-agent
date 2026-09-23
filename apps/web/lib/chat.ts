@@ -338,6 +338,17 @@ export function chatTitleLabel(title: string | null | undefined): string {
  * `actionThreadIds`; it is two lines here so this module stays pure and the
  * browser never pulls the database in behind it.
  */
+/**
+ * Who a composed mail is addressed to, said the way a person would: one
+ * address, or the first and how many more. The address itself is shown, not a
+ * name looked up from it, so the operator checks what will actually be used.
+ */
+export function recipientLabel(to: string[]): string {
+  const [first, ...rest] = to;
+  if (!first) return "someone";
+  return rest.length === 0 ? first : `${first} and ${rest.length} more`;
+}
+
 export function threadsOf(action: ProposedAction): string[] {
   if (action.threadIds && action.threadIds.length > 0) return action.threadIds;
   return action.threadId ? [action.threadId] : [];
@@ -444,6 +455,10 @@ export function actionLabel(action: ProposedAction): string {
     // Celeste's text on it and stops there (spec 10c, 2026-09-10).
     case "apply_draft":
       return "Apply to draft";
+    // Mail to someone there is no thread with yet (2026-09-22). The label
+    // names the recipient, because that is the part the operator checks.
+    case "compose":
+      return action.to && action.to.length > 0 ? `Draft mail to ${recipientLabel(action.to)}` : "Draft a new mail";
   }
 }
 
@@ -462,6 +477,8 @@ export function actionDoneLabel(kind: ProposedAction["kind"], done: number, fail
       return "Opened";
     case "apply_draft":
       return "Applied to the draft";
+    case "compose":
+      return `${done} ${done === 1 ? "draft" : "drafts"} created${tail}`;
   }
 }
 

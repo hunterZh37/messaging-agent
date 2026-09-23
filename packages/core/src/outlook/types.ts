@@ -79,6 +79,13 @@ export interface OutlookClient {
    * a fetch that is refused looks the attachment up again here.
    */
   listAttachments(messageId: string): Promise<{ id: string; name: string; size: number }[]>;
+  /**
+   * Opens a draft that is not a reply to anything (compose, 2026-09-22),
+   * so the mail carries no conversation it was never part of. The draft is
+   * then updated, attached to and sent exactly like a reply's.
+   */
+  createMessage(p: { subject: string; to: string[]; cc: string[] }): Promise<{ draftId: string }>;
+
   createReply(messageId: string): Promise<{ draftId: string }>;
   updateDraft(draftId: string, p: { body: string; html?: string; to: string[]; cc: string[] }): Promise<void>;
   /**

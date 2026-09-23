@@ -164,6 +164,22 @@ describe("createOutlookClient", () => {
     expect(JSON.parse(init.body as string)).toEqual({ categories: ["existing", "agent/important"] });
   });
 
+  it("createMessage: POSTs to /me/messages with subject and recipients, returns the draft id", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "draft-1" }));
+    const client = createOutlookClient(getAccessToken);
+    const r = await client.createMessage({ subject: "Let's talk", to: ["bob@x.com"], cc: ["carol@x.com"] });
+    expect(r.draftId).toBe("draft-1");
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(String(url)).toContain("/me/messages");
+    expect(String(url)).not.toContain("/createReply");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      subject: "Let's talk",
+      toRecipients: [{ emailAddress: { address: "bob@x.com" } }],
+      ccRecipients: [{ emailAddress: { address: "carol@x.com" } }],
+    });
+  });
+
   it("createReply: returns the draft id from createReply", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ id: "draft-1" }));
     const client = createOutlookClient(getAccessToken);

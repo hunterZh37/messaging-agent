@@ -57,6 +57,7 @@ import { CelesteMark } from "../queue/CelesteMark";
 import { recordAppliedRevisionAction, reviseAction } from "../actions";
 import {
   askAction,
+  askComposeAction,
   askDraftAction,
   askFileAction,
   askMarkHandledAction,
@@ -250,6 +251,19 @@ function ActionButton({
         setRan({ label: actionDoneLabel(action.kind, r.draftIds.length, r.failed), href: `/drafts?draft=${r.draftIds[0]}` });
         // Asked from the Drafts folder, the new card joins the list beside the
         // answer, so it is the one that opens rather than whatever was on top.
+        if (pathname === "/drafts") router.replace(`/drafts?draft=${r.draftIds[0]}`);
+      } else if (action.kind === "compose") {
+        // Mail to someone there is no thread with (2026-09-22). It lands in
+        // the queue like any other draft, and opens there, because the
+        // recipient and subject are the operator's to check before it goes.
+        const r = await askComposeAction({
+          to: action.to ?? [],
+          ...(action.cc && action.cc.length > 0 ? { cc: action.cc } : {}),
+          subject: action.subject ?? "",
+          ...(action.instruction ? { instruction: action.instruction } : {}),
+        });
+        if ("error" in r && !("draftIds" in r)) return setError(r.error);
+        setRan({ label: actionDoneLabel(action.kind, r.draftIds.length, r.failed), href: `/drafts?draft=${r.draftIds[0]}` });
         if (pathname === "/drafts") router.replace(`/drafts?draft=${r.draftIds[0]}`);
       } else if (action.kind === "file_to_project") {
         const r = await askFileAction(threadIds, action.projectName ?? "", action.createProject === true);

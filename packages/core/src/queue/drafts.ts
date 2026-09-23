@@ -10,7 +10,12 @@ import { recordAction } from "./actions";
 
 export interface DraftView {
   draft: DraftRow;
-  replyTo: MessageRow;
+  /**
+   * The message this answers, and the conversation around it. Both are null
+   * for a composed message (2026-09-22), which begins a conversation instead
+   * of continuing one.
+   */
+  replyTo: MessageRow | null;
   thread: MessageRow[];
   account: AccountRow;
   sort: SortRow | null;
@@ -25,13 +30,29 @@ export interface DraftView {
 }
 
 function view(db: Db, draft: DraftRow): DraftView | null {
-  const replyTo = db.select().from(messages).where(eq(messages.id, draft.replyToMessageId)).get();
-  if (!replyTo) return null;
-  const account = db.select().from(accounts).where(eq(accounts.id, replyTo.accountId)).get();
+  // A composed draft carries its own account and subject; a reply takes both
+  // from the message it answers, as it always did.
+  const replyTo = draft.replyToMessageId
+    ? (db.select().from(messages).where(eq(messages.id, draft.replyToMessageId)).get() ?? null)
+    : null;
+  if (draft.replyToMessageId && !replyTo) return null;
+  const accountId = replyTo?.accountId ?? draft.accountId;
+  if (!accountId) return null;
+  const account = db.select().from(accounts).where(eq(accounts.id, accountId)).get();
   if (!account) return null;
-  const thread = db.select().from(messages).where(eq(messages.threadId, draft.threadId)).orderBy(asc(messages.sentAt)).all();
-  const sort = db.select().from(sorts).where(eq(sorts.messageId, replyTo.id)).get() ?? null;
-  return { draft, replyTo, thread, account, sort, attachments: listDraftAttachments(db, draft.id), replySubject: replySubject(replyTo.subject) };
+  const thread = draft.threadId
+    ? db.select().from(messages).where(eq(messages.threadId, draft.threadId)).orderBy(asc(messages.sentAt)).all()
+    : [];
+  const sort = replyTo ? (db.select().from(sorts).where(eq(sorts.messageId, replyTo.id)).get() ?? null) : null;
+  return {
+    draft,
+    replyTo,
+    thread,
+    account,
+    sort,
+    attachments: listDraftAttachments(db, draft.id),
+    replySubject: replyTo ? replySubject(replyTo.subject) : (draft.subject ?? ""),
+  };
 }
 
 /**
@@ -83,6 +104,17 @@ export function getDraftView(db: Db, draftId: string): DraftView | null {
  * The one path that sends. Reachable only from the queue's send button after
  * confirm and the cancel window. Records an action whether it succeeds or fails.
  */
+
+/**
+ * A channel that cannot begin a conversation yet says so, rather than sending
+ * the message into the wrong one. iMessage and WhatsApp compose land in their
+ * own change (spec 2026-09-22); mail sends through `sendNew`.
+ */
+async function sendNewOrRefuse(sender: Sender, p: Parameters<NonNullable<Sender["sendNew"]>>[0]): Promise<{ id: string }> {
+  if (!sender.sendNew) throw new Error("this channel cannot start a new conversation yet");
+  return sender.sendNew(p);
+}
+
 export async function sendDraft(
   db: Db,
   sender: Sender,
@@ -93,9 +125,16 @@ export async function sendDraft(
   if (!v) throw new Error(`draft not found: ${p.draftId}`);
   if (v.draft.status !== "pending") throw new Error(`draft ${p.draftId} is not pending (status=${v.draft.status})`);
   if (p.to.length === 0) throw new Error("at least one To recipient is required");
+  // The card blocks this, but the send is reachable without it (review,
+  // 2026-09-22): nothing empty leaves, whoever asked.
+  if (p.finalText.trim() === "") throw new Error("an empty message is not sent");
 
-  const thread = db.select().from(threads).where(eq(threads.id, v.draft.threadId)).get();
-  if (!thread) throw new Error(`thread not found: ${v.draft.threadId}`);
+  // A composed message has no thread and nothing to answer: it goes out
+  // through sendNew, which sets no In-Reply-To and no References.
+  const composed = v.replyTo === null;
+  const thread = v.draft.threadId ? db.select().from(threads).where(eq(threads.id, v.draft.threadId)).get() : null;
+  if (!composed && !thread) throw new Error(`thread not found: ${v.draft.threadId}`);
+  if (composed && !v.draft.subject) throw new Error(`composed draft ${p.draftId} has no subject`);
 
   // A mail address has a shape; a text goes to a handle Messages already
   // knows (a number or an Apple ID), which the text sender checks itself
@@ -123,18 +162,23 @@ export async function sendDraft(
   const marked = !chat && hasMarkup(p.finalText);
 
   try {
-    const sent = await sender.sendReply({
-      replyToProviderMessageId: v.replyTo.providerMessageId,
-      providerThreadId: thread.providerThreadId,
+    const common = {
       from: v.account.email,
       to: p.to,
       cc: p.cc,
-      subject: v.replySubject,
-      inReplyTo: v.replyTo.rfcMessageId,
       body: stripMarkup(p.finalText),
       ...(marked ? { html: markupToHtml(p.finalText) } : {}),
       attachments,
-    });
+    };
+    const sent = composed
+        ? await sendNewOrRefuse(sender, { ...common, subject: v.draft.subject ?? "" })
+        : await sender.sendReply({
+            ...common,
+            replyToProviderMessageId: v.replyTo!.providerMessageId,
+            providerThreadId: thread!.providerThreadId,
+            subject: v.replySubject,
+            inReplyTo: v.replyTo!.rfcMessageId,
+          });
     const t = clock();
     db.update(drafts)
       .set({ status: "sent", finalText: p.finalText, toAddresses: p.to, ccAddresses: p.cc, sentProviderMessageId: sent.id, updatedAt: t })
@@ -145,7 +189,7 @@ export async function sendDraft(
       {
         kind: edited ? "edit_send" : "send",
         draftId: p.draftId,
-        messageId: v.replyTo.id,
+        ...(v.replyTo ? { messageId: v.replyTo.id } : {}),
         payload: {
           originalText: v.draft.originalText,
           originalTo: v.draft.toAddresses,
@@ -164,7 +208,7 @@ export async function sendDraft(
     const t = clock();
     try {
       db.update(drafts).set({ status: "failed", error: message, finalText: p.finalText, updatedAt: t }).where(eq(drafts.id, p.draftId)).run();
-      recordAction(db, { kind: "send_failed", draftId: p.draftId, messageId: v.replyTo.id, payload: { error: message, finalText: p.finalText, to: p.to, cc: p.cc } }, () => t);
+      recordAction(db, { kind: "send_failed", draftId: p.draftId, ...(v.replyTo ? { messageId: v.replyTo.id } : {}), payload: { error: message, finalText: p.finalText, to: p.to, cc: p.cc } }, () => t);
     } catch (bookkeepingError) {
       console.error("sendDraft: failed to record failure:", bookkeepingError);
     }
@@ -184,7 +228,7 @@ export function skipDraft(db: Db, draftId: string, clock: () => number = now): v
   if (v.draft.status !== "pending") throw new Error(`draft ${draftId} is not pending (status=${v.draft.status})`);
   const t = clock();
   db.update(drafts).set({ status: "skipped", updatedAt: t }).where(eq(drafts.id, draftId)).run();
-  recordAction(db, { kind: "skip", draftId, messageId: v.replyTo.id, payload: {} }, () => t);
+  recordAction(db, { kind: "skip", draftId, ...(v.replyTo ? { messageId: v.replyTo.id } : {}), payload: {} }, () => t);
 }
 
 /**
@@ -196,14 +240,17 @@ export function restoreDraft(db: Db, draftId: string, clock: () => number = now)
   const v = getDraftView(db, draftId);
   if (!v) throw new Error(`draft not found: ${draftId}`);
   if (v.draft.status !== "skipped") throw new Error(`draft ${draftId} is not deleted (status=${v.draft.status})`);
-  const other = db
-    .select({ id: drafts.id })
-    .from(drafts)
-    .where(and(eq(drafts.threadId, v.draft.threadId), eq(drafts.status, "pending")))
-    .get();
+  // A composed message has no thread, so nothing can have superseded it.
+  const other = v.draft.threadId
+    ? db
+        .select({ id: drafts.id })
+        .from(drafts)
+        .where(and(eq(drafts.threadId, v.draft.threadId), eq(drafts.status, "pending")))
+        .get()
+    : undefined;
   if (other) throw new Error("This thread already has a newer draft.");
   const t = clock();
   db.update(drafts).set({ status: "pending", updatedAt: t }).where(eq(drafts.id, draftId)).run();
-  recordAction(db, { kind: "restore", draftId, messageId: v.replyTo.id, payload: { from: "skipped" } }, () => t);
+  recordAction(db, { kind: "restore", draftId, ...(v.replyTo ? { messageId: v.replyTo.id } : {}), payload: { from: "skipped" } }, () => t);
   return getDraftView(db, draftId)!;
 }

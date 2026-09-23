@@ -21,6 +21,16 @@ function PencilIcon() {
   );
 }
 
+/** A page and a pencil at its corner: a new message, not an answer to one (spec 2026-09-22). */
+function ComposeIcon() {
+  return (
+    <svg viewBox="0 0 24 24">
+      <path d="M11 4H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h13a2 2 0 0 0 2-2v-6" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z" />
+    </svg>
+  );
+}
+
 function InboxIcon() {
   return (
     <svg viewBox="0 0 24 24">
@@ -310,6 +320,7 @@ export function Nav(props: { counts: TreeCounts; params?: ViewParams }) {
     status: params?.get("status") ?? undefined,
   });
   const inboxesOn = activeKey === "inboxes";
+  const composeOn = pathname.startsWith("/compose");
   const usageOn = pathname.startsWith("/usage");
   const statsOn = pathname.startsWith("/stats");
   const archOn = pathname.startsWith("/architecture");
@@ -399,6 +410,14 @@ export function Nav(props: { counts: TreeCounts; params?: ViewParams }) {
   // desktop sidebar keeps it, having no header bar to hold one.
   const content = (inDrawer: boolean) => (
     <>
+      {/* Begins a conversation rather than opening one already waiting (spec
+          2026-09-22), so it sits above the folders rather than among them. */}
+      <div className="tree compose-tree">
+        <Link href="/compose" className={composeOn ? "on" : undefined} aria-current={composeOn ? "page" : undefined}>
+          <ComposeIcon />
+          <span className="tree-label">Compose</span>
+        </Link>
+      </div>
       {hasTexts && !inDrawer ? <SideToggle side={side} counts={props.counts} params={props.params ?? {}} onPick={pickSide} /> : null}
       <Tree counts={props.counts} activeKey={activeKey} params={props.params ?? {}} side={hasTexts ? side : "mail"} />
       <div className="tree-spacer" />

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb } from "./helpers/db";
-import { accounts, messages, actions } from "../src/db/schema";
+import { accounts, messages, actions, drafts } from "../src/db/schema";
 
 describe("db", () => {
   it("migrates and round-trips an account", () => {
@@ -41,5 +41,37 @@ describe("db", () => {
     db.insert(actions).values({ kind: "skip", draftId: null, messageId: null, payload: {}, createdAt: 2 }).run();
     const rows = db.select().from(actions).all();
     expect(rows.map((r) => r.id)).toEqual([1, 2]);
+  });
+
+  /**
+   * Migration 0040_compose: thread_id and reply_to_message_id on drafts
+   * became nullable, and account_id/subject were added, so a composed
+   * message (2026-09-22) can be stored with no thread and nothing it
+   * replies to. Goes through the ordinary openDb path, not a hand-rolled
+   * schema, so this fails if the migration is ever reverted or skipped.
+   */
+  it("lets a composed draft's thread_id and reply_to_message_id be null", () => {
+    const db = testDb();
+    db.insert(accounts).values({ id: "a1", provider: "imap", email: "me@example.com", displayName: null, createdAt: 1 }).run();
+    db.insert(drafts).values({
+      id: "d1",
+      threadId: null,
+      replyToMessageId: null,
+      accountId: "a1",
+      subject: "Hello",
+      originalText: "Hi Bob.",
+      finalText: null,
+      toAddresses: ["bob@x.com"],
+      ccAddresses: [],
+      status: "pending",
+      mode: "new",
+      model: "operator",
+      sentProviderMessageId: null,
+      error: null,
+      createdAt: 1,
+      updatedAt: 1,
+    }).run();
+    const row = db.select().from(drafts).where(eq(drafts.id, "d1")).get();
+    expect(row).toMatchObject({ threadId: null, replyToMessageId: null, accountId: "a1", subject: "Hello", mode: "new" });
   });
 });

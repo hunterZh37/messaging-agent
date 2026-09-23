@@ -234,6 +234,69 @@ describe("askCeleste", () => {
     expect(result).toContain("needs a project_name");
   });
 
+  /**
+   * Mail to someone there is no thread with (operator, 2026-09-22). Celeste
+   * used to refuse this in so many words — "there's no existing thread to
+   * attach it to" — because every proposal had to name a thread.
+   */
+  it("proposes a composed mail, which names no thread", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1" }]);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([
+        {
+          id: "tu1",
+          name: "propose_action",
+          input: {
+            kind: "compose",
+            to: ["  new@example.com  "],
+            cc: ["copy@example.com"],
+            subject: "  The mirrors  ",
+            instruction: "ask when the mirrors can be done, and loop in their colleague",
+          },
+        },
+      ]),
+      textResponse("Here it is."),
+    ]);
+
+    const turn = await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "write to them", contextThreadId: null });
+
+    expect(turn.actions).toEqual([
+      {
+        kind: "compose",
+        threadIds: [],
+        // A composed mail covers no thread, so the list of them is empty
+        // rather than absent: one button, nothing behind it yet.
+        threads: [],
+        to: ["new@example.com"],
+        cc: ["copy@example.com"],
+        subject: "The mirrors",
+        instruction: "ask when the mirrors can be done, and loop in their colleague",
+      },
+    ]);
+  });
+
+  it("refuses a composed mail with no recipient or no subject", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1" }]);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([
+        { id: "tu1", name: "propose_action", input: { kind: "compose", subject: "No one" } },
+        { id: "tu2", name: "propose_action", input: { kind: "compose", to: ["new@example.com"] } },
+      ]),
+      textResponse("Nothing to offer."),
+    ]);
+
+    const turn = await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "write to them", contextThreadId: null });
+
+    expect(turn.actions).toEqual([]);
+    const result = JSON.stringify(client.requests[1]!.messages.at(-1)!.content);
+    expect(result).toContain("compose needs to");
+    expect(result).toContain("needs a subject");
+  });
+
   it("keeps the last 20 turns of history in front of the new question", async () => {
     const db = testDb();
     seedMail(db, []);

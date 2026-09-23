@@ -9,6 +9,15 @@ import type { OutlookClient } from "./types";
  */
 export function outlookSender(client: OutlookClient): Sender {
   return {
+    /** A message with nothing above it: a fresh Graph draft, then the same road out. */
+    async sendNew(p) {
+      const { draftId } = await client.createMessage({ subject: p.subject, to: p.to, cc: p.cc });
+      await client.updateDraft(draftId, { body: p.body, ...(p.html ? { html: p.html } : {}), to: p.to, cc: p.cc });
+      for (const file of p.attachments ?? []) await client.addAttachment(draftId, file);
+      await client.sendDraft(draftId);
+      return { id: draftId };
+    },
+
     async sendReply(p) {
       const { draftId } = await client.createReply(p.replyToProviderMessageId);
       await client.updateDraft(draftId, { body: p.body, ...(p.html ? { html: p.html } : {}), to: p.to, cc: p.cc });

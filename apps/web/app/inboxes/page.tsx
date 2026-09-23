@@ -74,12 +74,17 @@ export default async function InboxesPage({ searchParams }: { searchParams: Prom
   const lastSyncByAccount = new Map(db.select().from(schema.watermarks).all().map((w) => [w.accountId, w.lastSyncAt]));
   // Which inboxes have gone quieter than they ever normally do.
   const silences = new Map(inboxSilences(db).map((x) => [x.accountId, x]));
+  // A composed draft answers no message (2026-09-22), so the account comes
+  // from the draft itself where there is nothing to join to. Counting only
+  // the joined ones would leave a composed draft out of the number beside
+  // the inbox it will be sent from.
+  const draftAccount = sql<string>`coalesce(${schema.drafts.accountId}, ${schema.messages.accountId})`;
   const pendingCounts = db
-    .select({ accountId: schema.messages.accountId, count: sql<number>`count(*)` })
+    .select({ accountId: draftAccount, count: sql<number>`count(*)` })
     .from(schema.drafts)
-    .innerJoin(schema.messages, eq(schema.messages.id, schema.drafts.replyToMessageId))
+    .leftJoin(schema.messages, eq(schema.messages.id, schema.drafts.replyToMessageId))
     .where(eq(schema.drafts.status, "pending"))
-    .groupBy(schema.messages.accountId)
+    .groupBy(draftAccount)
     .all();
   const pendingByAccount = new Map(pendingCounts.map((p) => [p.accountId, p.count]));
 

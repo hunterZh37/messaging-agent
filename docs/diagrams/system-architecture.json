@@ -435,6 +435,20 @@
    ]
   },
   {
+   "id": "composep",
+   "type": "frontend",
+   "label": "Compose",
+   "sublabel": "a new conversation",
+   "pos": [
+    1145,
+    960
+   ],
+   "size": [
+    140,
+    64
+   ]
+  },
+  {
    "id": "messages",
    "type": "external",
    "label": "Messages.app + chat.db",
@@ -554,7 +568,7 @@
    "sublabel": "MCP server, private tier",
    "pos": [
     1170,
-    960
+    1060
    ],
    "size": [
     190,
@@ -586,6 +600,7 @@
     "inboxes",
     "statsp",
     "usagep",
+    "composep",
     "lock",
     "watcher",
     "mailclock",
@@ -604,7 +619,8 @@
     "editors",
     "inboxes",
     "statsp",
-    "usagep"
+    "usagep",
+    "composep"
    ]
   },
   {
@@ -1188,6 +1204,14 @@
    "fromSide": "top",
    "toSide": "bottom",
    "variant": "dashed"
+  },
+  {
+   "id": "ui-compose",
+   "from": "composep",
+   "to": "askp",
+   "fromSide": "top",
+   "toSide": "bottom",
+   "variant": "dashed"
   }
  ],
  "cards": [
@@ -1225,7 +1249,8 @@
     "Project bar: tabs per inbox; under All inboxes one pill per mailbox that folds its row",
     "Thread: chat bubbles, quoted history folded, Draft with Celeste, Mark handled, No reply needed, Move to project",
     "Drafts: two panes, Skip or Send moves to the next, counts refresh; the Ask panel rewrites the draft from one line, with Undo on the card; drop a file on the card or the Ask panel to attach it, sent with the reply",
-    "Ask Celeste: right panel, resizable, cites messages, proposes actions as buttons, reads a dropped PDF; \u00d7 closes every dialog"
+    "Ask Celeste: right panel, resizable, cites messages, proposes actions as buttons, reads a dropped PDF; \u00d7 closes every dialog",
+    "Compose (2026-09-22): a new email to someone there is no thread with, written by hand or by Celeste from one line. It queues as a draft like a reply, and the confirm dialog says when an address has never been written to before"
    ]
   },
   {
@@ -1245,6 +1270,7 @@
    "title": "Human gate",
    "items": [
     "Nothing sends, trashes, or files a project without the button",
+    "A composed message goes through the same button, dialog and 6-second cancel as a reply",
     "A dropped file sits on the draft until Send; nothing reaches a provider before the click",
     "Confirm dialog, then 6-second cancel",
     "Delete goes through the same gate as Send; mail moves to the provider's Trash, never destroyed",

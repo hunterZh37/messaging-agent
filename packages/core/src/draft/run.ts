@@ -199,7 +199,11 @@ export async function reviseDraft(
   if (draft.status !== "pending") throw new Error(`draft ${draftId} is not pending (status=${draft.status})`);
   if (!instruction.trim()) throw new Error("Say what to change.");
 
-  const ctx = buildDraftContext(db, draft.replyToMessageId, draft.mode);
+  // A composed message has nothing above it to build a context from; its own
+  // rewriting waits for its own change (spec 2026-09-22).
+  if (!draft.replyToMessageId) throw new Error("Revise is not available for a composed message yet.");
+  // mode is "reply" or "follow-up" here: a composed draft threw two lines up.
+  const ctx = buildDraftContext(db, draft.replyToMessageId, draft.mode as "reply" | "follow-up");
   const text = await drafter.revise(voice, ctx, current, instruction);
 
   return { text, revisionId: recordDraftRevision(db, { draftId, instruction, before: current, after: text, model: drafter.model }, clock) };

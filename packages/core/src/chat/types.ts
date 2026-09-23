@@ -59,7 +59,7 @@ export interface ContextChatFile {
 }
 
 /** What Celeste can offer to do. Every one of these needs the operator's click. */
-export type ProposedActionKind = "draft_reply" | "draft_follow_up" | "file_to_project" | "mark_handled" | "open_thread" | "apply_draft";
+export type ProposedActionKind = "draft_reply" | "draft_follow_up" | "file_to_project" | "mark_handled" | "open_thread" | "apply_draft" | "compose";
 
 export const PROPOSED_ACTION_KINDS: ProposedActionKind[] = [
   "draft_reply",
@@ -68,6 +68,7 @@ export const PROPOSED_ACTION_KINDS: ProposedActionKind[] = [
   "mark_handled",
   "open_thread",
   "apply_draft",
+  "compose",
 ];
 
 /** A thread a proposal covers, named so the operator can see what they are agreeing to. */
@@ -94,6 +95,14 @@ export interface ProposedAction {
   threads?: ProposedThread[];
   /** What a proposal carried before it could cover more than one thread. */
   threadId?: string;
+  /**
+   * Only for `compose`: the mail that would begin a conversation (operator,
+   * 2026-09-22). A compose covers no thread, because there is none yet: the
+   * refusal it replaces was "there's no existing thread to attach it to".
+   */
+  to?: string[];
+  cc?: string[];
+  subject?: string;
   /** Only for `file_to_project`: the project the operator would file them under. */
   projectName?: string;
   /** For `file_to_project`: the project does not exist yet, and the click makes it. */

@@ -9,6 +9,48 @@ import { accounts, actions, draftAttachments, drafts, messages, sorts, threads }
 import { listPendingDrafts, getDraftView, restoreDraft, retireAnsweredDrafts, sendDraft, skipDraft } from "../../src/queue/drafts";
 import { recordAction } from "../../src/queue/actions";
 import { imapSender } from "../../src/imap/sender";
+import type { Sender } from "../../src/connectors/types";
+
+/** Records every call it gets instead of reaching a provider, so a test can assert exactly what sendDraft handed it. */
+function spySender(): Sender & { replyCalls: unknown[]; newCalls: unknown[] } {
+  return {
+    replyCalls: [],
+    newCalls: [],
+    async sendReply(p) {
+      this.replyCalls.push(p);
+      return { id: "provider-reply-1" };
+    },
+    async sendNew(p) {
+      this.newCalls.push(p);
+      return { id: "provider-new-1" };
+    },
+  };
+}
+
+/** A composed draft (2026-09-22): its own account and subject, no thread, nothing it replies to. */
+function seedComposed(db: ReturnType<typeof testDb>, overrides: Partial<typeof drafts.$inferInsert> = {}) {
+  const account = db.select().from(accounts).where(eq(accounts.id, "a1")).get();
+  if (!account) db.insert(accounts).values({ id: "a1", provider: "imap", email: "me@example.com", displayName: null, createdAt: 1 }).run();
+  db.insert(drafts).values({
+    id: "dc1",
+    threadId: null,
+    replyToMessageId: null,
+    accountId: "a1",
+    subject: "A new thing",
+    originalText: "Hi Carol,",
+    finalText: null,
+    toAddresses: ["carol@x.com"],
+    ccAddresses: [],
+    status: "pending",
+    mode: "new",
+    model: "x",
+    sentProviderMessageId: null,
+    error: null,
+    createdAt: 1,
+    updatedAt: 1,
+    ...overrides,
+  }).run();
+}
 
 function seed(db: ReturnType<typeof testDb>) {
   db.insert(accounts).values({ id: "a1", provider: "imap", email: "me@example.com", displayName: null, createdAt: 1 }).run();
@@ -56,7 +98,7 @@ describe("queue reads", () => {
     const views = listPendingDrafts(db);
     expect(views).toHaveLength(1);
     expect(views[0]?.draft.id).toBe("d1");
-    expect(views[0]?.replyTo.fromAddress).toBe("bob@x.com");
+    expect(views[0]?.replyTo?.fromAddress).toBe("bob@x.com");
     expect(views[0]?.thread.map((m) => m.id)).toEqual(["a1:m1", "a1:m2"]);
     expect(views[0]?.account.email).toBe("me@example.com");
     expect(views[0]?.sort?.reason).toBe("asks for a date");
@@ -272,5 +314,178 @@ describe("a marked draft on the way out", () => {
     seed(db);
     await sendDraft(db, imapSender(new FakeSmtpClient()), { draftId: "d1", finalText: "The **signed** copy.", to: ["bob@x.com"], cc: [] });
     expect(db.select().from(drafts).where(eq(drafts.id, "d1")).get()?.finalText).toBe("The **signed** copy.");
+  });
+});
+
+/**
+ * A composed message (2026-09-22): a draft with no thread and nothing it
+ * answers. `getDraftView`/`listPendingDrafts` must not filter it out, and
+ * `sendDraft` must route it to `sendNew`, never `sendReply`.
+ */
+describe("a composed draft", () => {
+  it("is included by listPendingDrafts and getDraftView, with replyTo null, an empty thread, and its own account", () => {
+    const db = testDb();
+    seedComposed(db);
+
+    const listed = listPendingDrafts(db);
+    expect(listed.map((v) => v.draft.id)).toEqual(["dc1"]);
+    expect(listed[0]?.replyTo).toBeNull();
+    expect(listed[0]?.thread).toEqual([]);
+    expect(listed[0]?.account.id).toBe("a1");
+
+    const view = getDraftView(db, "dc1");
+    expect(view?.replyTo).toBeNull();
+    expect(view?.thread).toEqual([]);
+    expect(view?.account.email).toBe("me@example.com");
+  });
+
+  it("falls back replySubject to the draft's own subject, since there is no message to derive Re: from", () => {
+    const db = testDb();
+    seedComposed(db, { subject: "A new thing" });
+    expect(getDraftView(db, "dc1")?.replySubject).toBe("A new thing");
+  });
+
+  it("scopes to the right inbox alongside a reply draft", () => {
+    const db = testDb();
+    seed(db);
+    seedComposed(db);
+    expect(listPendingDrafts(db).map((v) => v.draft.id).sort()).toEqual(["d1", "dc1"]);
+    expect(listPendingDrafts(db, { accountId: "a1" }).map((v) => v.draft.id).sort()).toEqual(["d1", "dc1"]);
+  });
+
+  describe("sendDraft", () => {
+    it("sends through sendNew, not sendReply, with subject/from/to/cc/body, marks sent, logs no messageId, and returns the provider id", async () => {
+      const db = testDb();
+      seedComposed(db);
+      const sender = spySender();
+
+      const r = await sendDraft(db, sender, { draftId: "dc1", finalText: "Hi Carol,", to: ["carol@x.com"], cc: [] }, () => 500);
+
+      expect(r.providerMessageId).toBe("provider-new-1");
+      expect(sender.replyCalls).toHaveLength(0);
+      expect(sender.newCalls).toHaveLength(1);
+      expect(sender.newCalls[0]).toMatchObject({
+        from: "me@example.com",
+        to: ["carol@x.com"],
+        cc: [],
+        subject: "A new thing",
+        body: "Hi Carol,",
+      });
+
+      const row = db.select().from(drafts).where(eq(drafts.id, "dc1")).get();
+      expect(row).toMatchObject({ status: "sent", sentProviderMessageId: "provider-new-1", updatedAt: 500 });
+
+      const a = db.select().from(actions).all();
+      expect(a).toHaveLength(1);
+      expect(a[0]).toMatchObject({ kind: "send", draftId: "dc1", messageId: null });
+    });
+
+    it("refuses when the channel cannot start a conversation, and mentions why", async () => {
+      const db = testDb();
+      seedComposed(db);
+      const sender: Sender = {
+        async sendReply() {
+          throw new Error("should not be called");
+        },
+      };
+
+      await expect(sendDraft(db, sender, { draftId: "dc1", finalText: "Hi Carol,", to: ["carol@x.com"], cc: [] })).rejects.toThrow(
+        /cannot start a new conversation/,
+      );
+      expect(db.select().from(drafts).where(eq(drafts.id, "dc1")).get()?.status).toBe("failed");
+    });
+
+    it("refuses a composed draft with no subject", async () => {
+      const db = testDb();
+      seedComposed(db, { subject: null });
+      const sender = spySender();
+
+      await expect(sendDraft(db, sender, { draftId: "dc1", finalText: "Hi Carol,", to: ["carol@x.com"], cc: [] })).rejects.toThrow(/no subject/);
+      expect(sender.newCalls).toHaveLength(0);
+    });
+
+    /**
+     * The card will not offer Send on an empty body, but the send is
+     * reachable without the card (review, 2026-09-22), and an empty mail is
+     * worse than no mail.
+     */
+    it("refuses a composed message with an empty body", async () => {
+      const db = testDb();
+      seedComposed(db);
+      const sender = spySender();
+
+      await expect(sendDraft(db, sender, { draftId: "dc1", finalText: "   \n  ", to: ["carol@x.com"], cc: [] })).rejects.toThrow(/empty/);
+      expect(sender.newCalls).toHaveLength(0);
+    });
+
+    it("refuses a reply with an empty body too", async () => {
+      const db = testDb();
+      seed(db);
+      const sender = spySender();
+
+      await expect(sendDraft(db, sender, { draftId: "d1", finalText: "", to: ["bob@x.com"], cc: [] })).rejects.toThrow(/empty/);
+      expect(sender.replyCalls).toHaveLength(0);
+    });
+
+    it("marks failed and rethrows when the send itself fails", async () => {
+      const db = testDb();
+      seedComposed(db);
+      const sender: Sender = {
+        async sendReply() {
+          throw new Error("should not be called");
+        },
+        async sendNew() {
+          throw new Error("quota");
+        },
+      };
+
+      await expect(sendDraft(db, sender, { draftId: "dc1", finalText: "Hi Carol,", to: ["carol@x.com"], cc: [] })).rejects.toThrow("quota");
+      const row = db.select().from(drafts).where(eq(drafts.id, "dc1")).get();
+      expect(row).toMatchObject({ status: "failed", error: "quota" });
+      expect(db.select().from(actions).get()).toMatchObject({ kind: "send_failed", draftId: "dc1", messageId: null });
+    });
+  });
+
+  describe("skipDraft and restoreDraft", () => {
+    it("skips and restores a composed draft, without tripping the 'thread already has a newer draft' check", () => {
+      const db = testDb();
+      seedComposed(db);
+
+      skipDraft(db, "dc1", () => 10);
+      expect(db.select().from(drafts).where(eq(drafts.id, "dc1")).get()?.status).toBe("skipped");
+
+      const restored = restoreDraft(db, "dc1", () => 20);
+      expect(restored.draft).toMatchObject({ id: "dc1", status: "pending", updatedAt: 20 });
+      expect(restored.replyTo).toBeNull();
+      expect(listPendingDrafts(db).map((v) => v.draft.id)).toEqual(["dc1"]);
+    });
+  });
+});
+
+/**
+ * A reply, unchanged (2026-09-22): `sendDraft` must still route a thread's
+ * draft to `sendReply` with the same threading fields it always sent, so
+ * compose's new branch cannot silently swallow the old path.
+ */
+describe("sendDraft on a reply (regression guard)", () => {
+  it("calls sendReply, not sendNew, with inReplyTo/providerThreadId/replyToProviderMessageId set", async () => {
+    const db = testDb();
+    seed(db);
+    const sender = spySender();
+
+    await sendDraft(db, sender, { draftId: "d1", finalText: "Yes, Friday.", to: ["bob@x.com"], cc: [] });
+
+    expect(sender.newCalls).toHaveLength(0);
+    expect(sender.replyCalls).toHaveLength(1);
+    expect(sender.replyCalls[0]).toMatchObject({
+      replyToProviderMessageId: "m2",
+      providerThreadId: "t1",
+      inReplyTo: "<m2@x>",
+      subject: "Re: Lunch",
+      from: "me@example.com",
+      to: ["bob@x.com"],
+      cc: [],
+      body: "Yes, Friday.",
+    });
   });
 });

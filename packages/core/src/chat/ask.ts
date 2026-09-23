@@ -125,7 +125,12 @@ const TOOLS: ChatToolDef[] = [
     input_schema: {
       type: "object",
       properties: {
-        kind: { type: "string", enum: PROPOSED_ACTION_KINDS, description: "draft_reply, draft_follow_up, file_to_project, mark_handled, open_thread or apply_draft." },
+        kind: {
+          type: "string",
+          enum: PROPOSED_ACTION_KINDS,
+          description:
+            "draft_reply, draft_follow_up, file_to_project, mark_handled, open_thread, apply_draft or compose. Use compose for mail to someone this is not already a thread with: it needs to, subject and instruction, and no thread id.",
+        },
         thread_ids: { type: "array", items: { type: "string" }, description: `Every thread this action covers, up to ${MAX_PROPOSAL_THREADS}. Each id is the whole string a citation carries, "<account>:<thread>", colon included.` },
         thread_id: { type: "string", description: "One thread, when that is all it covers." },
         project_name: { type: "string", description: "For file_to_project: the project to file the threads under." },
@@ -138,6 +143,9 @@ const TOOLS: ChatToolDef[] = [
           type: "string",
           description: "For draft_reply and draft_follow_up: everything the operator said the draft should say, in their words. Required whenever they said anything about its content.",
         },
+        to: { type: "array", items: { type: "string" }, description: "For compose: every address the new mail goes to." },
+        cc: { type: "array", items: { type: "string" }, description: "For compose: addresses in copy, if the operator named any." },
+        subject: { type: "string", description: "For compose: the subject line of the new mail." },
         note: { type: "string", description: "One short line saying why, shown beside the button." },
       },
       required: ["kind"],
@@ -228,6 +236,22 @@ function proposalFrom(db: Db, input: Record<string, unknown>, draftThreadId: str
     const text = typeof input.draft_text === "string" ? humanizePunctuation(input.draft_text.trim()) : "";
     if (text === "") return "apply_draft needs draft_text: the whole revised body of the draft.";
     return { kind, threadIds: [draftThreadId], text, ...(note ? { note } : {}) };
+  }
+
+  // A composed mail begins a conversation, so it names no thread and skips
+  // the checks below entirely (operator, 2026-09-22: asked for mail to two
+  // people it had no thread with, and was refused). The addresses are the
+  // model's reading of what the operator asked for; the operator still sees
+  // them in full on the card and in the confirm dialog before anything goes.
+  if (kind === "compose") {
+    const list = (v: unknown): string[] =>
+      (Array.isArray(v) ? v : typeof v === "string" && v !== "" ? [v] : []).filter((x): x is string => typeof x === "string" && x.trim() !== "").map((x) => x.trim());
+    const to = list(input.to);
+    if (to.length === 0) return "compose needs to: the address the new mail goes to.";
+    const subject = typeof input.subject === "string" ? input.subject.trim() : "";
+    if (subject === "") return "compose needs a subject for the new mail.";
+    const what = typeof input.instruction === "string" && input.instruction.trim() !== "" ? input.instruction.trim() : undefined;
+    return { kind, threadIds: [], to, cc: list(input.cc), subject, ...(what ? { instruction: what } : {}), ...(note ? { note } : {}) };
   }
 
   const raw = Array.isArray(input.thread_ids) ? input.thread_ids : input.thread_id !== undefined ? [input.thread_id] : [];

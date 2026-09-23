@@ -9,7 +9,7 @@ import { formatTime, sendBlockFor, shortAccount } from "@/lib/format";
 import { popRevision, pushRevision } from "@/lib/queue";
 import { changeCount, wordDiff } from "@/lib/diff";
 import { marked, toggleMark, type Mark } from "@/lib/marks";
-import { listDraftAttachmentsAction } from "../actions";
+import { firstContactAction, listDraftAttachmentsAction } from "../actions";
 import { TrashIcon } from "../inbox/icons";
 import { ContextDraftCard, type AttachResult } from "../ask/AskProvider";
 import { ClipIcon } from "./AttachmentPreview";
@@ -128,6 +128,34 @@ export function DraftCard(props: {
   const mode: CardMode = props.mode === "confirm" && sendBlock ? "edit" : props.mode;
   const settled = files.filter((f) => !f.uploading);
   const drop = dropTargetLabel({ to: toList });
+
+  // Who on a composed draft has never had mail from this account (spec
+  // 2026-09-22): asked for only at the confirm dialog, and only for a
+  // composed draft — a reply is implicitly safe, the other side wrote first.
+  const composed = view.draft.mode === "new";
+  // null while the answer is still coming: the dialog holds Send until it is
+  // here, so the warning cannot be missed by sending in the first frame
+  // (review, 2026-09-22). "unknown" when the check itself failed.
+  const [firstContactList, setFirstContactList] = useState<string[] | "unknown" | null>(null);
+  useEffect(() => {
+    if (mode !== "confirm" || !composed) {
+      setFirstContactList(null);
+      return;
+    }
+    let cancelled = false;
+    void firstContactAction(view.account.id, [...toList, ...ccList])
+      .then((list) => {
+        if (!cancelled) setFirstContactList(list);
+      })
+      .catch(() => {
+        // Say so rather than letting silence read as "nobody is new".
+        if (!cancelled) setFirstContactList("unknown");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, composed, view.account.id, to, cc]);
 
   // Celeste's wording, applied from the Ask panel (spec 10c, 2026-09-10),
   // with Undo behind it. Its identity never changes, or registering the card
@@ -265,8 +293,11 @@ export function DraftCard(props: {
           stands, edits and revisions included, and the way back onto it. */}
       <ContextDraftCard
         draftId={view.draft.id}
-        threadId={view.replyTo.threadId}
-        subject={view.replyTo.subject}
+        // A composed draft has no thread to key Ask Celeste's conversation on
+        // (2026-09-22): the draft's own id stands in for one, since it is
+        // just as stable and just as unique to this card.
+        threadId={view.replyTo?.threadId ?? view.draft.id}
+        subject={view.replyTo?.subject ?? view.draft.subject ?? ""}
         to={toList}
         cc={ccList}
         text={text}
@@ -280,12 +311,26 @@ export function DraftCard(props: {
             <ChannelIcon provider={view.account.provider} />
             <span>{shortAccount(view.account.email)}</span>
             <span>·</span>
-            <span>{view.replyTo.fromName ?? view.replyTo.fromAddress}</span>
-            <span>·</span>
-            <span>{formatTime(view.replyTo.sentAt)}</span>
+            {/* A composed message answers nobody (2026-09-22): there is no
+                sender to name, only when Celeste wrote the card. */}
+            {view.replyTo ? (
+              <>
+                <span>{view.replyTo.fromName ?? view.replyTo.fromAddress}</span>
+                <span>·</span>
+                <span>{formatTime(view.replyTo.sentAt)}</span>
+              </>
+            ) : (
+              <span>{formatTime(view.draft.createdAt)}</span>
+            )}
             <span style={{ marginLeft: "auto" }}>{props.remaining} in queue</span>
           </div>
-          <h1>{isText ? `Text from ${view.replyTo.fromName ?? view.replyTo.fromAddress}` : view.replyTo.subject || "(no subject)"}</h1>
+          <h1>
+            {isText
+              ? `Text from ${view.replyTo?.fromName ?? view.replyTo?.fromAddress}`
+              : view.replyTo
+                ? view.replyTo.subject || "(no subject)"
+                : view.draft.subject || "(no subject)"}
+          </h1>
           {view.sort && (
             <div className="reason">
               <CelesteMark />
@@ -296,7 +341,9 @@ export function DraftCard(props: {
       )}
 
       <div className="card">
-        {showThread && <Thread messages={view.thread} initialExpandedId={view.replyTo.id} />}
+        {/* No thread above a composed draft's box (2026-09-22): it began the
+            conversation, so there is nothing above it to show. */}
+        {showThread && view.replyTo && <Thread messages={view.thread} initialExpandedId={view.replyTo.id} />}
 
         <label>To</label>
         <input className="field" value={to} onChange={(e) => setTo(e.target.value)} disabled={mode === "confirm" || isText} />
@@ -334,7 +381,14 @@ export function DraftCard(props: {
         </DraftAttachmentChips>
 
         <label>
-          <CelesteMark suffix={isText ? "text" : view.draft.mode === "follow-up" ? "follow-up" : "draft"} />
+          {/* A composed mail the operator typed themselves is theirs, and
+              saying "Celeste draft" over it would claim work she never did
+              (2026-09-22). Her mark returns the moment she writes it. */}
+          {view.draft.mode === "new" && view.draft.model === "operator" ? (
+            <span className="celeste-none">Your email</span>
+          ) : (
+            <CelesteMark suffix={isText ? "text" : view.draft.mode === "follow-up" ? "follow-up" : view.draft.mode === "new" ? "email" : "draft"} />
+          )}
           {revision ? ` · revised, ${revision.count === 1 ? "1 change" : `${revision.count} changes`}` : edited ? " · edited" : ""}
           {/* The text a rewrite replaced waits behind this, a stack ten deep. */}
           {undoStack.length > 0 && mode !== "confirm" && (
@@ -433,6 +487,7 @@ export function DraftCard(props: {
           to={toList}
           cc={ccList}
           files={settled}
+          firstContact={composed ? firstContactList : null}
           onSend={() => props.onConfirm(text, toList, ccList)}
           onClose={() => setMode("view")}
         />

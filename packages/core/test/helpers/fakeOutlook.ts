@@ -37,8 +37,11 @@ export function fakeGraphMessage(p: {
 }
 
 interface DraftState {
-  forMessageId: string;
+  /** Null for a composed draft, which replies to nothing (2026-09-22). */
+  forMessageId: string | null;
+  subject?: string;
   body?: string;
+  html?: string;
   to?: string[];
   cc?: string[];
   attachments: { filename: string; mimeType: string; bytes: Buffer }[];
@@ -166,6 +169,14 @@ export class FakeOutlookClient implements OutlookClient {
     return bytes;
   }
 
+  /** A draft with nothing above it (compose, 2026-09-22): no message it replies to. */
+  async createMessage(p: { subject: string; to: string[]; cc: string[] }) {
+    this.draftSeq++;
+    const draftId = `draft_${this.draftSeq}`;
+    this.drafts.set(draftId, { forMessageId: null, subject: p.subject, to: p.to, cc: p.cc, attachments: [], sent: false });
+    return { draftId };
+  }
+
   async createReply(messageId: string) {
     this.draftSeq++;
     const draftId = `draft_${this.draftSeq}`;
@@ -173,10 +184,11 @@ export class FakeOutlookClient implements OutlookClient {
     return { draftId };
   }
 
-  async updateDraft(draftId: string, p: { body: string; to: string[]; cc: string[] }) {
+  async updateDraft(draftId: string, p: { body: string; html?: string; to: string[]; cc: string[] }) {
     const d = this.drafts.get(draftId);
     if (!d) throw new Error(`unknown draft ${draftId}`);
     d.body = p.body;
+    d.html = p.html;
     d.to = p.to;
     d.cc = p.cc;
   }

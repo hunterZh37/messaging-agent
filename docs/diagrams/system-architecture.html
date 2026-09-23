@@ -5076,10 +5076,11 @@
         <path data-edge-from="tsserve" data-edge-to="lock" data-edge-label="proxy + Tailscale-User headers" data-edge-key="36" data-edge-id="ts-proxy" data-composition-points="415,1110;415,1017;375,1017;375,924" d="M 415 1110 L 415 1025 Q 415 1017 407 1017 L 383 1017 Q 375 1017 375 1009 L 375 924" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="phone" data-edge-to="tsctl" data-edge-label="auth, peer keys" data-edge-key="37" data-edge-id="phone-ctl" data-composition-points="125,1174;125,1212;705,1212;705,1174" d="M 125 1174 L 125 1204 Q 125 1212 133 1212 L 697 1212 Q 705 1212 705 1204 L 705 1174" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="tsserve" data-edge-to="tsctl" data-edge-label="node key, cert" data-edge-key="38" data-edge-id="mac-ctl" data-composition-points="490,1142;620,1142" d="M 490 1142 L 620 1142" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="server" data-edge-to="alex" data-edge-label="Add to Alex" data-edge-key="39" data-edge-id="alex-out" data-composition-points="1125,748;1384,748;1384,992;1360,992" d="M 1125 748 L 1376 748 Q 1384 748 1384 756 L 1384 984 Q 1384 992 1376 992 L 1360 992" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="server" data-edge-to="alex" data-edge-label="Add to Alex" data-edge-key="39" data-edge-id="alex-out" data-composition-points="1125,748;1384,748;1384,1092;1360,1092" d="M 1125 748 L 1376 748 Q 1384 748 1384 756 L 1384 1084 Q 1384 1092 1376 1092 L 1360 1092" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="sorter" data-edge-to="typesafe" data-edge-label="typed sort, when keyed" data-edge-key="40" data-edge-id="jev-sort" data-composition-points="1000,180;1000,156;776,156;776,52;800,52" d="M 1000 180 L 1000 164 Q 1000 156 992 156 L 784 156 Q 776 156 776 148 L 776 60 Q 776 52 784 52 L 800 52" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="statsp" data-edge-to="thread" data-edge-key="41" data-edge-id="ui-stats" data-composition-points="895,960;895,924" d="M 895 960 L 895 924" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="usagep" data-edge-to="drafts" data-edge-key="42" data-edge-id="ui-usage" data-composition-points="1055,960;1055,924" d="M 1055 960 L 1055 924" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="composep" data-edge-to="askp" data-edge-key="43" data-edge-id="ui-compose" data-composition-points="1215,960;1215,924" d="M 1215 960 L 1215 924" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
         <!-- Components -->
         <g id="node-imap" data-node-id="imap" data-node-label="IMAP / SMTP inboxes" tabindex="0" role="button" aria-label="Focus IMAP / SMTP inboxes, Gmail, Fastmail, any IMAP, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Gmail, Fastmail, any IMAP" data-node-context="Architecture component">
@@ -5396,6 +5397,20 @@
         <text data-detail="context" x="1055" y="1006" class="t-muted" font-size="9" text-anchor="middle">calls, tokens, cost</text>
         </g>
 
+        <g id="node-composep" data-node-id="composep" data-node-label="Compose" tabindex="0" role="button" aria-label="Focus Compose, a new conversation, Operator&#39;s Mac (always-on server on 127.0.0.1:3100) › Next.js client in the browser" aria-pressed="false" data-node-kind="frontend" data-node-sublabel="a new conversation" data-node-context="Operator&#39;s Mac (always-on server on 127.0.0.1:3100) › Next.js client in the browser">
+          <title>Compose · a new conversation · Operator&#39;s Mac (always-on server on 127.0.0.1:3100) › Next.js client in the browser</title>
+          <rect x="1145" y="960" width="140" height="64" rx="6" class="c-mask"/>
+          <rect x="1145" y="960" width="140" height="64" rx="6" class="c-frontend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="frontend" class="semantic-sigil s-frontend" transform="translate(1151 966) scale(0.6875)">
+            <rect x="2" y="3" width="12" height="10" rx="2"/>
+            <path d="M2 6.5h12"/>
+            <circle cx="4.1" cy="4.8" r=".7" class="sigil-fill"/>
+            <circle cx="6.3" cy="4.8" r=".7" class="sigil-fill"/>
+          </g>
+          <text data-node-label="" data-detail-anchor="" x="1215" y="990" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Compose</text>
+        <text data-detail="context" x="1215" y="1006" class="t-muted" font-size="9" text-anchor="middle">a new conversation</text>
+        </g>
+
         <g id="node-messages" data-node-id="messages" data-node-label="Messages.app + chat.db" tabindex="0" role="button" aria-label="Focus Messages.app + chat.db, this Mac, read-only, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="this Mac, read-only" data-node-context="Architecture component">
           <title>Messages.app + chat.db · this Mac, read-only · Architecture component</title>
           <rect x="40" y="370" width="170" height="64" rx="6" class="c-mask"/>
@@ -5491,14 +5506,14 @@
 
         <g id="node-alex" data-node-id="alex" data-node-label="Scheduling agent" tabindex="0" role="button" aria-label="Focus Scheduling agent, MCP server, private tier, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="MCP server, private tier" data-node-context="Architecture component">
           <title>Scheduling agent · MCP server, private tier · Architecture component</title>
-          <rect x="1170" y="960" width="190" height="64" rx="6" class="c-mask"/>
-          <rect x="1170" y="960" width="190" height="64" rx="6" class="c-external" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1176 966) scale(0.6875)">
+          <rect x="1170" y="1060" width="190" height="64" rx="6" class="c-mask"/>
+          <rect x="1170" y="1060" width="190" height="64" rx="6" class="c-external" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1176 1066) scale(0.6875)">
             <rect x="2.5" y="5" width="8.5" height="8" rx="1.5"/>
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="1265" y="990" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Scheduling agent</text>
-        <text data-detail="context" x="1265" y="1006" class="t-muted" font-size="9" text-anchor="middle">MCP server, private tier</text>
+          <text data-node-label="" data-detail-anchor="" x="1265" y="1090" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Scheduling agent</text>
+        <text data-detail="context" x="1265" y="1106" class="t-muted" font-size="9" text-anchor="middle">MCP server, private tier</text>
         </g>
 
         <!-- Connection labels -->
@@ -5629,13 +5644,14 @@
           <text x="555" y="1132" class="t-messagebus" font-size="8" text-anchor="middle">node key, cert</text>
         </g>
         <g data-detail="context" data-edge-from="server" data-edge-to="alex" data-edge-label="Add to Alex" data-edge-key="39" data-edge-id="alex-out">
-          <rect x="1352.6" y="850" width="62.8" height="14" rx="3" class="c-mask"/>
-          <text x="1384" y="860" class="t-muted" font-size="8" text-anchor="middle">Add to Alex</text>
+          <rect x="1352.6" y="900" width="62.8" height="14" rx="3" class="c-mask"/>
+          <text x="1384" y="910" class="t-muted" font-size="8" text-anchor="middle">Add to Alex</text>
         </g>
         <g data-detail="context" data-edge-from="sorter" data-edge-to="typesafe" data-edge-label="typed sort, when keyed" data-edge-key="40" data-edge-id="jev-sort">
           <rect x="872.2" y="102" width="115.6" height="14" rx="3" class="c-mask"/>
           <text x="930" y="112" class="t-backend" font-size="8" text-anchor="middle">typed sort, when keyed</text>
         </g>
+
 
 
 
@@ -5912,6 +5928,7 @@
           <li>&bull; Thread: chat bubbles, quoted history folded, Draft with Celeste, Mark handled, No reply needed, Move to project</li>
           <li>&bull; Drafts: two panes, Skip or Send moves to the next, counts refresh; the Ask panel rewrites the draft from one line, with Undo on the card; drop a file on the card or the Ask panel to attach it, sent with the reply</li>
           <li>&bull; Ask Celeste: right panel, resizable, cites messages, proposes actions as buttons, reads a dropped PDF; × closes every dialog</li>
+          <li>&bull; Compose (2026-09-22): a new email to someone there is no thread with, written by hand or by Celeste from one line. It queues as a draft like a reply, and the confirm dialog says when an address has never been written to before</li>
         </ul>
       </div>
 
@@ -5937,6 +5954,7 @@
         </div>
         <ul>
           <li>&bull; Nothing sends, trashes, or files a project without the button</li>
+          <li>&bull; A composed message goes through the same button, dialog and 6-second cancel as a reply</li>
           <li>&bull; A dropped file sits on the draft until Send; nothing reaches a provider before the click</li>
           <li>&bull; Confirm dialog, then 6-second cancel</li>
           <li>&bull; Delete goes through the same gate as Send; mail moves to the provider&#39;s Trash, never destroyed</li>

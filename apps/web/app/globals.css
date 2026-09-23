@@ -63,6 +63,11 @@ main { max-width: 720px; margin: 0 auto; padding: 24px 16px 40px; }
 h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 8px; line-height: 1.25; }
 .reason { display: flex; align-items: baseline; gap: 10px; font-size: 14px; line-height: 1.5; color: var(--fg); margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 7%, transparent); }
 .reason > span:last-child { flex: 1; }
+/* "First message ever sent to…" on a composed draft's send preview (spec
+   2026-09-22): a warning, not a block, so it is tinted rather than red text. */
+.first-contact { display: flex; align-items: baseline; gap: 10px; font-size: 13px; line-height: 1.5; color: var(--fg); margin: 14px 0 0; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--critical) 12%, transparent); border: 1px solid color-mix(in srgb, var(--critical) 30%, transparent); }
+.first-contact svg { width: 14px; height: 14px; flex: none; stroke: var(--critical); fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.first-contact > span:last-child { flex: 1; }
 /* The drafter's "nothing to answer" note, in the action row where the button was, with the way past it at its end. */
 .draft-declined { flex: 1 1 100%; margin: 0; align-items: center; }
 .draft-declined > span:not(.celeste) { flex: 1; }
@@ -290,6 +295,8 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 .side button, .drawer button { border: none; background: none; font: inherit; cursor: pointer; }
 
 .tree { display: flex; flex-direction: column; }
+/* Compose sits above the folders, set apart the way the switcher's pill is (spec 2026-09-22). */
+.compose-tree { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
 .tree a, .side-bottom a, .side-bottom button {
   position: relative; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; font-size: 13.5px; width: 100%; text-align: left;
 }
@@ -854,6 +861,9 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 .mark-btn.on { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
 .draft-marks-hint { font-size: 11.5px; color: var(--muted); }
 .draft-field { resize: none; overflow: hidden; min-height: 0; }
+/* The one-line instruction beside "Draft with Celeste" grows with the card; the button does not (spec 2026-09-22). */
+.compose-celeste-row .field { flex: 1 1 auto; min-width: 0; }
+.compose-celeste-row .btn { flex: none; }
 @media (max-width: 560px) { .draft-marks-hint { display: none; } }
 /* Drawn in the card the moment the editing stops, and in the send preview. */
 .draft strong, .mail-body strong { font-weight: 650; }

@@ -108,6 +108,24 @@ export interface OutgoingAttachment {
 }
 
 export interface Sender {
+  /**
+   * Starts a conversation: a message with nothing above it, so no In-Reply-To,
+   * no References and no provider thread (compose, 2026-09-22). Absent on a
+   * channel that cannot begin one yet — iMessage and WhatsApp, whose compose
+   * lands in its own change — and the send refuses rather than guessing a
+   * conversation to put it in.
+   */
+  sendNew?(p: {
+    from: string;
+    to: string[];
+    cc: string[];
+    subject: string;
+    body: string;
+    /** The same words as HTML, when the operator marked any (see sendReply). */
+    html?: string;
+    attachments?: OutgoingAttachment[];
+  }): Promise<{ id: string }>;
+
   /** Sends an in-thread reply. Returns the provider message id of the sent message. */
   sendReply(p: {
     replyToProviderMessageId: string;

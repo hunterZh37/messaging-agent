@@ -8,6 +8,9 @@ import {
   attachChatFileToDraft,
   conversationUsage,
   createChatClient,
+  composeDraft,
+  composeText,
+  operatorNameFor,
   createDrafter,
   draftForThread,
   fileThreadsToProject,
@@ -17,6 +20,7 @@ import {
   listChats,
   listDraftAttachments,
   loadPipelineInputs,
+  providerForRole,
   openChatFor,
   schema,
   startNewChat,
@@ -241,6 +245,61 @@ export async function askDraftAction(threadIds: string[], instruction?: string):
     if (draftIds.length === 0) return { error: firstError ?? "Nothing to draft." };
     revalidatePath("/drafts");
     return { draftIds, failed, ...(firstError ? { error: firstError } : {}) };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
+
+
+/**
+ * A proposed "Draft mail to <someone>", clicked (operator, 2026-09-22).
+ *
+ * The refusal this replaces was Celeste's own: asked to write to two people it
+ * had no thread with, it explained that its action tool needed one. A composed
+ * draft needs no thread. The words are written here and the draft lands in the
+ * queue; nothing reaches anybody until the operator sends it from there.
+ */
+export async function askComposeAction(p: {
+  to: string[];
+  cc?: string[];
+  subject: string;
+  instruction?: string;
+}): Promise<{ draftIds: string[]; failed: number; error?: string } | StepError> {
+  try {
+    const { cfg, db } = core();
+    // Mail only: a chat cannot be composed into yet (spec 2026-09-22), and a
+    // composed draft on a chat account would queue a message that can never go.
+    const mail = db
+      .select({ id: schema.accounts.id, provider: schema.accounts.provider, email: schema.accounts.email, status: schema.accounts.status })
+      .from(schema.accounts)
+      .all()
+      .filter((a) => a.provider !== "imessage" && a.provider !== "whatsapp");
+    if (mail.length === 0) return { error: "No mail account to send from." };
+    const selected = await selectedInbox();
+    const account = mail.find((a) => a.id === selected) ?? mail[0]!;
+
+    const { voice } = await loadPipelineInputs(cfg);
+    const text = p.instruction?.trim()
+      ? await composeText(providerForRole("drafter", cfg, db, { accountId: account.id }), voice, {
+          instruction: p.instruction,
+          // Without this the mail signs off with a name nobody has: the
+          // model invents one when the thread cannot tell it (2026-09-22).
+          fromName: operatorNameFor(db, account.id),
+          subject: p.subject,
+          to: p.to,
+          ...(p.cc ? { cc: p.cc } : {}),
+        })
+      : "";
+    const draft = composeDraft(db, {
+      accountId: account.id,
+      to: p.to,
+      ...(p.cc ? { cc: p.cc } : {}),
+      subject: p.subject,
+      text,
+      model: cfg.models.drafter.model,
+    });
+    revalidatePath("/drafts");
+    return { draftIds: [draft.id], failed: 0 };
   } catch (err) {
     return { error: (err as Error).message };
   }

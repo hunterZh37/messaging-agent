@@ -30,9 +30,10 @@ function Row(props: { view: DraftView; selected: boolean; account: string | unde
       </div>
       <div className="inbox-sender">
         <span>{toLine(draft.toAddresses)}</span>
-        <span className="tag">{draft.mode === "follow-up" ? "follow-up" : "reply"}</span>
+        <span className="tag">{draft.mode === "follow-up" ? "follow-up" : draft.mode === "new" ? "compose" : "reply"}</span>
       </div>
-      <div className="inbox-subject">{view.replyTo.subject || "(no subject)"}</div>
+      {/* A composed draft has no reply-to; its own subject is what the row shows (spec 2026-09-22). */}
+      <div className="inbox-subject">{(view.replyTo ? view.replyTo.subject : view.draft.subject) || "(no subject)"}</div>
       <div className="oneline">{draft.originalText.replace(/\s+/g, " ").slice(0, 140)}</div>
     </Link>
   );

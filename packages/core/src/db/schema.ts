@@ -305,8 +305,22 @@ export const threadOpens = sqliteTable("thread_opens", {
 
 export const drafts = sqliteTable("drafts", {
   id: text("id").primaryKey(),
-  threadId: text("thread_id").notNull().references(() => threads.id),
-  replyToMessageId: text("reply_to_message_id").notNull().references(() => messages.id),
+  /**
+   * The conversation this answers, and the message it answers. Both are null
+   * for a composed message (2026-09-22): it begins a conversation, so there is
+   * no thread to hang it on and nothing it replies to. A reply still carries
+   * both, and everything that reads them must handle their absence.
+   */
+  threadId: text("thread_id").references(() => threads.id),
+  replyToMessageId: text("reply_to_message_id").references(() => messages.id),
+  /**
+   * Which account sends this. A reply takes it from the message it answers;
+   * a composed message has to say, so it is stored. Backfilled for the drafts
+   * that existed before compose.
+   */
+  accountId: text("account_id").references(() => accounts.id),
+  /** A composed message's own subject. Null on a reply, whose subject is the thread's. */
+  subject: text("subject"),
   originalText: text("original_text").notNull(),
   finalText: text("final_text"),
   toAddresses: text("to_addresses", { mode: "json" }).$type<string[]>().notNull(),
@@ -319,7 +333,7 @@ export const drafts = sqliteTable("drafts", {
    * operator's own last message went unanswered (spec 6). The queue says
    * which, because they are read differently.
    */
-  mode: text("mode", { enum: ["reply", "follow-up"] }).notNull().default("reply"),
+  mode: text("mode", { enum: ["reply", "follow-up", "new"] }).notNull().default("reply"),
   model: text("model").notNull(),
   sentProviderMessageId: text("sent_provider_message_id"),
   error: text("error"),

@@ -190,6 +190,19 @@ export function createOutlookClient(getAccessToken: () => Promise<string>): Outl
       return Buffer.from(await res.arrayBuffer());
     },
 
+    async createMessage(p) {
+      const res = await request(`${BASE}/me/messages`, {
+        method: "POST",
+        body: JSON.stringify({
+          subject: p.subject,
+          toRecipients: p.to.map((address) => ({ emailAddress: { address } })),
+          ccRecipients: p.cc.map((address) => ({ emailAddress: { address } })),
+        }),
+      });
+      const data = (await requireOk(res)) as { id: string };
+      return { draftId: data.id };
+    },
+
     async createReply(messageId) {
       const res = await request(`${BASE}/me/messages/${messageId}/createReply`, { method: "POST", body: JSON.stringify({}) });
       const data = (await requireOk(res)) as { id: string };
