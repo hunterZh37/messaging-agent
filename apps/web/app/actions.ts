@@ -17,10 +17,12 @@ import {
   sendDraft,
   skipDraft,
   storeSentReply,
+  suggestRecipients,
   schema,
   restoreDraft,
   type DraftRow,
   type DraftView,
+  type RecipientSuggestion,
 } from "@messaging-agent/core";
 import { eq } from "drizzle-orm";
 import { core } from "@/lib/core";
@@ -201,4 +203,16 @@ export async function draftWithCelesteAction(input: {
 export async function firstContactAction(accountId: string, addresses: string[]): Promise<string[]> {
   if (addresses.length === 0) return [];
   return firstContact(core().db, accountId, addresses);
+}
+
+/**
+ * Autofill for To/Cc (operator, 2026-09-23: "type in the first half of a
+ * contact name or email address" and get everyone it could mean). No
+ * account picked yet means nobody to rank first and nothing worth showing.
+ */
+export async function suggestRecipientsAction(query: string, accountId: string): Promise<RecipientSuggestion[]> {
+  // Before an account is chosen there is nothing to rank by, but the operator
+  // is already typing a name: answer without the account bias rather than
+  // looking broken (review, 2026-09-23).
+  return suggestRecipients(core().db, { query, ...(accountId ? { accountId } : {}), limit: 8 });
 }

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { celesteBlockFor, composeBlockFor, parseAddressList } from "@/lib/compose";
 import { marked, toggleMark, type Mark } from "@/lib/marks";
 import { composeDraftAction, draftWithCelesteAction } from "../actions";
+import { RecipientInput } from "./RecipientInput";
 
 export interface ComposeAccount {
   id: string;
@@ -114,10 +115,10 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
       </select>
 
       <label htmlFor="compose-to">To</label>
-      <input id="compose-to" className="field" value={to} onChange={(e) => setTo(e.target.value)} placeholder="ana@example.com" />
+      <RecipientInput id="compose-to" value={to} onChange={setTo} accountId={accountId} placeholder="ana@example.com" />
 
       <label htmlFor="compose-cc">Cc</label>
-      <input id="compose-cc" className="field" value={cc} onChange={(e) => setCc(e.target.value)} />
+      <RecipientInput id="compose-cc" value={cc} onChange={setCc} accountId={accountId} />
 
       <label htmlFor="compose-subject">Subject</label>
       <input id="compose-subject" className="field" value={subject} onChange={(e) => setSubject(e.target.value)} />

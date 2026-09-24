@@ -66,3 +66,52 @@ export function firstContactLabel(addresses: string[]): string | null {
   const [determiner, noun] = addresses.length === 1 ? ["this", "address"] : ["these", "addresses"];
   return `First message ever sent to ${determiner} ${noun}: ${addresses.join(", ")}`;
 }
+
+/**
+ * Which comma-separated slot in To/Cc the caret sits in (operator,
+ * 2026-09-23: autofill completes "the token under the caret", not the
+ * whole field). Commas are the seam, not whitespace — a typed name can
+ * still hold a space — so `start`/`end` bound the run between the comma
+ * before the caret and the one after it, and `query` is that run trimmed,
+ * ready to hand to `suggestRecipients`.
+ */
+export function tokenAtCaret(value: string, caret: number): { start: number; end: number; query: string } {
+  const at = Math.max(0, Math.min(caret, value.length));
+  let start = 0;
+  for (let i = at - 1; i >= 0; i--) {
+    if (value[i] === ",") {
+      start = i + 1;
+      break;
+    }
+  }
+  let end = value.length;
+  for (let i = at; i < value.length; i++) {
+    if (value[i] === ",") {
+      end = i;
+      break;
+    }
+  }
+  return { start, end, query: value.slice(start, end).trim() };
+}
+
+/**
+ * Accepting a suggestion (operator, 2026-09-23): the token under the caret
+ * is swapped for the full address and the rest of the list is left exactly
+ * as it was. Only when nothing follows it does a ", " get added, so the
+ * field is ready for the next address the same motion would have typed.
+ */
+export function replaceToken(value: string, caret: number, address: string): { value: string; caret: number } {
+  const { start, end } = tokenAtCaret(value, caret);
+  const raw = value.slice(start, end);
+  const trimmed = raw.trim();
+  // An empty (or all-whitespace) token — a bare "," just typed — keeps its
+  // spacing rather than being trimmed away from underneath it.
+  const leadingWs = trimmed === "" ? raw.length : raw.length - raw.trimStart().length;
+  const trailingWs = trimmed === "" ? 0 : raw.length - raw.trimEnd().length;
+  const coreStart = start + leadingWs;
+  const coreEnd = end - trailingWs;
+  const hasFollowing = end < value.length;
+  const suffix = hasFollowing ? "" : ", ";
+  const next = value.slice(0, coreStart) + address + suffix + value.slice(coreEnd);
+  return { value: next, caret: coreStart + address.length + suffix.length };
+}
