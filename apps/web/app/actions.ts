@@ -155,10 +155,16 @@ export async function composeDraftAction(input: {
   subject: string;
   text: string;
   model?: string;
-}): Promise<{ ok: true; draftId: string } | { ok: false; error: string }> {
+}): Promise<{ ok: true; draftId: string; view: DraftView } | { ok: false; error: string }> {
   try {
-    const draft: DraftRow = composeDraft(core().db, input);
-    return { ok: true, draftId: draft.id };
+    const db = core().db;
+    const draft: DraftRow = composeDraft(db, input);
+    // The card the composer shows before it goes: one button now sends from
+    // here rather than parking the mail in the queue first (operator,
+    // 2026-09-23: "don't make two steps ... just have a button that says Send").
+    const view = getDraftView(db, draft.id);
+    if (!view) return { ok: false, error: "the draft could not be read back" };
+    return { ok: true, draftId: draft.id, view };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }

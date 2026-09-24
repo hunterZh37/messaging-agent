@@ -26,7 +26,7 @@ import { outlookForAccount } from "../outlook/oauth";
 import { outlookSender } from "../outlook/sender";
 import { backfillOutlookAccount, syncOutlookAccount } from "../outlook/sync";
 import { restoreOutlookMessages, trashOutlookMessages } from "../outlook/trash";
-import { AccountAuthError, type MailConnector } from "./types";
+import { AccountAuthError, type MailConnector, type MailSender } from "./types";
 
 /** The provider's own id for the message an attachment hangs off: what both providers' fetch paths address it by. */
 function messageProviderId(db: Db, att: AttachmentRow): string {
@@ -54,9 +54,13 @@ export function connectorForAccount(cfg: Config, db: Db, account: AccountRow): M
         fetchImapAttachment(imapForAccount(attDb, attAccount.id, cfg).imap, messageProviderId(attDb, att), att),
       trash: (trashDb, trashAccount, messageIds) => trashImapMessages(trashDb, imapForAccount(trashDb, trashAccount.id, cfg).imap, messageIds),
       restore: (restoreDb, restoreAccount, messageIds) => restoreImapMessages(restoreDb, imapForAccount(restoreDb, restoreAccount.id, cfg).imap, messageIds),
+      // Typed as a MailSender so that a method left unforwarded is caught
+      // here rather than by the operator (2026-09-23). Each call opens its
+      // own SMTP client, as every other operation on this account does.
       sender: {
         sendReply: (p) => imapSender(imapForAccount(db, account.id, cfg).smtp).sendReply(p),
-      },
+        sendNew: (p) => imapSender(imapForAccount(db, account.id, cfg).smtp).sendNew(p),
+      } satisfies MailSender,
     };
   }
 

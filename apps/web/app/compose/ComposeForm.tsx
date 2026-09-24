@@ -4,8 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { celesteBlockFor, composeBlockFor, parseAddressList } from "@/lib/compose";
 import { marked, toggleMark, type Mark } from "@/lib/marks";
-import { composeDraftAction, draftWithCelesteAction } from "../actions";
+import { composeDraftAction, draftWithCelesteAction, firstContactAction, skipAction } from "../actions";
 import { RecipientInput } from "./RecipientInput";
+import { SendPreviewDialog } from "../queue/SendPreviewDialog";
+import { useSendGate } from "../queue/SendProvider";
+import { SEND_DELAY_MS } from "@/lib/queue";
+import type { DraftView } from "@messaging-agent/core";
 
 export interface ComposeAccount {
   id: string;
@@ -17,8 +21,12 @@ export interface ComposeAccount {
  * The composer (spec 2026-09-22): To, Cc, Subject and a body that takes the
  * same marks as a reply (see DraftCard), plus the one way in a reply never
  * needed — an account to send from, since there is no message to take it
- * from. Two ways out: typed by hand onto the queue, or filled from one line
- * told to Celeste and then read over before it goes anywhere.
+ * from. Written by hand or filled from one line told to Celeste, and sent
+ * from here (operator, 2026-09-23: "don't make two steps ... just have a
+ * button that says Send"): the mail still becomes an ordinary draft, still
+ * shows the same confirm card and the same first-contact warning, and still
+ * leaves through the one gate with its six seconds to change your mind. The
+ * only thing gone is the trip through the queue on the way.
  */
 export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
   const router = useRouter();
@@ -28,6 +36,10 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
   const [subject, setSubject] = useState("");
   const [text, setText] = useState("");
   const [instruction, setInstruction] = useState("");
+  // The draft as it stands once made, waiting on the confirm card.
+  const [ready, setReady] = useState<DraftView | null>(null);
+  const [firstContact, setFirstContact] = useState<string[] | "unknown" | null>(null);
+  const gate = useSendGate();
   // Whichever model last filled the body, so the draft that lands in the
   // queue carries who wrote it the way a reply's `draft.model` always does;
   // "operator" once the box has only ever held the operator's own words.
@@ -80,24 +92,45 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
       .finally(() => setCelestePending(false));
   }
 
-  function addToDrafts() {
+  /** Make the draft, then show it as it will arrive. Nothing has gone yet. */
+  function review() {
     setAddError(undefined);
     setAddPending(true);
+    setFirstContact(null);
     void composeDraftAction({ accountId, to: toList, cc: ccList, subject, text, ...(model ? { model } : {}) })
       .then((r) => {
+        setAddPending(false);
         if (!r.ok) {
           setAddError(r.error);
-          setAddPending(false);
           return;
         }
-        // Drafts is where every other draft goes to be sent (spec 2026-09-22):
-        // this one belongs there too, not in a preview of its own.
-        router.push("/drafts");
+        setReady(r.view);
+        // Who has never had mail from this account, for the warning on the
+        // card. Send waits for this answer (spec 2026-09-22).
+        void firstContactAction(accountId, [...toList, ...ccList])
+          .then((list) => setFirstContact(list))
+          .catch(() => setFirstContact("unknown"));
       })
       .catch((err) => {
         setAddError((err as Error).message);
         setAddPending(false);
       });
+  }
+
+  /** The button on the card: out through the same gate as every other send. */
+  function sendItNow() {
+    if (!ready) return;
+    gate.send({ draftId: ready.draft.id, finalText: text, to: toList, cc: ccList, endsAt: Date.now() + SEND_DELAY_MS, item: ready });
+    setReady(null);
+    setFirstContact(null);
+    // An empty composer, and the toast below carrying the six seconds.
+    setTo("");
+    setCc("");
+    setSubject("");
+    setText("");
+    setInstruction("");
+    setModel(null);
+    router.refresh();
   }
 
   return (
@@ -173,14 +206,37 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
       </div>
       {celesteError && <div className="error">{celesteError}</div>}
 
-      {addError && <div className="error">Could not add to drafts: {addError}</div>}
+      {addError && <div className="error">Could not send: {addError}</div>}
 
       <div className="row draft-actions">
-        <button type="button" className="btn primary" onClick={addToDrafts} disabled={addPending || Boolean(addBlock)} title={addBlock}>
-          {addPending ? "Adding…" : "Add to Drafts"}
+        <button type="button" className="btn primary" onClick={review} disabled={addPending || Boolean(addBlock)} title={addBlock}>
+          {addPending ? "Preparing…" : "Send"}
         </button>
         {addBlock && <span className="send-block">{addBlock}</span>}
       </div>
+
+      {ready && (
+        <SendPreviewDialog
+          view={ready}
+          text={text}
+          to={toList}
+          cc={ccList}
+          files={[]}
+          firstContact={firstContact}
+          onSend={sendItNow}
+          onClose={() => {
+            // Closed rather than sent: the words are still in the composer,
+            // so the row made a moment ago is let go rather than left in the
+            // queue. Send, look, close, fix a typo, Send again used to leave
+            // one behind every time, each of them counted beside the drafts
+            // that are really waiting (review, 2026-09-23).
+            const abandoned = ready.draft.id;
+            setReady(null);
+            setFirstContact(null);
+            void skipAction(abandoned).finally(() => router.refresh());
+          }}
+        />
+      )}
     </div>
   );
 }

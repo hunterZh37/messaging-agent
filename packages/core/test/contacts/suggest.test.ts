@@ -136,14 +136,14 @@ describe("suggestRecipients", () => {
 
   /**
    * WhatsApp identities carry an @ without being addresses: found in the
-   * browser, 2026-09-23, offering "176231148437518@lid" as somewhere to send
-   * an email.
+   * browser on 2026-09-23, where a contact's WhatsApp id was offered under
+   * their own name as somewhere to send an email.
    */
   it("leaves out a chat handle that merely contains an at sign", () => {
     const db = testDb();
     seed(db);
     const base = { fromName: "Chat Person", ccAddresses: [] as string[], snippet: null, attachmentNames: [] as string[], receivedAt: T0, bodyText: "hi", isFromOperator: false, rfcMessageId: null };
-    const handles = ["176231148437518@lid", "15555550100@s.whatsapp.net", "120363100000000001@g.us"];
+    const handles = ["someone@lid", "14155550100@s.whatsapp.net", "a-group@g.us"];
     handles.forEach((handle, i) => {
       db.insert(messages)
         .values({ ...base, id: `a1:c${i}`, accountId: "a1", threadId: "a1:t1", providerMessageId: `c${i}`, fromAddress: handle, toAddresses: ["me@example.com"], subject: "Chat", sentAt: T0 - i })
@@ -152,7 +152,7 @@ describe("suggestRecipients", () => {
     forgetRecipients(db);
     expect(addresses(db, "chat person")).toEqual([]);
     expect(addresses(db, "@lid")).toEqual([]);
-    expect(addresses(db, "1762311")).toEqual([]);
+    expect(addresses(db, "someone")).toEqual([]);
   });
 
   it("puts an address that begins with the letters above a name that merely holds them", () => {

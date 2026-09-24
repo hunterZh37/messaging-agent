@@ -1,5 +1,5 @@
 import { validateRecipients } from "../connectors/mime";
-import type { Sender } from "../connectors/types";
+import type { MailSender } from "../connectors/types";
 import type { SmtpClient } from "./types";
 
 /**
@@ -7,7 +7,7 @@ import type { SmtpClient } from "./types";
  * thread through In-Reply-To and References; nodemailer builds the MIME, the
  * draft's files included.
  */
-export function imapSender(smtp: SmtpClient): Sender {
+export function imapSender(smtp: SmtpClient): MailSender {
   return {
     /**
      * A message that starts a conversation (compose, 2026-09-22): the same

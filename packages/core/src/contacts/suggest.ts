@@ -49,8 +49,9 @@ const cache = new WeakMap<object, { at: number; rows: Row[] }>();
 /**
  * WhatsApp's own identities carry an @ and are not addresses anybody can
  * write to: `<id>@lid`, `<number>@s.whatsapp.net`, a group's `<id>@g.us`.
- * They reached the list because an @ was taken to mean an email (found in the
- * browser, 2026-09-23: "Kate Czarniak | 176231148437518@lid").
+ * They reached the list because an @ was taken to mean an email: the composer
+ * offered a contact's WhatsApp id under their own name as somewhere to send
+ * mail (found in the browser, 2026-09-23).
  */
 const CHAT_DOMAINS = ["@lid", "@s.whatsapp.net", "@g.us", "@broadcast", "@newsletter"];
 

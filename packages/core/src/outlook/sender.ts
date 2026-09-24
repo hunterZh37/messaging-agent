@@ -1,4 +1,4 @@
-import type { Sender } from "../connectors/types";
+import type { MailSender } from "../connectors/types";
 import type { OutlookClient } from "./types";
 
 /**
@@ -7,7 +7,7 @@ import type { OutlookClient } from "./types";
  * send, because Graph will not attach anything to a message once it is gone,
  * and one that fails to attach throws rather than sending the mail without it.
  */
-export function outlookSender(client: OutlookClient): Sender {
+export function outlookSender(client: OutlookClient): MailSender {
   return {
     /** A message with nothing above it: a fresh Graph draft, then the same road out. */
     async sendNew(p) {

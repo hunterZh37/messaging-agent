@@ -107,6 +107,26 @@ export interface OutgoingAttachment {
   bytes: Buffer;
 }
 
+/**
+ * A sender that can also begin a conversation. Mail can; a chat cannot yet
+ * (spec 2026-09-22). Naming it separately is what makes a connector that
+ * forwards only `sendReply` a compile error rather than a send that fails in
+ * front of the operator: compose reached the wrapper in connectors/index.ts,
+ * which passed on `sendReply` alone, and every composed mail was refused with
+ * "this channel cannot start a new conversation yet" (2026-09-23).
+ */
+export interface MailSender extends Sender {
+  sendNew(p: {
+    from: string;
+    to: string[];
+    cc: string[];
+    subject: string;
+    body: string;
+    html?: string;
+    attachments?: OutgoingAttachment[];
+  }): Promise<{ id: string }>;
+}
+
 export interface Sender {
   /**
    * Starts a conversation: a message with nothing above it, so no In-Reply-To,

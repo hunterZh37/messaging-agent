@@ -25,6 +25,10 @@ describe("connectorForAccount", () => {
     expect(typeof connector.sync).toBe("function");
     expect(typeof connector.applyLabels).toBe("function");
     expect(typeof connector.sender.sendReply).toBe("function");
+    // The composed mail that failed in front of the operator went out through
+    // this wrapper, which forwarded sendReply alone (2026-09-23). Testing the
+    // sender on its own never saw it.
+    expect(typeof connector.sender.sendNew).toBe("function");
   });
 
   it("throws AccountAuthError for an imap account whose password row is gone", () => {
@@ -54,6 +58,7 @@ describe("connectorForAccount", () => {
     expect(typeof connector.sync).toBe("function");
     expect(typeof connector.applyLabels).toBe("function");
     expect(typeof connector.sender.sendReply).toBe("function");
+    expect(typeof connector.sender.sendNew).toBe("function");
   });
 
   it("an outlook account without MICROSOFT_CLIENT_ID fails to get an access token when used", async () => {
