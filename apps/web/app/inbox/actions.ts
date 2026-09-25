@@ -21,6 +21,8 @@ import {
   alexConnected,
   freeTimes,
   retryAlexItem,
+  celesteLink,
+  publicBase,
   sendToAlex,
   markThreadsOpened,
   proposeProjects,
@@ -504,7 +506,10 @@ export async function addToAlexAction(threadId: string, item: AlexItem): Promise
     const { db, cfg } = core();
     const thread = db.select().from(schema.threads).where(eq(schema.threads.id, threadId)).get();
     if (!thread) return { error: "Thread not found." };
-    const row = await sendToAlex(db, threadId, item, cfg.alex);
+    // The way back, put on the item itself (operator, 2026-09-23): one
+    // address per thread that lands on the draft while there is one.
+    const link = celesteLink(await publicBase(cfg), threadId);
+    const row = await sendToAlex(db, threadId, { ...item, link }, cfg.alex);
     revalidatePath(`/inbox/${threadId}`);
     return { item: row };
   } catch (err) {
@@ -516,7 +521,11 @@ export async function addToAlexAction(threadId: string, item: AlexItem): Promise
 export async function retryAlexItemAction(threadId: string, id: string): Promise<{ item: AlexItemRow } | StepError> {
   try {
     const { db, cfg } = core();
-    const row = await retryAlexItem(db, id, cfg.alex);
+    // The same way back as the first attempt, worked out again from the
+    // thread rather than kept anywhere (2026-09-23).
+    const failed = db.select().from(schema.alexItems).where(eq(schema.alexItems.id, id)).get();
+    const link = failed ? celesteLink(await publicBase(cfg), failed.threadId) : undefined;
+    const row = await retryAlexItem(db, id, cfg.alex, undefined, undefined, link);
     if (!row) return { error: "That item is already in Alex." };
     revalidatePath(`/inbox/${threadId}`);
     return { item: row };

@@ -16,8 +16,8 @@
  * (operator, 2026-09-16: "just do actionable, event").
  */
 export type AlexItem =
-  | { kind: "actionable"; title: string; dayISO: string; startISO?: string; endISO?: string }
-  | { kind: "event"; title: string; startISO: string; endISO: string; location?: string; description?: string };
+  | { kind: "actionable"; title: string; dayISO: string; startISO?: string; endISO?: string; items?: string[]; link?: string }
+  | { kind: "event"; title: string; startISO: string; endISO: string; location?: string; description?: string; link?: string };
 
 export type AlexKind = AlexItem["kind"];
 
@@ -66,21 +66,30 @@ export class AlexRefused extends Error {
   }
 }
 
+import { LINK_LABEL } from "./link";
+
 const TIMEOUT_MS = 20_000;
 
 /** The arguments each kind goes over the wire as. */
 export function argumentsFor(item: AlexItem): Record<string, unknown> {
+  // The way back to the mail this came from (2026-09-23). An event has a
+  // description to hold it; an actionable has only its list, so the link is
+  // a line of that list. Neither kind has a field meant for a link, so it
+  // goes in labelled, rather than as a bare address in the middle of prose.
+  const line = item.link ? `${LINK_LABEL}: ${item.link}` : null;
   if (item.kind === "actionable") {
     // Both times or neither: Alex rejects half a range.
     const timed = item.startISO && item.endISO ? { startISO: item.startISO, endISO: item.endISO } : {};
-    return { title: item.title, dayISO: item.dayISO, ...timed };
+    const items = [...(item.items ?? []), ...(line ? [line] : [])];
+    return { title: item.title, dayISO: item.dayISO, ...timed, ...(items.length > 0 ? { items } : {}) };
   }
+  const description = [item.description, line].filter(Boolean).join("\n\n");
   return {
     title: item.title,
     startISO: item.startISO,
     endISO: item.endISO,
     ...(item.location ? { location: item.location } : {}),
-    ...(item.description ? { description: item.description } : {}),
+    ...(description ? { description } : {}),
   };
 }
 

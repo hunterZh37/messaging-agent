@@ -93,6 +93,8 @@ export * from "./queue/trash";
 export * from "./export";
 export * from "./pipeline";
 export * from "./alex/client";
+export * from "./alex/link";
+export * from "./alex/landing";
 export * from "./alex/items";
 export * from "./stats/stats";
 export * from "./stats/tone";

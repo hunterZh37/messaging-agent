@@ -87,6 +87,12 @@ export interface Config {
    * because an unconfigured install must never call somebody else's.
    */
   alex: { url: string | undefined; token: string | undefined };
+  /**
+   * Where this Celeste answers from for somebody else's click: the address
+   * that goes into a link handed to Alex (2026-09-23). Unset means ask
+   * Tailscale, which is what the phone uses to reach this Mac.
+   */
+  publicUrl: string | undefined;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env, homeDir: string = homedir()): Config {
@@ -114,6 +120,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, homeDir: string
       url: env.ALEX_MCP_URL?.trim() || undefined,
       token: env.ALEX_MCP_TOKEN?.trim() || undefined,
     },
+    publicUrl: env.CELESTE_PUBLIC_URL?.trim() || undefined,
   };
 }
 

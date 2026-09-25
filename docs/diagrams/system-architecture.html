@@ -5076,7 +5076,7 @@
         <path data-edge-from="tsserve" data-edge-to="lock" data-edge-label="proxy + Tailscale-User headers" data-edge-key="36" data-edge-id="ts-proxy" data-composition-points="415,1110;415,1017;375,1017;375,924" d="M 415 1110 L 415 1025 Q 415 1017 407 1017 L 383 1017 Q 375 1017 375 1009 L 375 924" class="a-security" stroke-width="1.5" marker-end="url(#arrowhead-security)"/>
         <path data-edge-from="phone" data-edge-to="tsctl" data-edge-label="auth, peer keys" data-edge-key="37" data-edge-id="phone-ctl" data-composition-points="125,1174;125,1212;705,1212;705,1174" d="M 125 1174 L 125 1204 Q 125 1212 133 1212 L 697 1212 Q 705 1212 705 1204 L 705 1174" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="tsserve" data-edge-to="tsctl" data-edge-label="node key, cert" data-edge-key="38" data-edge-id="mac-ctl" data-composition-points="490,1142;620,1142" d="M 490 1142 L 620 1142" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
-        <path data-edge-from="server" data-edge-to="alex" data-edge-label="Add to Alex" data-edge-key="39" data-edge-id="alex-out" data-composition-points="1125,748;1384,748;1384,1092;1360,1092" d="M 1125 748 L 1376 748 Q 1384 748 1384 756 L 1384 1084 Q 1384 1092 1376 1092 L 1360 1092" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="server" data-edge-to="alex" data-edge-label="Add to Alex, with a way back" data-edge-key="39" data-edge-id="alex-out" data-composition-points="1125,748;1384,748;1384,1092;1360,1092" d="M 1125 748 L 1376 748 Q 1384 748 1384 756 L 1384 1084 Q 1384 1092 1376 1092 L 1360 1092" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="sorter" data-edge-to="typesafe" data-edge-label="typed sort, when keyed" data-edge-key="40" data-edge-id="jev-sort" data-composition-points="1000,180;1000,156;776,156;776,52;800,52" d="M 1000 180 L 1000 164 Q 1000 156 992 156 L 784 156 Q 776 156 776 148 L 776 60 Q 776 52 784 52 L 800 52" class="a-emphasis" stroke-width="1.8" marker-end="url(#arrowhead-emphasis)"/>
         <path data-edge-from="statsp" data-edge-to="thread" data-edge-key="41" data-edge-id="ui-stats" data-composition-points="895,960;895,924" d="M 895 960 L 895 924" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="usagep" data-edge-to="drafts" data-edge-key="42" data-edge-id="ui-usage" data-composition-points="1055,960;1055,924" d="M 1055 960 L 1055 924" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
@@ -5504,8 +5504,8 @@
         <text data-detail="context" x="705" y="1156" class="t-muted" font-size="9" text-anchor="middle">keys, NAT traversal, DERP</text>
         </g>
 
-        <g id="node-alex" data-node-id="alex" data-node-label="Scheduling agent" tabindex="0" role="button" aria-label="Focus Scheduling agent, MCP server, private tier, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="MCP server, private tier" data-node-context="Architecture component">
-          <title>Scheduling agent · MCP server, private tier · Architecture component</title>
+        <g id="node-alex" data-node-id="alex" data-node-label="Scheduling agent" tabindex="0" role="button" aria-label="Focus Scheduling agent, MCP server, links back, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="MCP server, links back" data-node-context="Architecture component">
+          <title>Scheduling agent · MCP server, links back · Architecture component</title>
           <rect x="1170" y="1060" width="190" height="64" rx="6" class="c-mask"/>
           <rect x="1170" y="1060" width="190" height="64" rx="6" class="c-external" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="external" class="semantic-sigil s-external" transform="translate(1176 1066) scale(0.6875)">
@@ -5513,7 +5513,7 @@
             <path d="M8 2.5h5.5V8M13.5 2.5 7.5 8.5"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="1265" y="1090" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Scheduling agent</text>
-        <text data-detail="context" x="1265" y="1106" class="t-muted" font-size="9" text-anchor="middle">MCP server, private tier</text>
+        <text data-detail="context" x="1265" y="1106" class="t-muted" font-size="9" text-anchor="middle">MCP server, links back</text>
         </g>
 
         <!-- Connection labels -->
@@ -5643,9 +5643,9 @@
           <rect x="516.4" y="1122" width="77.2" height="14" rx="3" class="c-mask"/>
           <text x="555" y="1132" class="t-messagebus" font-size="8" text-anchor="middle">node key, cert</text>
         </g>
-        <g data-detail="context" data-edge-from="server" data-edge-to="alex" data-edge-label="Add to Alex" data-edge-key="39" data-edge-id="alex-out">
-          <rect x="1352.6" y="900" width="62.8" height="14" rx="3" class="c-mask"/>
-          <text x="1384" y="910" class="t-muted" font-size="8" text-anchor="middle">Add to Alex</text>
+        <g data-detail="context" data-edge-from="server" data-edge-to="alex" data-edge-label="Add to Alex, with a way back" data-edge-key="39" data-edge-id="alex-out">
+          <rect x="1311.8" y="900" width="144.4" height="14" rx="3" class="c-mask"/>
+          <text x="1384" y="910" class="t-muted" font-size="8" text-anchor="middle">Add to Alex, with a way back</text>
         </g>
         <g data-detail="context" data-edge-from="sorter" data-edge-to="typesafe" data-edge-label="typed sort, when keyed" data-edge-key="40" data-edge-id="jev-sort">
           <rect x="872.2" y="102" width="115.6" height="14" rx="3" class="c-mask"/>
@@ -5929,6 +5929,7 @@
           <li>&bull; Drafts: two panes, Skip or Send moves to the next, counts refresh; the Ask panel rewrites the draft from one line, with Undo on the card; drop a file on the card or the Ask panel to attach it, sent with the reply</li>
           <li>&bull; Ask Celeste: right panel, resizable, cites messages, proposes actions as buttons, reads a dropped PDF; × closes every dialog</li>
           <li>&bull; Compose (2026-09-22): a new email to someone there is no thread with, written by hand or by Celeste from one line. It queues as a draft like a reply, and the confirm dialog says when an address has never been written to before. Half a name or address in To or Cc brings back everyone the mail knows, across every inbox, the address book included where it holds an email (2026-09-23)</li>
+          <li>&bull; Add to Alex (2026-09-23): the item carries one address per thread, on the tailnet name so the phone can follow it. It opens the draft while one is waiting and the conversation once it has gone</li>
         </ul>
       </div>
 

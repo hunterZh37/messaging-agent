@@ -51,17 +51,25 @@ export async function sendToAlex(
   }
 }
 
-/** A failed row, sent again as it was. The old row stays: it is the record of the attempt. */
+/**
+ * A failed row, sent again as it was. The old row stays: it is the record of
+ * the attempt. `link` is passed in rather than read back from the row,
+ * because it is the same address either way, worked out from the thread
+ * (2026-09-23): a retry that lost the way back would be a quieter bug than a
+ * retry that failed.
+ */
 export async function retryAlexItem(
   db: Db,
   id: string,
   config: AlexConfig,
   clock: () => number = now,
   fetchImpl: typeof fetch = fetch,
+  link?: string,
 ): Promise<AlexItemRow | null> {
   const row = db.select().from(alexItems).where(eq(alexItems.id, id)).get();
   if (!row || row.status === "added") return null;
-  return sendToAlex(db, row.threadId, itemOf(row), config, clock, fetchImpl);
+  const item = itemOf(row);
+  return sendToAlex(db, row.threadId, link ? { ...item, link } : item, config, clock, fetchImpl);
 }
 
 /** A row read back as the item it was, so a retry sends exactly what failed. */
