@@ -1699,3 +1699,9 @@ main.architecture-page { display: flex; flex-direction: column; height: 100vh; m
   border-radius: 10px;
   background: var(--bg);
 }
+
+/* "Fix grammar", beside bold and underline (operator, 2026-09-25). It is a
+   word rather than a letter, so it takes the width it needs and keeps the
+   quiet weight of the marks it sits with. */
+.draft-marks .grammar-btn { width: auto; padding: 0 8px; font-size: 12px; letter-spacing: 0.01em; }
+.draft-marks .grammar-btn:disabled { opacity: 0.5; cursor: default; }

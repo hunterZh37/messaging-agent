@@ -79,6 +79,7 @@ export * from "./draft/drafter";
 export * from "./draft/anthropic";
 export * from "./draft/run";
 export * from "./draft/compose";
+export * from "./draft/grammar";
 export * from "./draft/style";
 export * from "./chat/index";
 export * from "./eval/index";

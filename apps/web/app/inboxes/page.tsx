@@ -39,6 +39,7 @@ const ROLE_LABELS: Record<(typeof MODEL_ROLES)[number], string> = {
   drafter: "Drafting",
   chat: "Ask Celeste",
   stats: "Reading your tone",
+  grammar: "Fixing grammar",
 };
 
 function kindLabel(a: { provider: "imap" | "outlook" | "imessage" | "whatsapp"; kind: "gmail" | "generic" | null }): string {

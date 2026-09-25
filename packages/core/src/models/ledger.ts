@@ -28,7 +28,7 @@ import {
  * names; the rest are jobs that borrow the drafter's model, and `embed` is
  * the local embedder.
  */
-export const USAGE_ROLES = ["sorter", "sorter_backlog", "drafter", "chat", "stats", "rules", "propose", "eval", "embed"] as const;
+export const USAGE_ROLES = ["sorter", "sorter_backlog", "drafter", "chat", "stats", "grammar", "rules", "propose", "eval", "embed"] as const;
 export type UsageRole = (typeof USAGE_ROLES)[number];
 
 /** What each role is called where the operator can see it. */
@@ -38,6 +38,7 @@ export const USAGE_ROLE_LABELS: Record<UsageRole, string> = {
   drafter: "Drafting",
   chat: "Ask Celeste",
   stats: "Reading your tone",
+  grammar: "Fixing grammar",
   rules: "Distilling rules",
   propose: "Proposing projects",
   eval: "Eval runs",

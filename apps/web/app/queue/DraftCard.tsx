@@ -9,7 +9,7 @@ import { formatTime, sendBlockFor, shortAccount } from "@/lib/format";
 import { popRevision, pushRevision } from "@/lib/queue";
 import { changeCount, wordDiff } from "@/lib/diff";
 import { marked, toggleMark, type Mark } from "@/lib/marks";
-import { firstContactAction, listDraftAttachmentsAction } from "../actions";
+import { firstContactAction, fixGrammarAction, listDraftAttachmentsAction } from "../actions";
 import { TrashIcon } from "../inbox/icons";
 import { ContextDraftCard, type AttachResult } from "../ask/AskProvider";
 import { ClipIcon } from "./AttachmentPreview";
@@ -167,6 +167,32 @@ export function DraftCard(props: {
     setRevisedFrom(text);
   };
   const applyFromAsk = useCallback((next: string) => applyLatest.current(next), []);
+
+  /**
+   * "Fix grammar" (operator, 2026-09-25): their own words with the mistakes
+   * taken out and nothing else touched. It lands like any other change, with
+   * Undo behind it; a reply that came back rewritten rather than corrected is
+   * refused in core, and the line beside the button says so.
+   */
+  const [grammarPending, setGrammarPending] = useState(false);
+  const [grammarNote, setGrammarNote] = useState<string | null>(null);
+  function fixGrammar() {
+    setGrammarNote(null);
+    setGrammarPending(true);
+    const before = text;
+    void fixGrammarAction({ draftId: view.draft.id, current: before })
+      .then((r) => {
+        setGrammarPending(false);
+        if (!r.ok) return setGrammarNote(r.error);
+        if (r.refused) return setGrammarNote(r.refused);
+        if (!r.changed) return setGrammarNote("Nothing to fix.");
+        applyLatest.current(r.text);
+      })
+      .catch((err) => {
+        setGrammarPending(false);
+        setGrammarNote((err as Error).message);
+      });
+  }
 
   /**
    * One file onto this draft. The chip goes up first with what the browser
@@ -414,7 +440,16 @@ export function DraftCard(props: {
             <button type="button" className={`mark-btn${activeMark("underline") ? " on" : ""}`} title="Underline the selection" aria-label="Underline the selection" onMouseDown={(e) => e.preventDefault()} onClick={() => applyMark("underline")}>
               <u>U</u>
             </button>
-            <span className="draft-marks-hint">Select a word, then bold it</span>
+            <button
+              type="button"
+              className="mark-btn grammar-btn"
+              onClick={fixGrammar}
+              disabled={grammarPending || text.trim() === ""}
+              title="Fix the grammar, and nothing else"
+            >
+              {grammarPending ? "Fixing…" : "Fix grammar"}
+            </button>
+            {grammarNote ? <span className="draft-marks-hint">{grammarNote}</span> : <span className="draft-marks-hint">Select a word, then bold it</span>}
           </div>
           <textarea
             className="field draft-field"

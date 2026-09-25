@@ -62,8 +62,12 @@ describe("loadConfig", () => {
   });
 
   it("names every role's environment variable", () => {
-    expect(MODEL_ROLES).toEqual(["sorter", "sorter_backlog", "drafter", "chat", "stats"]);
+    expect(MODEL_ROLES).toEqual(["sorter", "sorter_backlog", "drafter", "chat", "stats", "grammar"]);
     expect(MODEL_ENV_VARS.sorter_backlog).toBe("CELESTE_MODEL_SORTER_BACKLOG");
+    expect(MODEL_ENV_VARS.grammar).toBe("CELESTE_MODEL_GRAMMAR");
+    // Fixing grammar is a small job on the operator's own words, pressed
+    // often: it stays on the machine and costs nothing (2026-09-25).
+    expect(loadConfig({}, "/Users/test").models.grammar).toEqual({ provider: "ollama", model: "qwen3:8b" });
   });
 
   it("lets the environment put a local model behind any single role", () => {

@@ -20,10 +20,18 @@ export const MODELS = {
    * the last body of text that should leave the machine.
    */
   stats: "ollama:qwen3:8b",
+  /**
+   * Fixing the grammar of a draft the operator has written or edited
+   * (operator, 2026-09-25: "one quick button for Fix Grammar ... it doesn't
+   * change anything else"). Local by default: it is a small job on their own
+   * words, pressed often, and there is no reason for it to cost anything or
+   * to leave the machine.
+   */
+  grammar: "ollama:qwen3:8b",
 } as const;
 
 /** The roles a model can be swapped behind, in the order the app lists them. */
-export const MODEL_ROLES = ["sorter", "sorter_backlog", "drafter", "chat", "stats"] as const;
+export const MODEL_ROLES = ["sorter", "sorter_backlog", "drafter", "chat", "stats", "grammar"] as const;
 export type ModelRole = (typeof MODEL_ROLES)[number];
 
 /** The environment variable that overrides each role's model. */
@@ -33,6 +41,7 @@ export const MODEL_ENV_VARS: Record<ModelRole, string> = {
   drafter: "CELESTE_MODEL_DRAFTER",
   chat: "CELESTE_MODEL_CHAT",
   stats: "CELESTE_MODEL_STATS",
+  grammar: "CELESTE_MODEL_GRAMMAR",
 };
 
 /** Local embedding model, pulled with `ollama pull nomic-embed-text`. */
@@ -145,6 +154,7 @@ function models(env: NodeJS.ProcessEnv): Record<ModelRole, ModelRef> {
     drafter: parseModelRef(env[MODEL_ENV_VARS.drafter]?.trim() || MODELS.drafter),
     chat: parseModelRef(env[MODEL_ENV_VARS.chat]?.trim() || MODELS.chat),
     stats: parseModelRef(env[MODEL_ENV_VARS.stats]?.trim() || MODELS.stats),
+    grammar: parseModelRef(env[MODEL_ENV_VARS.grammar]?.trim() || MODELS.grammar),
   };
 }
 

@@ -7,6 +7,7 @@ import {
   connectorForAccount,
   createDrafter,
   firstContact,
+  fixGrammar,
   formatModelRef,
   getDraftView,
   listDraftAttachments,
@@ -97,6 +98,29 @@ export async function reviseAction(input: { draftId: string; current: string; in
     const { voice } = await loadPipelineInputs(cfg);
     const { text } = await reviseDraft(db, createDrafter(cfg, db, { ref: input.draftId }), voice, input.draftId, input.current, input.instruction);
     return { ok: true, text };
+  } catch (err) {
+    return { ok: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * "Fix grammar" on a draft card (operator, 2026-09-25). Their own words come
+ * back with the mistakes taken out and nothing else touched; a reply that has
+ * been rewritten rather than corrected is refused in core, and the card keeps
+ * what it had. Local by default, so pressing it often costs nothing.
+ *
+ * The card holds the result with Undo beside it, like every other change to a
+ * draft: nothing is written to the draft row until it is sent.
+ */
+export async function fixGrammarAction(input: {
+  draftId: string;
+  current: string;
+}): Promise<{ ok: true; text: string; changed: boolean; refused?: string } | { ok: false; error: string }> {
+  try {
+    const { cfg, db } = core();
+    const provider = providerForRole("grammar", cfg, db, { ref: input.draftId });
+    const result = await fixGrammar(provider, input.current);
+    return { ok: true, text: result.text, changed: result.changed, ...(result.refused ? { refused: result.refused } : {}) };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
   }
