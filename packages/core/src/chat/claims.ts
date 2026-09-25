@@ -24,19 +24,52 @@ const CLAIMS = [
   /\bthe draft (?:now )?(?:says|reads)\b/i,
   /\bapplied (?:it |that |the text )?to (?:the|your) draft\b/i,
   /\bit (?:is|'s) on your card\b/i,
+  // The same thing said without the word "draft" (review, 2026-09-24).
+  /\b(?:the|your) card (?:is|has been) (?:now )?(?:updated|revised|changed)\b/i,
+  /\b(?:that|it)(?:'s| is) (?:now )?in (?:the|your) draft\b/i,
+  /\bi(?:'ve| have) (?:gone ahead and )?(?:updated|revised|rewritten|edited) it\b/i,
+  /\bit(?:'s| is) (?:now )?(?:updated|revised|rewritten) on your (?:screen|card)\b/i,
 ];
 
-/** Words that turn a claim back into an offer or a plan, read just before it. */
-const NOT_YET = /\b(?:i can|i could|i'll|i will|shall i|should i|want me to|would you like|if you want|do you want)\b[^.!?]{0,80}$/i;
+/**
+ * An offer or a plan, not a claim — but only when the modal governs a verb
+ * about changing the draft. "I can confirm the draft is updated" asserts it
+ * (review, 2026-09-24); "I can update the draft" does not.
+ */
+const NOT_YET = /\b(?:i can|i could|i'll|i will|i would|shall i|should i|want me to|would you like|do you want|if you want)\s+(?:\w+\s+){0,2}(?:update|updating|revise|revising|rewrite|rewriting|change|changing|edit|editing|apply|applying|fold|adding|add)\b/i;
+
+/**
+ * A denial reads like a claim with one word in it: "I have not changed the
+ * draft" says the opposite of what the pattern matches (found by its own
+ * test, 2026-09-24).
+ */
+const DENIED = /\b(?:not|never|n't|without|nothing|neither)\b[^.;!?]{0,40}$/i;
+
+/**
+ * Words the answer is only repeating: what the operator said, what a message
+ * said, what she said last time. A claim inside quotation marks is not a
+ * claim about the card in front of them (review, 2026-09-24).
+ */
+function withoutQuotations(answer: string): string {
+  return answer
+    .replace(/"[^"]*"/g, " ")
+    .replace(/\u201c[^\u201d]*\u201d/g, " ")
+    .replace(/^>.*$/gm, " ");
+}
 
 /** Does this answer tell the operator their draft has already changed? */
 export function claimsDraftChanged(answer: string): boolean {
-  for (const pattern of CLAIMS) {
-    const match = pattern.exec(answer);
-    if (!match) continue;
-    const before = answer.slice(0, match.index);
-    if (NOT_YET.test(before)) continue;
-    return true;
+  const text = withoutQuotations(answer);
+  // Sentence by sentence: an offer in one sentence says nothing about a
+  // claim in the next (review, 2026-09-24).
+  for (const sentence of text.split(/(?<=[.!?\n])\s+/)) {
+    for (const pattern of CLAIMS) {
+      const match = pattern.exec(sentence);
+      if (!match) continue;
+      if (NOT_YET.test(sentence)) continue;
+      if (DENIED.test(sentence.slice(0, match.index))) continue;
+      return true;
+    }
   }
   return false;
 }

@@ -591,6 +591,34 @@ describe("askCeleste and the draft the operator has open", () => {
     expect(turn.assistant.content).toContain("The draft on your screen was not changed.");
   });
 
+  /**
+   * A second pass costs nothing that was already agreed: clearing the
+   * proposals took a good one down with a badly worded answer, and did the
+   * same to the older quote retry, which had never lost one (review,
+   * 2026-09-24).
+   */
+  it("keeps a proposal made before the answer was sent back", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "Can you make Friday?" }]);
+    seedDraft(db);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "propose_action", input: { kind: "file_to_project", thread_id: "a1:t-m1", project_name: "Invoices" } }]),
+      textResponse("Filed, and the draft is updated on your screen."),
+      textResponse("Filed. I have not changed the draft."),
+    ]);
+
+    const turn = await askCeleste(
+      db,
+      { client, clock: clockFrom(1000) },
+      { chatId: chat.id, question: "file this and tidy the draft", contextThreadId: null, contextDraft: openDraft },
+    );
+
+    // The filing survives the second pass; the false claim is gone.
+    expect(turn.actions.map((a) => a.kind)).toEqual(["file_to_project"]);
+    expect(turn.assistant.content).not.toContain("was not changed");
+  });
+
   it("leaves an answer that proposes the change alone", async () => {
     const db = testDb();
     seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "Can you make Friday?" }]);

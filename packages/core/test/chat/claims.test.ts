@@ -26,6 +26,43 @@ describe("claimsDraftChanged", () => {
     }
   });
 
+  /** Phrasings the first pass of this check missed (review, 2026-09-24). */
+  it("reads it said without the word draft, and said about the card", () => {
+    for (const said of [
+      "The card is updated with the folder line.",
+      "That's in the draft now.",
+      "It's in the draft now.",
+      "I've gone ahead and updated it.",
+      "I have revised it.",
+      "It is now updated on your screen.",
+    ]) {
+      expect(claimsDraftChanged(said), said).toBe(true);
+    }
+  });
+
+  it("does not let an offer in one sentence excuse a claim in the next", () => {
+    expect(claimsDraftChanged("I can help with that. The draft is updated on your screen.")).toBe(true);
+    // "I can confirm X" asserts X; only a modal governing the change is an offer.
+    expect(claimsDraftChanged("I can confirm the draft is updated on your screen.")).toBe(true);
+  });
+
+  it("does not read words it is only repeating as a claim of its own", () => {
+    expect(claimsDraftChanged('You said "the draft is updated on your screen", and it was not.')).toBe(false);
+    expect(claimsDraftChanged("The mail you sent said \u201cthe draft is updated\u201d in its last line.")).toBe(false);
+    expect(claimsDraftChanged("> the draft is updated on your screen")).toBe(false);
+  });
+
+  it("reads a denial as a denial, not a claim", () => {
+    for (const said of [
+      "I have not changed the draft.",
+      "I did not update your draft, since you have not said which thread.",
+      "I answered without changing the draft.",
+      "Nothing is in the draft yet.",
+    ]) {
+      expect(claimsDraftChanged(said), said).toBe(false);
+    }
+  });
+
   it("leaves an offer, a question and a plan alone", () => {
     for (const said of [
       "I can update the draft to say that if you like.",

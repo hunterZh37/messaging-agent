@@ -506,9 +506,10 @@ export async function askCeleste(db: Db, deps: AskDeps, input: AskInput): Promis
       role: "user",
       content: [mismatches.length > 0 ? quoteCorrection(mismatches) : "", saidWithoutDoing ? CLAIM_CORRECTION : ""].filter(Boolean).join("\n\n"),
     });
-    // The round that follows answers afresh: what it proposed before was not
-    // acted on, and a second copy of it would be a second button.
-    proposals.length = 0;
+    // What was proposed in the first pass is kept. Clearing it took a good
+    // proposal down with a badly worded answer — and did the same to the
+    // quote retry, which had never lost one before (review, 2026-09-24).
+    // A proposal repeated in the second pass is dropped by the key above.
   }
   // Named here, where there is a database: the panel shows what each thread
   // is, and a stored turn still says it a week later.
