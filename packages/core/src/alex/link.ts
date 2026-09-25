@@ -17,6 +17,9 @@ import { promisify } from "node:util";
  * the phone as often as on the Mac, and only the tailnet name answers on both.
  */
 
+// A tailnet name is worth a second, not a hung Add button: the local address
+// is a fine answer when tailscale does not come back (review, 2026-09-24).
+const TAILSCALE_TIMEOUT_MS = 2_000;
 const run = promisify(execFile);
 
 /** One steady address for a thread, wherever the operator opens it. */
@@ -42,7 +45,7 @@ const HOLD_MS = 10 * 60_000;
 export async function publicBase(
   cfg: { publicUrl?: string | undefined },
   clock: () => number = Date.now,
-  exec: (cmd: string, args: string[]) => Promise<{ stdout: string }> = (cmd, args) => run(cmd, args),
+  exec: (cmd: string, args: string[]) => Promise<{ stdout: string }> = (cmd, args) => run(cmd, args, { timeout: TAILSCALE_TIMEOUT_MS }),
 ): Promise<string> {
   const set = cfg.publicUrl?.trim();
   if (set) return set.replace(/\/+$/, "");
