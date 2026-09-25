@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixGrammar, kept, KEEP_AT_LEAST } from "../../src/draft/grammar";
+import { facts, fixGrammar, kept, KEEP_AT_LEAST, tokens } from "../../src/draft/grammar";
 import type { ModelProvider, TextRequest } from "../../src/models/types";
 
 /**
@@ -102,6 +102,101 @@ Hunter`;
   });
 });
 
+/**
+ * Everything a correction must not do, proved rather than asked for. Each of
+ * these came back from a review on 2026-09-25, two of them reproduced against
+ * the real local model.
+ */
+describe("what a correction may not touch", () => {
+  it("keeps the blank line the draft ended with, and calls an identical answer unchanged", async () => {
+    const withTail = `${DRAFT}\n\n`;
+    const result = await fixGrammar(provider(DRAFT), withTail);
+    expect(result.text).toBe(withTail);
+    expect(result.changed).toBe(false);
+  });
+
+  it("does not refuse an honest fix because the draft ended in blank lines", async () => {
+    const withTail = `${DRAFT}\n\n\n\n`;
+    const result = await fixGrammar(provider(FIXED), withTail);
+    expect(result.refused).toBeUndefined();
+    expect(result.text).toBe(`${FIXED}\n\n\n\n`);
+  });
+
+  it("takes off the trailing spaces a local model likes to add", async () => {
+    const draft = "Hi Sam,\n\nThank you for the update.\n\nBest,\nHunter";
+    const spaced = draft.replace("Best,", "Best,  ");
+    const result = await fixGrammar(provider(spaced), draft);
+    expect(result.text).toBe(draft);
+    expect(result.changed).toBe(false);
+  });
+
+  it("leaves trailing spaces the operator put there", async () => {
+    const draft = "Hi Sam,  \n\nThank you for the update.\n\nBest,\nHunter";
+    const result = await fixGrammar(provider(draft), draft);
+    expect(result.text).toBe(draft);
+  });
+
+  it("refuses a number, a sum or a date that moved", async () => {
+    const moved = FIXED.replace("15 hours", "50 hours");
+    const result = await fixGrammar(provider(moved), DRAFT);
+    expect(result.text).toBe(DRAFT);
+    expect(result.refused).toMatch(/15/);
+  });
+
+  it("refuses a link that moved", async () => {
+    const draft = "Hi Ana,\n\nThe folder is at https://example.com/a/b and i will add the rest tomorrow.\n\nHunter";
+    const moved = draft.replace("https://example.com/a/b", "https://example.com/x/y").replace(" i ", " I ");
+    const result = await fixGrammar(provider(moved), draft);
+    expect(result.text).toBe(draft);
+    expect(result.refused).toMatch(/example\.com/);
+  });
+
+  it("refuses an answer that dropped the operator's emphasis", async () => {
+    const draft = "Hi Ana,\n\nthis is **important** and i will send it today.\n\nHunter";
+    const flattened = draft.replace("**important**", "important").replace(" i ", " I ");
+    const result = await fixGrammar(provider(flattened), draft);
+    expect(result.text).toBe(draft);
+    expect(result.refused).toMatch(/bold or underline/);
+  });
+
+  it("refuses a mail whose paragraphs came back shuffled", async () => {
+    const shuffled = DRAFT.split("\n\n").reverse().join("\n\n");
+    const result = await fixGrammar(provider(shuffled), DRAFT);
+    expect(result.text).toBe(DRAFT);
+    expect(result.refused).toMatch(/greeting or sign-off/);
+  });
+
+  /**
+   * A reviewer put this through the real local model on 2026-09-25: it fixed
+   * the 在/再 homophone correctly and the guard threw the fix away, because a
+   * whole clause counted as one word in a script that has no spaces.
+   */
+  it("accepts a one-character fix in a language written without spaces", async () => {
+    const draft = "我们明天再公司开会，好吗？";
+    const fixed = "我们明天在公司开会，好吗？";
+    const result = await fixGrammar(provider(fixed), draft);
+    expect(result.refused).toBeUndefined();
+    expect(result.text).toBe(fixed);
+  });
+});
+
+describe("tokens", () => {
+  it("counts a Chinese character as a piece of its own, and a Latin word as one", () => {
+    expect(tokens("我们明天")).toEqual(["我", "们", "明", "天"]);
+    expect(tokens("Hello there")).toEqual(["hello", "there"]);
+  });
+});
+
+describe("facts", () => {
+  it("picks out the numbers, links and addresses a correction must keep", () => {
+    const found = facts("Send 15 copies to ana@example.com via https://example.com/x by 2026-09-30.");
+    expect(found).toContain("15");
+    expect(found).toContain("ana@example.com");
+    expect(found).toContain("https://example.com/x");
+    expect(found).toContain("2026-09-30");
+  });
+});
+
 describe("kept", () => {
   it("is all of it when nothing moved, and near all for a word or two fixed", () => {
     expect(kept(DRAFT, DRAFT)).toBe(1);
@@ -110,6 +205,12 @@ describe("kept", () => {
 
   it("falls below the line when the mail is written again", () => {
     expect(kept(DRAFT, "Dear Keith, I hope this finds you well. Kind regards, Hunter")).toBeLessThan(KEEP_AT_LEAST);
+  });
+
+  it("sees words moved out of their order, not only words gone", () => {
+    // The same words, read backwards: a bag of words calls this untouched.
+    const backwards = tokens(DRAFT).reverse().join(" ");
+    expect(kept(DRAFT, backwards)).toBeLessThan(KEEP_AT_LEAST);
   });
 
   it("counts cutting half the mail as losing half of it", () => {

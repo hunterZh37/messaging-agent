@@ -1703,7 +1703,10 @@ main.architecture-page { display: flex; flex-direction: column; height: 100vh; m
 /* "Fix grammar", beside bold and underline (operator, 2026-09-25). It is a
    word rather than a letter, so it takes the width it needs and keeps the
    quiet weight of the marks it sits with. */
-.draft-marks .grammar-btn { width: auto; padding: 0 8px; font-size: 12px; letter-spacing: 0.01em; }
+/* Wider and taller than the letters beside it: a mis-tap on B is nothing,
+   a mis-tap here is a wait and a change to the words (review, 2026-09-25). */
+.draft-marks .grammar-btn { width: auto; height: 30px; padding: 0 12px; font-size: 12px; letter-spacing: 0.01em; }
+@media (max-width: 560px) { .draft-marks .grammar-btn { height: 36px; padding: 0 14px; } }
 .draft-marks .grammar-btn:disabled { opacity: 0.5; cursor: default; }
 /* What the last press of Fix grammar had to say. Unlike the hint beside it,
    this stays on a phone: a refusal nobody can read is a button that looks

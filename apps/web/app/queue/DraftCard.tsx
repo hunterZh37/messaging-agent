@@ -78,6 +78,7 @@ export function DraftCard(props: {
     if (next.text === text) return;
     setText(next.text);
     setRevisedFrom(null);
+    setGrammarNote(null);
     setPicked([next.start, next.end]);
     // After React has painted the new value, or the selection lands in the
     // old string and the operator is left with the cursor somewhere else.
@@ -165,6 +166,9 @@ export function DraftCard(props: {
     setUndoStack((stack) => pushRevision(stack, text));
     setText(next);
     setRevisedFrom(text);
+    // Undo, a rewrite from the Ask panel, a grammar fix: the draft has moved,
+    // so a note about the last one no longer describes it (review, 2026-09-25).
+    setGrammarNote(null);
   };
   const applyFromAsk = useCallback((next: string) => applyLatest.current(next), []);
 
@@ -174,8 +178,25 @@ export function DraftCard(props: {
    * Undo behind it; a reply that came back rewritten rather than corrected is
    * refused in core, and the line beside the button says so.
    */
+  /**
+   * The provider's own failure reads like a stack trace ("fetch failed",
+   * ECONNREFUSED). What the operator needs to know is that the model on this
+   * Mac is not answering (review, 2026-09-25).
+   */
+  function plainError(message: string): string {
+    return /fetch failed|econnrefused|enotfound|network|socket|timed? ?out/i.test(message)
+      ? "The model on this Mac did not answer. Is Ollama running?"
+      : message;
+  }
+
   const [grammarPending, setGrammarPending] = useState(false);
   const [grammarNote, setGrammarNote] = useState<string | null>(null);
+  // What the card holds right now, read when a fix comes back rather than
+  // when it was asked for.
+  const latestText = useRef(text);
+  latestText.current = text;
+  const latestMode = useRef(mode);
+  latestMode.current = mode;
   function fixGrammar() {
     setGrammarNote(null);
     setGrammarPending(true);
@@ -183,9 +204,18 @@ export function DraftCard(props: {
     void fixGrammarAction({ draftId: view.draft.id, current: before })
       .then((r) => {
         setGrammarPending(false);
-        if (!r.ok) return setGrammarNote(r.error);
+        if (!r.ok) return setGrammarNote(plainError(r.error));
         if (r.refused) return setGrammarNote(r.refused);
         if (!r.changed) return setGrammarNote("Nothing to fix.");
+        // The operator kept writing while it thought, or is at the confirm
+        // card: their words are newer than the fix, and dropping the fix on
+        // top would take work away without saying so (review, 2026-09-25).
+        if (latestText.current !== before) {
+          return setGrammarNote("You kept writing, so your words were left as they are. Press it again when you are done.");
+        }
+        if (latestMode.current === "confirm") {
+          return setGrammarNote("The send card was open, so your draft was left as it is.");
+        }
         applyLatest.current(r.text);
       })
       .catch((err) => {
@@ -297,6 +327,8 @@ export function DraftCard(props: {
     setUndoStack(stack);
     setText(previous);
     setRevisedFrom(null);
+    // The draft has gone back; a note about the last fix has gone with it.
+    setGrammarNote(null);
   }
 
   return (
