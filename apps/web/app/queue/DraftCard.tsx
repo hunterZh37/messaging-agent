@@ -449,7 +449,16 @@ export function DraftCard(props: {
             >
               {grammarPending ? "Fixing…" : "Fix grammar"}
             </button>
-            {grammarNote ? <span className="draft-marks-hint">{grammarNote}</span> : <span className="draft-marks-hint">Select a word, then bold it</span>}
+            {/* Its own class, not the hint's: the hint is hidden on a phone,
+                and a refusal that says nothing at all would leave the
+                operator pressing a button that appears to do nothing. */}
+            {grammarNote ? (
+              <span className="draft-marks-note" role="status">
+                {grammarNote}
+              </span>
+            ) : (
+              <span className="draft-marks-hint">Select a word, then bold it</span>
+            )}
           </div>
           <textarea
             className="field draft-field"
@@ -459,6 +468,8 @@ export function DraftCard(props: {
             onChange={(e) => {
               setText(e.target.value);
               setRevisedFrom(null);
+              // A note about the last fix says nothing about these words.
+              setGrammarNote(null);
             }}
             // Nothing to leave: the field is the draft, and clicking away
             // puts the cursor somewhere else rather than putting the field
