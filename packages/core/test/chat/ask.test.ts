@@ -541,6 +541,78 @@ describe("askCeleste and the draft the operator has open", () => {
     expect(listChatMessages(db, chat.id).map((r) => r.contextDraftId)).toEqual(["d1", "d1"]);
   });
 
+  /**
+   * "Draft updated on your screen", with nothing proposed to update it
+   * (operator, 2026-09-24: "draft did not get updated"). She is told once,
+   * and what she says the second time is what the operator reads.
+   */
+  it("sends back an answer that says the draft changed when nothing would change it", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "Can you make Friday?" }]);
+    seedDraft(db);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      textResponse("Draft updated on your screen with the folder link."),
+      toolResponse([{ id: "tu1", name: "propose_action", input: { kind: "apply_draft", draft_text: "Friday works. The folder is ready." } }]),
+      textResponse("The draft is updated on your screen: it now mentions the folder."),
+    ]);
+
+    const turn = await askCeleste(
+      db,
+      { client, clock: clockFrom(1000) },
+      { chatId: chat.id, question: "say the folder is ready", contextThreadId: null, contextDraft: openDraft },
+    );
+
+    // Told what was wrong, in the same conversation.
+    const sentBack = JSON.stringify(client.requests[1]!.messages);
+    expect(sentBack).toContain("proposed nothing that changes it");
+    // The second answer proposes the change, so the claim in it is true.
+    expect(turn.actions.map((a) => a.kind)).toEqual(["apply_draft"]);
+    expect(turn.assistant.content).not.toContain("was not changed");
+  });
+
+  it("says plainly under the answer when it claims the change a second time", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "Can you make Friday?" }]);
+    seedDraft(db);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      textResponse("Draft updated on your screen."),
+      textResponse("I updated the draft, as I said."),
+    ]);
+
+    const turn = await askCeleste(
+      db,
+      { client, clock: clockFrom(1000) },
+      { chatId: chat.id, question: "say the folder is ready", contextThreadId: null, contextDraft: openDraft },
+    );
+
+    expect(turn.actions).toEqual([]);
+    expect(turn.assistant.content).toContain("The draft on your screen was not changed.");
+  });
+
+  it("leaves an answer that proposes the change alone", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "Can you make Friday?" }]);
+    seedDraft(db);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "propose_action", input: { kind: "apply_draft", draft_text: "Friday works. The folder is ready." } }]),
+      textResponse("The draft is updated on your screen."),
+    ]);
+
+    const turn = await askCeleste(
+      db,
+      { client, clock: clockFrom(1000) },
+      { chatId: chat.id, question: "say the folder is ready", contextThreadId: null, contextDraft: openDraft },
+    );
+
+    expect(turn.actions.map((a) => a.kind)).toEqual(["apply_draft"]);
+    expect(turn.assistant.content).not.toContain("was not changed");
+    // One pass only: nothing was sent back.
+    expect(client.requests).toHaveLength(2);
+  });
+
   it("names the files on the draft and fences the text she is shown", async () => {
     const db = testDb();
     seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "Can you make Friday?" }]);

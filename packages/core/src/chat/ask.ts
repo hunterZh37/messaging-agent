@@ -7,6 +7,7 @@ import { HUMAN_STYLE_RULE, humanizePunctuation } from "../draft/style";
 import { describeThreads, renderChatFiles, renderContextDraft, renderThread } from "./context";
 import { listMailForChat, MAX_LIST_LIMIT, type ChatStatus, type ChatWindow } from "./list";
 import { MAX_SEARCH_LIMIT, searchMessages } from "./search";
+import { CLAIM_CORRECTION, CLAIM_WARNING, changesTheDraft, claimsDraftChanged } from "./claims";
 import { checkQuotes, QUOTE_WARNING, quoteCorrection } from "./quotes";
 import { appendChatMessage, listChatMessages } from "./store";
 import {
@@ -63,7 +64,7 @@ Drafting a reply for them:
 - Ask or act, never both. If you are unsure what they want, ask your question and propose nothing. If you propose, do not ask whether you should have: the draft is already on their screen, so an answer that asks "do you want me to start a fresh reply?" and then says "the draft is on your screen now" contradicts itself.
 
 The draft they have open:
-- When a draft is shown below and they ask for a change to it — shorter, warmer, add a line, answer the second question too — say in one sentence what you changed, and propose "apply_draft" with the whole revised body in "draft_text". The body is complete mail, not a diff and not an excerpt: it lands on their card the moment you propose it, so speak of the change as done, and they can undo it. Keep everything they did not ask you to touch, in their language and their tone. The body follows the operator's writing rule: ${HUMAN_STYLE_RULE.replace(/^- /, "")}
+- When a draft is shown below and they ask for a change to it — shorter, warmer, add a line, answer the second question too — say in one sentence what you changed, and propose "apply_draft" with the whole revised body in "draft_text". The body is complete mail, not a diff and not an excerpt: it lands on their card the moment you propose it, and they can undo it. Say the draft has changed only in the same answer as that proposal: without it the card in front of them has not moved, and "the draft is updated on your screen" is then simply untrue (2026-09-24). Keep everything they did not ask you to touch, in their language and their tone. The body follows the operator's writing rule: ${HUMAN_STYLE_RULE.replace(/^- /, "")}
 - Files they attached to it are listed under the draft, with the text of any PDF that had one. They put them there, so there is nothing to propose: when they ask what one is, say in a line what it is and whether it fits the thread.
 - Never send it. The button puts your text on their card; they still read it and press Send themselves.
 
@@ -490,13 +491,24 @@ export async function askCeleste(db: Db, deps: AskDeps, input: AskInput): Promis
 
     answer = said.length > 0 ? said.join("\n\n") : "I could not work that out.";
     const mismatches = checkQuotes(db, answer);
-    if (mismatches.length === 0) break;
+    // Saying the draft has changed is a claim about what the operator is
+    // looking at, and it was being made with nothing proposed to change it
+    // (2026-09-24). Checked like a quote, and sent back the same once.
+    const saidWithoutDoing = claimsDraftChanged(answer) && !changesTheDraft(proposals, draftThreadId);
+    if (mismatches.length === 0 && !saidWithoutDoing) break;
     if (pass === 1) {
-      answer = `${answer}\n\n${QUOTE_WARNING}`;
+      if (mismatches.length > 0) answer = `${answer}\n\n${QUOTE_WARNING}`;
+      if (saidWithoutDoing) answer = `${answer}\n\n${CLAIM_WARNING}`;
       break;
     }
     conversation.push({ role: "assistant", content: answer });
-    conversation.push({ role: "user", content: quoteCorrection(mismatches) });
+    conversation.push({
+      role: "user",
+      content: [mismatches.length > 0 ? quoteCorrection(mismatches) : "", saidWithoutDoing ? CLAIM_CORRECTION : ""].filter(Boolean).join("\n\n"),
+    });
+    // The round that follows answers afresh: what it proposed before was not
+    // acted on, and a second copy of it would be a second button.
+    proposals.length = 0;
   }
   // Named here, where there is a database: the panel shows what each thread
   // is, and a stored turn still says it a week later.
