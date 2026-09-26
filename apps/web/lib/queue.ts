@@ -602,6 +602,42 @@ export function deletingThreadIds(s: SendState): string[] {
 }
 
 /**
+ * Which way the open thread's pane leaves the screen, as a class on it.
+ *
+ * A sweep is something the operator watches happen: the thread was on the
+ * screen, they pressed Delete, it goes. So it is read as a change, from what
+ * was true when the pane opened. A pane that is hidden from the moment it
+ * opens is not an animation, it is a thread that cannot be read — which is
+ * what Deleted items was (operator, 2026-09-25: "I cannot view the content
+ * of the deleted emails when I click on the email card"). That folder lists
+ * exactly the threads this session deleted, every one of them still on
+ * `gone` for the session, and the sweep ends at `opacity: 0` and stays
+ * there.
+ */
+export function paneSweep(
+  now: { going: boolean; handled: boolean; back: boolean },
+  opened: { going: boolean; handled: boolean },
+): "" | " deleting" | " handling" | " returning" {
+  // Already gone when this pane opened: it is being read, not thrown away.
+  if (now.going) return opened.going ? "" : " deleting";
+  if (now.handled) return opened.handled ? "" : " handling";
+  if (now.back) return " returning";
+  return "";
+}
+
+/**
+ * What a pane's `opened` baseline should hold, given what it held a render
+ * ago and what is true of the thread now (2026-09-25). React keeps the pane's
+ * element across a move from one thread to the next, so the baseline is only
+ * good for the thread it was taken for: the same thread keeps it, so a delete
+ * mid-read still sweeps; a different thread replaces it, or the new thread's
+ * pane would open reading the old thread's history.
+ */
+export function openedPane<T extends { threadId: string }>(previous: T, current: T): T {
+  return previous.threadId === current.threadId ? previous : current;
+}
+
+/**
  * How many texts a card's Undo can walk back through (spec 8, 2026-09-10).
  * Ten is generous for one sitting and keeps a long conversation with
  * Celeste from growing without end.

@@ -21,6 +21,8 @@ import {
   dueTrash,
   leavingThreadIds,
   deletingThreadIds,
+  paneSweep,
+  openedPane,
   threadCountLabel,
   restoredToastLabel,
   handledThreadIds,
@@ -761,5 +763,94 @@ describe("hidden threads stay in the folder", () => {
     // Undo of the hide lets it back onto the sorting lists.
     s = sendReducer(s, { type: "undo_started", job: hideJob });
     expect(leavingThreadIds(s)).toEqual(["a1:deleted"]);
+  });
+});
+
+/**
+ * A deleted thread can still be read (operator, 2026-09-25: "I cannot view
+ * the content of the deleted emails when I click on the email card"). Deleted
+ * items lists the threads this session deleted, every one of them still on
+ * `gone`, and the sweep ends at `opacity: 0` and stays there: read as a state
+ * rather than as a change, it opened the pane already empty.
+ */
+describe("paneSweep", () => {
+  const nothing = { going: false, handled: false, back: false };
+
+  it("does not sweep a thread that was already gone when the pane opened", () => {
+    expect(paneSweep({ ...nothing, going: true }, { going: true, handled: false })).toBe("");
+  });
+
+  it("sweeps the thread the operator deletes while reading it", () => {
+    expect(paneSweep({ ...nothing, going: true }, { going: false, handled: false })).toBe(" deleting");
+  });
+
+  it("does not sweep a thread that was already handled when the pane opened", () => {
+    expect(paneSweep({ ...nothing, handled: true }, { going: false, handled: true })).toBe("");
+  });
+
+  it("sweeps the thread the operator marks handled while reading it", () => {
+    expect(paneSweep({ ...nothing, handled: true }, { going: false, handled: false })).toBe(" handling");
+  });
+
+  it("runs the sweep in reverse on the way back from Cmd-Z", () => {
+    expect(paneSweep({ ...nothing, back: true }, { going: false, handled: false })).toBe(" returning");
+  });
+
+  it("stays put when nothing is happening to the thread", () => {
+    expect(paneSweep(nothing, { going: false, handled: false })).toBe("");
+  });
+
+  /** Both at once: a delete decides it, and an old one still reads. */
+  it("keeps a gone-and-handled thread readable rather than filing it away", () => {
+    expect(paneSweep({ going: true, handled: true, back: false }, { going: true, handled: true })).toBe("");
+  });
+});
+
+describe("openedPane", () => {
+  it("keeps the old baseline for the same thread, so a delete mid-read still sweeps", () => {
+    const previous = { threadId: "a1:t1", going: false, handled: false };
+    const current = { threadId: "a1:t1", going: true, handled: false };
+    expect(openedPane(previous, current)).toBe(previous);
+  });
+
+  it("takes the new baseline on a switch to a different thread", () => {
+    const previous = { threadId: "a1:t1", going: true, handled: false };
+    const current = { threadId: "a1:t2", going: false, handled: false };
+    expect(openedPane(previous, current)).toBe(current);
+  });
+});
+
+/**
+ * The state Deleted items is actually in: a thread deleted a moment ago is on
+ * `gone` for the rest of the session, and its card in Deleted items opens a
+ * pane that must be readable.
+ */
+describe("a thread read in Deleted items after this session deleted it", () => {
+  const empty: SendState = { pending: [], inFlight: [], sent: [], trash: [], trashInFlight: [], trashed: [], gone: [], done: [], restoring: [], returning: [], handling: [], handled: [] };
+
+  it("is on the deleting list, and its pane still shows", () => {
+    const s = sendReducer(empty, { type: "trash_done", job: trashJob(["a1:t1"], 1, "d1") });
+    const going = deletingThreadIds(s).includes("a1:t1");
+    expect(going).toBe(true);
+    // The pane opens with the delete already done: nothing sweeps.
+    expect(paneSweep({ going, handled: false, back: false }, { going, handled: false })).toBe("");
+  });
+
+  /**
+   * The regression itself (operator, 2026-09-25): reading a deleted thread in
+   * Deleted items, then navigating to a live one, must not carry the first
+   * thread's already-gone baseline onto the second — or deleting the thread
+   * being read would sweep nothing.
+   */
+  it("still sweeps a thread deleted after navigating away from a thread read in Deleted items", () => {
+    let s = sendReducer(empty, { type: "trash_done", job: trashJob(["a1:t1"], 1, "d1") });
+    // Opens on the already-deleted thread first.
+    let opened = { threadId: "a1:t1", going: deletingThreadIds(s).includes("a1:t1"), handled: false };
+    // React reuses the pane on a client navigation to a live thread: the baseline reseeds.
+    opened = openedPane(opened, { threadId: "a1:t2", going: deletingThreadIds(s).includes("a1:t2"), handled: false });
+    // The operator deletes the thread they are now looking at.
+    s = sendReducer(s, { type: "trash_done", job: trashJob(["a1:t2"], 2, "d2") });
+    const going = deletingThreadIds(s).includes("a1:t2");
+    expect(paneSweep({ going, handled: false, back: false }, opened)).toBe(" deleting");
   });
 });
