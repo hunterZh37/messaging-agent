@@ -15,6 +15,7 @@ import { ContextDraftCard, type AttachResult } from "../ask/AskProvider";
 import { ClipIcon } from "./AttachmentPreview";
 import { DraftAttachmentChips, type CardFile } from "./DraftAttachments";
 import { SendPreviewDialog } from "./SendPreviewDialog";
+import { useSendGate } from "./SendProvider";
 import { Thread } from "./Thread";
 import { ChannelIcon } from "../inbox/icons";
 
@@ -49,6 +50,9 @@ export function DraftCard(props: {
   // A text (2026-09-11): one person, no Cc, no subject, no files this phase.
   const isText = view.account.provider === "imessage" || view.account.provider === "whatsapp";
   const showThread = props.showThread !== false;
+  // The app's own voice, for the things this card does that leave no mark on
+  // the screen the operator is watching.
+  const { say } = useSendGate();
   const [text, setText] = useState(props.initialEdit?.text ?? view.draft.originalText);
   // What is selected in the body, kept so the B and U buttons act on it: a
   // press on a button takes the focus off the textarea, and the selection
@@ -177,6 +181,14 @@ export function DraftCard(props: {
    * taken out and nothing else touched. It lands like any other change, with
    * Undo behind it; a reply that came back rewritten rather than corrected is
    * refused in core, and the line beside the button says so.
+   *
+   * Whatever comes of it is said out loud as well (operator, 2026-09-28: "I
+   * don't think Fix Grammar button worked because when I pressed Fix Grammar
+   * the content didn't change"). Their draft had nothing wrong with it, so
+   * nothing changed and the card said so in eleven-point grey beside a button
+   * they had stopped looking at ten seconds earlier. A press that takes that
+   * long has to answer where the operator is, and the app answers in its
+   * toasts.
    */
   /**
    * The provider's own failure reads like a stack trace ("fetch failed",
@@ -191,6 +203,15 @@ export function DraftCard(props: {
 
   const [grammarPending, setGrammarPending] = useState(false);
   const [grammarNote, setGrammarNote] = useState<string | null>(null);
+  /**
+   * What came of the press, twice over: beside the button, where the whole
+   * sentence fits and stays for as long as the draft is untouched, and in the
+   * app's own toast, which is where the operator is actually looking.
+   */
+  function note(beside: string, aloud: string): void {
+    setGrammarNote(beside);
+    say(aloud);
+  }
   // What the card holds right now, read when a fix comes back rather than
   // when it was asked for.
   const latestText = useRef(text);
@@ -204,23 +225,26 @@ export function DraftCard(props: {
     void fixGrammarAction({ draftId: view.draft.id, current: before })
       .then((r) => {
         setGrammarPending(false);
-        if (!r.ok) return setGrammarNote(plainError(r.error));
-        if (r.refused) return setGrammarNote(r.refused);
-        if (!r.changed) return setGrammarNote("Nothing to fix.");
+        if (!r.ok) return note(plainError(r.error), "Could not fix the grammar");
+        if (r.refused) return note(r.refused, "Your draft was left as it is");
+        if (!r.changed) return note("Nothing to fix.", "Nothing to fix — the grammar is already right");
         // The operator kept writing while it thought, or is at the confirm
         // card: their words are newer than the fix, and dropping the fix on
         // top would take work away without saying so (review, 2026-09-25).
         if (latestText.current !== before) {
-          return setGrammarNote("You kept writing, so your words were left as they are. Press it again when you are done.");
+          return note("You kept writing, so your words were left as they are. Press it again when you are done.", "You kept writing, so your words were kept");
         }
         if (latestMode.current === "confirm") {
-          return setGrammarNote("The send card was open, so your draft was left as it is.");
+          return note("The send card was open, so your draft was left as it is.", "The send card was open, so nothing changed");
         }
         applyLatest.current(r.text);
+        // The change itself is the answer, and it can be one comma: said out
+        // loud, with the way back behind it, exactly as a send is.
+        say("Grammar fixed", { undo: () => undoLatest.current() });
       })
       .catch((err) => {
         setGrammarPending(false);
-        setGrammarNote((err as Error).message);
+        note(plainError((err as Error).message), "Could not fix the grammar");
       });
   }
 
@@ -330,6 +354,16 @@ export function DraftCard(props: {
     // The draft has gone back; a note about the last fix has gone with it.
     setGrammarNote(null);
   }
+  /**
+   * The same Undo, for a toast that outlives the render that raised it. The
+   * link beside the label is wired afresh every render and is always right;
+   * a toast holds the callback it was given, and the one from eleven seconds
+   * ago remembers an undo stack from before the fix was pushed onto it — so
+   * it would have restored the wrong words, or silently none (review,
+   * 2026-09-28).
+   */
+  const undoLatest = useRef(undoRevision);
+  undoLatest.current = undoRevision;
 
   return (
     <div

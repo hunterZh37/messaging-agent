@@ -79,10 +79,13 @@ export function ThreadDraftHost({
       ) : null}
       <div className="row thread-actions">
         {/* The card above is the draft, so there is nothing here to open.
-            A thread the operator wrote last gets no button either
-            (operator, 2026-09-11: no Celeste drafts for sent mail, they
-            only cost tokens). */}
-        {card || followUp || !canReply ? null : <DraftReplyButton threadId={threadId} followUp={followUp} text={text} />}
+            A thread the operator wrote last offers a nudge instead of an
+            answer: the button was taken away on 2026-09-11 because drafts
+            for sent mail "only cost tokens", which was true of drafts that
+            wrote themselves and is not true of this one — nothing runs until
+            it is pressed, and a press is about a penny (operator,
+            2026-09-28: "why is the draft with Celeste button gone?"). */}
+        {card || !canReply ? null : <DraftReplyButton threadId={threadId} followUp={followUp} text={text} />}
         {children}
       </div>
     </>
