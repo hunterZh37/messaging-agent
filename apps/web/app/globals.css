@@ -335,7 +335,9 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
    the bottom of a fixed rail put them out of reach altogether (2026-09-28).
    They scroll among themselves instead, and the links below stay put. */
 .people-tree { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); flex: 0 0 auto; }
-.tree-section-label { padding: 0 8px 4px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.tree-section-label { display: flex; align-items: baseline; gap: 6px; padding: 0 8px 4px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+/* The number sits where a folder row's count sits, on the same line. */
+.tree-section-label .tree-count { letter-spacing: normal; }
 /* One person's row: the link fills it, and the ✕ sits at the end without
    being inside the link, which no anchor may hold (2026-09-28). It waits for
    the pointer or the keyboard rather than sitting there being pressable —

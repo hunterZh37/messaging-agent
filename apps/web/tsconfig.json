@@ -9,6 +9,6 @@
     "plugins": [{ "name": "next" }],
     "paths": { "@/*": ["./*"] }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next.nosync/types/**/*.ts"],
+  "exclude": ["node_modules", "**/* [0-9].ts", "**/* [0-9].tsx"]
 }

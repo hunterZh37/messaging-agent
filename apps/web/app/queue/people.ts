@@ -14,7 +14,18 @@ import { core } from "@/lib/core";
  * both sides need and the rail picks. Someone reached both ways is in both
  * lists, counted once here.
  */
-export function sidebarPeople(): Person[] {
+export interface SidebarPeople {
+  /** Enough people for either side of the toggle to show a full eight. */
+  list: Person[];
+  /** How many the operator has on each side, which the rail says beside its
+   * heading (operator, 2026-09-29: "next to the text there should be a number
+   * for displaying how many contacts should be shown") — so eight rows read
+   * as the top of a longer list rather than as the whole of it. */
+  mail: number;
+  chat: number;
+}
+
+export function sidebarPeople(): SidebarPeople {
   const { db } = core();
   const everyone = frequentPeople(db);
   const picked: Person[] = [];
@@ -28,5 +39,10 @@ export function sidebarPeople(): Person[] {
     }
   }
   // Best first, whichever side they came from: the rail slices this in order.
-  return picked.sort((a, b) => b.score - a.score || b.lastAt - a.lastAt);
+  picked.sort((a, b) => b.score - a.score || b.lastAt - a.lastAt);
+  return {
+    list: picked,
+    mail: everyone.filter((p) => p.channels.includes("mail")).length,
+    chat: everyone.filter((p) => p.channels.includes("chat")).length,
+  };
 }

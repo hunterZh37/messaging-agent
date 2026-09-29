@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import type { Person } from "@messaging-agent/core";
+import type { SidebarPeople } from "./people";
 import { SIDEBAR_PEOPLE } from "@messaging-agent/core/people";
 import { activeTreeKey, rowsForSide, sideHref, sideOfPath, treeRows, type TreeIcon, type TreeSide, type ViewParams } from "@/lib/folders";
 import { useAsk } from "../ask/AskProvider";
@@ -326,7 +327,7 @@ function Tree(props: { counts: TreeCounts; activeKey: string; params: ViewParams
  * pressed often is a mis-tap on a phone. Nothing is deleted — what they send
  * from now on still counts, which is how somebody comes back.
  */
-function People(props: { people: Person[]; pathname: string; side: TreeSide; inDrawer: boolean }) {
+function People(props: { people: SidebarPeople; pathname: string; side: TreeSide; inDrawer: boolean }) {
   const { say } = useSendGate();
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -335,9 +336,20 @@ function People(props: { people: Person[]; pathname: string; side: TreeSide; inD
   const [gone, setGone] = useState<string[]>([]);
 
   const wanted = props.side === "messages" ? "chat" : "mail";
-  const people = props.people
+  const people = props.people.list
     .filter((p) => p.channels.includes(wanted) && !gone.includes(p.key))
     .slice(0, SIDEBAR_PEOPLE);
+  // How many there are on this side: eight rows read as the top of a longer
+  // list rather than as the whole of it. Only the ones the server has not
+  // caught up with yet are taken off by hand — subtracting every removal
+  // outright took each of them off twice, once here and once when the fresh
+  // count arrived (seen in the browser, 2026-09-29) — and only the ones this
+  // side counts, or somebody taken off the Messages list came off the Mail
+  // number too (review, 2026-09-29).
+  const unseen = gone.filter((key) =>
+    props.people.list.some((p) => p.key === key && p.channels.includes(wanted)),
+  ).length;
+  const total = Math.max(people.length, (wanted === "chat" ? props.people.chat : props.people.mail) - unseen);
   if (people.length === 0) return null;
 
   function bump(person: Person) {
@@ -365,7 +377,10 @@ function People(props: { people: Person[]; pathname: string; side: TreeSide; inD
 
   return (
     <div className="tree people-tree">
-      <div className="tree-section-label">People</div>
+      <div className="tree-section-label">
+        <span>People</span>
+        <span className="tree-count">{total}</span>
+      </div>
       {people.map((p) => {
         const href = `/people/${encodeURIComponent(p.key)}`;
         const on = props.pathname === href;
@@ -401,7 +416,7 @@ function People(props: { people: Person[]; pathname: string; side: TreeSide; inD
  * in, which every row carries, so picking a folder or a child row changes
  * that and leaves the window, the money side and the project alone.
  */
-export function Nav(props: { counts: TreeCounts; people: Person[]; params?: ViewParams }) {
+export function Nav(props: { counts: TreeCounts; people: SidebarPeople; params?: ViewParams }) {
   const pathname = usePathname() ?? "/";
   const params = useSearchParams();
   const [open, setOpen] = useState(false);

@@ -14,6 +14,13 @@ const csp =
   "default-src 'self'; img-src 'self' https: data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; frame-src 'self'; object-src 'none'";
 
 const config: NextConfig = {
+  // This repo lives under ~/Desktop, which iCloud Drive syncs. It was carrying
+  // 1.8GB of build output up to iCloud and writing conflict copies back down
+  // beside the originals — "routes.d 2.ts" next to "routes.d.ts", identical
+  // but for their permissions — which `tsc` then read as a second declaration
+  // of everything and refused to typecheck (2026-09-29). iCloud leaves a
+  // `.nosync` name alone, so the build output stays on this Mac.
+  distDir: ".next.nosync",
   transpilePackages: ["@messaging-agent/core"],
   // `pdf-parse` reads the text of a file dropped on a draft (spec 8,
   // 2026-09-10); it carries pdfjs and a native canvas binding, so it is left
