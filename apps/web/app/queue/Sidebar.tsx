@@ -14,6 +14,7 @@ import { ArchitectureDialog } from "./ArchitectureDialog";
 import { ThemeToggle } from "./ThemeToggle";
 import { NotifyToggle } from "./NotifyToggle";
 import { LinkPending } from "./LinkPending";
+import { NavPendingOverlay } from "./NavPendingOverlay";
 import { useListAdjustVersion } from "./useListAdjust";
 import { lessGone, listAdjust } from "@/lib/listAdjust";
 
@@ -373,6 +374,7 @@ function People(props: { people: Person[]; pathname: string; side: TreeSide; inD
           <div key={p.key} className="people-row">
             <Link href={href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>
               <span className="tree-label">{name}</span>
+              <LinkPending />
             </Link>
             {props.inDrawer ? null : (
               <button
@@ -571,6 +573,9 @@ export function Nav(props: { counts: TreeCounts; people: Person[]; params?: View
       <nav className="side" aria-label="Primary">
         {content(false)}
       </nav>
+      {/* Once, beside the rails rather than inside either: it belongs to the
+          whole window, and the drawer is not always there (2026-09-29). */}
+      <NavPendingOverlay />
     </>
   );
 }

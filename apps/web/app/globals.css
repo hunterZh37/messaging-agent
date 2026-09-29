@@ -241,7 +241,11 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 /* Why Send is held back, beside the button while editing (stress audit, 2026-09-11). */
 .send-block { color: var(--muted); font-size: 13px; align-self: center; }
 
-.toasts { position: fixed; left: 16px; right: 16px; bottom: 92px; display: flex; flex-direction: column; gap: 8px; z-index: 20; }
+/* Above the glass that goes over a slow navigation: a toast answers for what
+   the operator already did, and its Undo has to stay reachable. Removing
+   somebody and then pressing a folder put the only way back behind the blur
+   (review, 2026-09-29). */
+.toasts { position: fixed; left: 16px; right: 16px; bottom: 92px; display: flex; flex-direction: column; gap: 8px; z-index: 80; }
 .toast { background: var(--toastbg); color: var(--toastfg); border-radius: 10px; padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22); font-size: 14px; }
 /* A delete of many under way (2026-09-13): the words, and a bar filling beneath them. */
 .toast.working { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -381,6 +385,46 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 .unlock-form .field { height: 48px; font-size: 16px; }
 .unlock-form .btn { height: 48px; justify-content: center; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* The app saying it is busy (operator, 2026-09-29: "a loading icon popover in
+   the middle while the background is glassy or dark"). It is only ever up for
+   a wait that ran long: `PENDING_AFTER_MS` holds it back through the fifth of
+   a second most pages arrive in. Above the drawer and its overlay, below
+   nothing — while it is up, the press has landed and a second one would only
+   race the first. */
+.nav-loading {
+  /* Above everything the app puts on screen — the drawer, a dialog's scrim,
+     an open menu — because while it is up the press has landed and nothing
+     underneath should take another. */
+  position: fixed; inset: 0; z-index: 70;
+  display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--bg) 55%, transparent);
+  /* Unprefixed only: written with the -webkit- twin beside it, the CSS build
+     kept the prefixed one and threw the standard property away, and this
+     browser does not take the prefixed one — so the glass was not glass at
+     all (seen in the browser, 2026-09-29). The build adds what it needs. */
+  backdrop-filter: blur(7px);
+  animation: nav-loading-in 140ms ease-out;
+}
+/* Without backdrop-filter there is no glass, so the page dims instead: a
+   see-through layer over unblurred text reads as a rendering fault. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .nav-loading { background: color-mix(in srgb, var(--bg) 82%, transparent); }
+}
+@keyframes nav-loading-in { from { opacity: 0; } to { opacity: 1; } }
+.nav-loading-ring {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 2.5px solid color-mix(in srgb, var(--fg) 18%, transparent);
+  border-top-color: var(--accent);
+  animation: nav-loading-spin 720ms linear infinite;
+}
+@keyframes nav-loading-spin { to { transform: rotate(360deg); } }
+/* Still an answer without the motion: the ring holds, and the glass says the
+   app is busy on its own. */
+@media (prefers-reduced-motion: reduce) {
+  .nav-loading { animation: none; }
+  .nav-loading-ring { animation: none; border-top-color: var(--accent); }
+}
 
 /* Mail or Messages (2026-09-14): a two-way switch at the top of the column. */
 .side-toggle { position: relative; isolation: isolate; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 3px; margin-block: 4px 12px; border-radius: 10px; background: color-mix(in srgb, var(--fg) 6%, transparent); }
