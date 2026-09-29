@@ -126,6 +126,29 @@ describe("frequentPeople", () => {
     expect(people[0]?.name).toBe("Sam");
   });
 
+  /**
+   * Where a person was reached, so the same name twice reads as two ways of
+   * reaching somebody rather than as a fault (operator, 2026-09-29: "do not
+   * merge but display if the contact is from email (which inbox) or whatsapp
+   * or message").
+   */
+  it("says which inboxes a person was seen in", () => {
+    const d = db();
+    mail(d, { from: "ana@example.com", at: NOW });
+    expect(frequentPeople(d, { now: NOW })[0]?.from).toEqual(["me@example.com"]);
+  });
+
+  it("names every inbox when somebody writes to more than one, busiest first", () => {
+    const d = db();
+    // Two in the chat account, one in the mail one: the rail has room for a
+    // single name beside theirs, so the busiest has to come first.
+    mail(d, { from: "ana@example.com", at: NOW - DAY, account: "a1" });
+    mail(d, { from: "ana@example.com", at: NOW - 2 * DAY, account: "a2" });
+    mail(d, { from: "ana@example.com", at: NOW, account: "a2" });
+    const ana = frequentPeople(d, { now: NOW })[0];
+    expect(ana?.from).toEqual(["texts@example.com", "me@example.com"]);
+  });
+
   it("gives back no more than it was asked for, best first", () => {
     const d = db();
     for (const who of ["a", "b", "c", "d"]) mail(d, { from: `${who}@example.com`, at: NOW - who.charCodeAt(0) * DAY });

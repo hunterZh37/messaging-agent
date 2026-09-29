@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import type { Person } from "@messaging-agent/core";
 import type { SidebarPeople } from "./people";
-import { SIDEBAR_PEOPLE } from "@messaging-agent/core/people";
+import { PEOPLE_CHOICES, SIDEBAR_PEOPLE } from "@messaging-agent/core/people";
 import { activeTreeKey, rowsForSide, sideHref, sideOfPath, treeRows, type TreeIcon, type TreeSide, type ViewParams } from "@/lib/folders";
 import { useAsk } from "../ask/AskProvider";
 import { useSendGate } from "./SendProvider";
@@ -16,6 +16,8 @@ import { ThemeToggle } from "./ThemeToggle";
 import { NotifyToggle } from "./NotifyToggle";
 import { LinkPending } from "./LinkPending";
 import { NavPendingOverlay } from "./NavPendingOverlay";
+import { ChannelIcon } from "../inbox/icons";
+import { shortAccount } from "@/lib/format";
 import { useListAdjustVersion } from "./useListAdjust";
 import { lessGone, listAdjust } from "@/lib/listAdjust";
 
@@ -281,6 +283,17 @@ function SideToggle(props: { side: TreeSide; counts: TreeCounts; params: ViewPar
 
 const SIDE_KEY = "celeste-side";
 
+/** Which account an inbox address belongs to, for its glyph: the two chat
+ * accounts are named rather than addressed (see `shortAccount`). */
+function providerOf(email: string): string {
+  if (email.startsWith("whatsapp:")) return "whatsapp";
+  if (email.startsWith("messages:")) return "imessage";
+  return "imap";
+}
+
+/** Where the rail remembers how many people to show. */
+const PEOPLE_COUNT_KEY = "celeste.people.count";
+
 /** Until when a menu that opens should stay open: set by a Mail / Messages switch made while the phone menu is open (2026-09-15). */
 let keepMenuOpenUntil = 0;
 
@@ -335,21 +348,32 @@ function People(props: { people: SidebarPeople; pathname: string; side: TreeSide
   // the rail is the thing the operator is looking at.
   const [gone, setGone] = useState<string[]>([]);
 
+  // How many to show, which is what the number beside the heading is for
+  // (operator, 2026-09-29: "we only want to display maybe 5 people at a time,
+  // that is what the number is for"). Remembered in this browser, the way the
+  // Mail/Messages side already is.
+  const [howMany, setHowMany] = useState<number>(SIDEBAR_PEOPLE);
+  useEffect(() => {
+    try {
+      const kept = Number(window.localStorage.getItem(PEOPLE_COUNT_KEY));
+      if (PEOPLE_CHOICES.includes(kept as (typeof PEOPLE_CHOICES)[number])) setHowMany(kept);
+    } catch {
+      /* storage off: the default stands */
+    }
+  }, []);
+  function showThisMany(next: number) {
+    setHowMany(next);
+    try {
+      window.localStorage.setItem(PEOPLE_COUNT_KEY, String(next));
+    } catch {
+      /* storage off: it holds for this page */
+    }
+  }
+
   const wanted = props.side === "messages" ? "chat" : "mail";
   const people = props.people.list
     .filter((p) => p.channels.includes(wanted) && !gone.includes(p.key))
-    .slice(0, SIDEBAR_PEOPLE);
-  // How many there are on this side: eight rows read as the top of a longer
-  // list rather than as the whole of it. Only the ones the server has not
-  // caught up with yet are taken off by hand — subtracting every removal
-  // outright took each of them off twice, once here and once when the fresh
-  // count arrived (seen in the browser, 2026-09-29) — and only the ones this
-  // side counts, or somebody taken off the Messages list came off the Mail
-  // number too (review, 2026-09-29).
-  const unseen = gone.filter((key) =>
-    props.people.list.some((p) => p.key === key && p.channels.includes(wanted)),
-  ).length;
-  const total = Math.max(people.length, (wanted === "chat" ? props.people.chat : props.people.mail) - unseen);
+    .slice(0, howMany);
   if (people.length === 0) return null;
 
   function bump(person: Person) {
@@ -379,7 +403,21 @@ function People(props: { people: SidebarPeople; pathname: string; side: TreeSide
     <div className="tree people-tree">
       <div className="tree-section-label">
         <span>People</span>
-        <span className="tree-count">{total}</span>
+        {/* The number is the setting, not a tally: it says how many names are
+            under it, and changing it changes that. */}
+        <select
+          className="tree-count people-many"
+          value={howMany}
+          onChange={(e) => showThisMany(Number(e.target.value))}
+          aria-label="How many people to show"
+          title="How many people to show"
+        >
+          {PEOPLE_CHOICES.map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
       </div>
       {people.map((p) => {
         const href = `/people/${encodeURIComponent(p.key)}`;
@@ -388,7 +426,20 @@ function People(props: { people: SidebarPeople; pathname: string; side: TreeSide
         return (
           <div key={p.key} className="people-row">
             <Link href={href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>
-              <span className="tree-label">{name}</span>
+              <span className="person-lines" title={p.from.map(shortAccount).join(", ")}>
+                <span className="tree-label">{name}</span>
+                {/* Where they were reached. The same name twice is two ways of
+                    reaching somebody, not a fault, and only this says so
+                    (operator, 2026-09-29). */}
+                <span className="person-from">
+                  <ChannelIcon provider={providerOf(p.from[0] ?? "")} />
+                  <span className="person-source">{shortAccount(p.from[0] ?? "")}</span>
+                  {/* The rest are counted rather than listed: a rail 220px
+                      wide has room for one inbox, and four of them wrapped
+                      over each other (seen in the browser, 2026-09-29). */}
+                  {p.from.length > 1 ? <span className="person-more">{`+${p.from.length - 1}`}</span> : null}
+                </span>
+              </span>
               <LinkPending />
             </Link>
             {props.inDrawer ? null : (

@@ -23,7 +23,7 @@ import { inboxRowsWhere, type InboxRow } from "../queue/inbox";
 
 /** How long a message keeps half its weight: about six weeks. */
 export const HALF_LIFE_MS = 45 * 86_400_000;
-export { SIDEBAR_PEOPLE } from "./limits";
+export { SIDEBAR_PEOPLE, PEOPLE_CHOICES, PEOPLE_MAX } from "./limits";
 
 /** What one message is worth now, by how long ago it was. */
 export function weight(sentAt: number, at: number): number {
@@ -46,6 +46,17 @@ export interface Person {
   handles: string[];
   /** Which ways they are reached, in a steady order. */
   channels: ("chat" | "mail")[];
+  /**
+   * The inboxes this person was seen in, busiest first, by the address each
+   * one is named by — "hunter@…" for mail, "whatsapp:…" or "messages:…" for
+   * the two chat accounts. The rail says the first beside their name, because
+   * the same name
+   * turning up twice reads as a fault until you can see that one of them is
+   * WhatsApp and the other is a work address (operator, 2026-09-29: "do not
+   * merge but display if the contact is from email (which inbox) or whatsapp
+   * or message").
+   */
+  from: string[];
   /** The last time anything passed between them and the operator. */
   lastAt: number;
   /** How many messages that is, all time. */
@@ -86,6 +97,8 @@ interface Tally {
   bumped: number | null;
   /** The newest thing said since they were put aside, 0 if nothing. */
   since: number;
+  /** The accounts this handle was seen in, and how much of it was in each. */
+  accounts: Map<string, number>;
 }
 
 const held = new WeakMap<object, { at: number; people: Person[] }>();
@@ -118,12 +131,12 @@ function gather(db: Db, at: number): Person[] {
   for (const b of db.select().from(peopleBumps).all()) bumped.set(b.handle, b.at);
 
   const byHandle = new Map<string, Tally>();
-  const add = (handle: string, name: string | null, sentAt: number) => {
+  const add = (handle: string, name: string | null, sentAt: number, accountId: string | null) => {
     const key = handle.trim().toLowerCase();
     if (key === "" || own.has(key)) return;
     if (NOT_A_PERSON.some((suffix) => key.endsWith(suffix))) return;
     if (AUTOMATED.test(key)) return;
-    const row = byHandle.get(key) ?? { handle: key, name: null, nameAt: -1, lastAt: 0, count: 0, score: 0, bumped: bumped.get(key) ?? null, since: 0 };
+    const row = byHandle.get(key) ?? { handle: key, name: null, nameAt: -1, lastAt: 0, count: 0, score: 0, bumped: bumped.get(key) ?? null, since: 0, accounts: new Map<string, number>() };
     row.count += 1;
     // Everything said before the operator put this person aside stops counting
     // towards how much they deal with them. The person themselves stays: their
@@ -134,6 +147,7 @@ function gather(db: Db, at: number): Person[] {
       if (sentAt > row.since) row.since = sentAt;
     }
     if (sentAt > row.lastAt) row.lastAt = sentAt;
+    if (accountId) row.accounts.set(accountId, (row.accounts.get(accountId) ?? 0) + 1);
     if (name?.trim() && sentAt >= row.nameAt) {
       row.name = name.trim();
       row.nameAt = sentAt;
@@ -141,10 +155,10 @@ function gather(db: Db, at: number): Person[] {
     byHandle.set(key, row);
   };
 
-  for (const m of db.all<{ handle: string; name: string | null; sentAt: number }>(sql`
-    select lower(from_address) as handle, from_name as name, sent_at as sentAt from messages
+  for (const m of db.all<{ handle: string; name: string | null; sentAt: number; accountId: string }>(sql`
+    select lower(from_address) as handle, from_name as name, sent_at as sentAt, account_id as accountId from messages
   `)) {
-    add(m.handle, m.name, m.sentAt);
+    add(m.handle, m.name, m.sentAt, m.accountId);
   }
   // Who the operator wrote to. Only their own mail is read this way: every
   // message they *receive* carries their own address in `to`, along with
@@ -153,12 +167,12 @@ function gather(db: Db, at: number): Person[] {
   // to be cc'd (seen against the real mailbox, 2026-09-28). Someone the
   // operator has written to, or heard from, is someone they talk to; a name
   // in the copy line of somebody else's mail is not.
-  for (const m of db.all<{ handle: string; sentAt: number }>(sql`
-    select lower(r.value) as handle, m.sent_at as sentAt from messages m, json_each(m.to_addresses) r where m.is_from_operator = 1
+  for (const m of db.all<{ handle: string; sentAt: number; accountId: string }>(sql`
+    select lower(r.value) as handle, m.sent_at as sentAt, m.account_id as accountId from messages m, json_each(m.to_addresses) r where m.is_from_operator = 1
     union all
-    select lower(r.value) as handle, m.sent_at as sentAt from messages m, json_each(m.cc_addresses) r where m.is_from_operator = 1
+    select lower(r.value) as handle, m.sent_at as sentAt, m.account_id as accountId from messages m, json_each(m.cc_addresses) r where m.is_from_operator = 1
   `)) {
-    add(m.handle, null, m.sentAt);
+    add(m.handle, null, m.sentAt, m.accountId);
   }
 
   return merge(db, [...byHandle.values()], own);
@@ -183,6 +197,22 @@ function cards(db: Db): Map<string, string> {
 }
 
 /**
+ * The inboxes a person was reached in, the busiest first: the rail has room
+ * for one of them beside a name, and the one most of them came through is the
+ * one worth the room (2026-09-29).
+ */
+function from(group: Tally[], inbox: ReadonlyMap<string, string>): string[] {
+  const byAccount = new Map<string, number>();
+  for (const t of group) {
+    for (const [id, n] of t.accounts) byAccount.set(id, (byAccount.get(id) ?? 0) + n);
+  }
+  return [...byAccount.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([id]) => inbox.get(id))
+    .filter((email): email is string => Boolean(email));
+}
+
+/**
  * Whether this person is one the operator has put aside and who has said
  * nothing since. The moment is the latest any of their handles carries, and
  * nothing said at or before it counts — including anything on a handle that
@@ -197,6 +227,9 @@ function putAside(group: Tally[]): boolean {
 
 function merge(db: Db, tallies: Tally[], own: ReadonlySet<string>): Person[] {
   const book = cards(db);
+  // Each inbox by the address it is named by: "hunter@…" for mail, and the
+  // "whatsapp:" / "messages:" names the two chat accounts carry.
+  const inbox = new Map(db.select({ id: accounts.id, email: accounts.email }).from(accounts).all().map((a) => [a.id, a.email]));
   const nameOf = (handle: string): string | null => {
     const direct = book.get(handle);
     if (direct) return direct;
@@ -255,6 +288,9 @@ function merge(db: Db, tallies: Tally[], own: ReadonlySet<string>): Person[] {
       name: card ?? signed,
       handles: group.map((t) => t.handle),
       channels: [...channels].sort(),
+      // In the order the inboxes are listed, so the rail reads the same way
+      // twice running.
+      from: from(group, inbox),
       // Put aside is asked of the person, not of each handle they answer to:
       // once the operator says they are done, a handle that joins them later
       // (an address book edit merges one in) must not bring their whole

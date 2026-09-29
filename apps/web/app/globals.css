@@ -344,8 +344,25 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
    and it is on the rail alone, by the operator's word: a small target beside
    a link pressed often is a mis-tap on a phone. */
 .people-row { position: relative; display: flex; align-items: center; }
+/* A person's row says who and where: the name, and under it the inboxes they
+   were reached in. The same name twice is two ways of reaching somebody
+   rather than a fault, and only the second line says so (2026-09-29). */
+/* Two lines need more room than the one-line rows above them, and tighter
+   leading: the tree's rows are a fixed 36px and the pair came to 37, so the
+   second line sat over the row beneath (measured in the browser, 2026-09-29).
+   The other multi-line rows in this file do the same (`.switcher-text`). */
+.people-row > a { height: auto; min-height: 36px; }
+.person-lines { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.25; }
+.person-from { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 10.5px; color: var(--muted); }
+.person-from svg { width: 10px; height: 10px; flex-shrink: 0; opacity: 0.8; }
+.person-source { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person-more { flex-shrink: 0; opacity: 0.75; }
+/* The number beside the heading is a control, dressed as the count it sits
+   in line with. */
+.people-many { appearance: none; border: none; background: none; font: inherit; color: inherit; cursor: pointer; padding: 0 2px; border-radius: 4px; }
+.people-many:hover, .people-many:focus-visible { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
 .people-row > a { flex: 1; min-width: 0; }
-.people-del { position: absolute; right: 4px; padding: 2px 6px; font-size: 12px; line-height: 1; color: var(--muted); opacity: 0; pointer-events: none; transition: opacity 120ms; }
+.people-del { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); padding: 2px 6px; font-size: 12px; line-height: 1; color: var(--muted); opacity: 0; pointer-events: none; transition: opacity 120ms; }
 .people-row:hover .people-del, .people-row:focus-within .people-del { opacity: 1; pointer-events: auto; }
 .people-del:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
 /* A pointer that cannot hover has no way to reveal it, so it stays hidden
