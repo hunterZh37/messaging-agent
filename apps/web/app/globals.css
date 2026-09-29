@@ -332,6 +332,19 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
    They scroll among themselves instead, and the links below stay put. */
 .people-tree { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); flex: 0 0 auto; }
 .tree-section-label { padding: 0 8px 4px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+/* One person's row: the link fills it, and the ✕ sits at the end without
+   being inside the link, which no anchor may hold (2026-09-28). It waits for
+   the pointer or the keyboard rather than sitting there being pressable —
+   and it is on the rail alone, by the operator's word: a small target beside
+   a link pressed often is a mis-tap on a phone. */
+.people-row { position: relative; display: flex; align-items: center; }
+.people-row > a { flex: 1; min-width: 0; }
+.people-del { position: absolute; right: 4px; padding: 2px 6px; font-size: 12px; line-height: 1; color: var(--muted); opacity: 0; pointer-events: none; transition: opacity 120ms; }
+.people-row:hover .people-del, .people-row:focus-within .people-del { opacity: 1; pointer-events: auto; }
+.people-del:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
+/* A pointer that cannot hover has no way to reveal it, so it stays hidden
+   rather than sitting invisible and pressable under the operator's thumb. */
+@media (hover: none) { .people-del { display: none; } }
 /* Pushes the Inboxes link and the theme toggle to the bottom of the column. */
 .tree-spacer { flex: 1; min-height: 12px; }
 .side-bottom { display: flex; flex-direction: column; padding-top: 8px; border-top: 1px solid var(--line); }

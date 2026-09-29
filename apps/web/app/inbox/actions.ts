@@ -5,6 +5,8 @@ import { wholeInbox } from "@/lib/opened";
 import { and, eq, inArray, or } from "drizzle-orm";
 import {
   afterBacklogRun,
+  bumpPerson,
+  unbumpPerson,
   autoSortMinSentAt,
   connectorForAccount,
   sendText,
@@ -575,6 +577,38 @@ export async function ruleSenderAction(
     }
     revalidatePath("/inbox");
     return { ok: true, senders };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
+
+/**
+ * Done with this person, for now (operator, 2026-09-28: "should have the
+ * ability to delete someone off"). Every handle they answer to goes at once,
+ * so a person reached two ways leaves as one, and what they send from now on
+ * counts as it always did — which is how they come back without being asked.
+ *
+ * Their mail is untouched: this takes a name off a list in the rail, and
+ * their own page goes on answering for whoever has the link.
+ */
+export async function bumpPersonAction(handles: string[]): Promise<{ ok: true } | StepError> {
+  try {
+    const { db } = core();
+    bumpPerson(db, handles);
+    revalidatePath("/", "layout");
+    return { ok: true };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
+
+/** Undo: the person stands exactly where they stood before (2026-09-28). */
+export async function unbumpPersonAction(handles: string[]): Promise<{ ok: true } | StepError> {
+  try {
+    const { db } = core();
+    unbumpPerson(db, handles);
+    revalidatePath("/", "layout");
+    return { ok: true };
   } catch (err) {
     return { error: (err as Error).message };
   }

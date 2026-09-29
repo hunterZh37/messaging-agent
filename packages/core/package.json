@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./text": "./src/text/index.ts"
+    "./text": "./src/text/index.ts",
+    "./people": "./src/contacts/limits.ts"
   },
   "scripts": {
     "test": "vitest run",

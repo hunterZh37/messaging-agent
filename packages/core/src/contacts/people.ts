@@ -1,7 +1,7 @@
-import { notInArray, sql, type SQL } from "drizzle-orm";
+import { inArray, notInArray, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { now as clockNow } from "../db/client";
-import { accounts, messages } from "../db/schema";
+import { accounts, messages, peopleBumps } from "../db/schema";
 import { inboxRowsWhere, type InboxRow } from "../queue/inbox";
 
 /**
@@ -23,8 +23,7 @@ import { inboxRowsWhere, type InboxRow } from "../queue/inbox";
 
 /** How long a message keeps half its weight: about six weeks. */
 export const HALF_LIFE_MS = 45 * 86_400_000;
-/** How many people the sidebar shows (operator, 2026-09-28: eight). */
-export const SIDEBAR_PEOPLE = 8;
+export { SIDEBAR_PEOPLE } from "./limits";
 
 /** What one message is worth now, by how long ago it was. */
 export function weight(sentAt: number, at: number): number {
@@ -53,6 +52,12 @@ export interface Person {
   count: number;
   /** What those messages are worth today, newer ones worth more. */
   score: number;
+  /**
+   * Put aside by the operator and quiet since. They keep their page and every
+   * conversation on it; they are simply not among the people the sidebar
+   * offers, until they write again (2026-09-28).
+   */
+  putAside: boolean;
 }
 
 function isChat(handle: string): boolean {
@@ -77,6 +82,10 @@ interface Tally {
   lastAt: number;
   count: number;
   score: number;
+  /** When the operator last put this handle aside, or null. */
+  bumped: number | null;
+  /** The newest thing said since they were put aside, 0 if nothing. */
+  since: number;
 }
 
 const held = new WeakMap<object, { at: number; people: Person[] }>();
@@ -102,15 +111,28 @@ function gather(db: Db, at: number): Person[] {
     if (m.handle?.trim()) own.add(m.handle.trim());
   }
 
+  // What the operator has said they are done with, and when. Everything said
+  // before that moment stops counting, so the person drops off the list and
+  // climbs back only on what they send next (2026-09-28).
+  const bumped = new Map<string, number>();
+  for (const b of db.select().from(peopleBumps).all()) bumped.set(b.handle, b.at);
+
   const byHandle = new Map<string, Tally>();
   const add = (handle: string, name: string | null, sentAt: number) => {
     const key = handle.trim().toLowerCase();
     if (key === "" || own.has(key)) return;
     if (NOT_A_PERSON.some((suffix) => key.endsWith(suffix))) return;
     if (AUTOMATED.test(key)) return;
-    const row = byHandle.get(key) ?? { handle: key, name: null, nameAt: -1, lastAt: 0, count: 0, score: 0 };
+    const row = byHandle.get(key) ?? { handle: key, name: null, nameAt: -1, lastAt: 0, count: 0, score: 0, bumped: bumped.get(key) ?? null, since: 0 };
     row.count += 1;
-    row.score += weight(sentAt, at);
+    // Everything said before the operator put this person aside stops counting
+    // towards how much they deal with them. The person themselves stays: their
+    // page is a link somebody may already have open, and putting them aside
+    // was never meant to lose the conversation (own test, 2026-09-28).
+    if (row.bumped === null || sentAt > row.bumped) {
+      row.score += weight(sentAt, at);
+      if (sentAt > row.since) row.since = sentAt;
+    }
     if (sentAt > row.lastAt) row.lastAt = sentAt;
     if (name?.trim() && sentAt >= row.nameAt) {
       row.name = name.trim();
@@ -158,6 +180,19 @@ function cards(db: Db): Map<string, string> {
     if (number) byHandle.set(`#${number}`, name);
   }
   return byHandle;
+}
+
+/**
+ * Whether this person is one the operator has put aside and who has said
+ * nothing since. The moment is the latest any of their handles carries, and
+ * nothing said at or before it counts — including anything on a handle that
+ * was never itself pressed (review, 2026-09-28).
+ */
+function putAside(group: Tally[]): boolean {
+  const moments = group.map((t) => t.bumped).filter((b): b is number => b !== null);
+  if (moments.length === 0) return false;
+  const at = Math.max(...moments);
+  return group.every((t) => t.lastAt <= at);
 }
 
 function merge(db: Db, tallies: Tally[], own: ReadonlySet<string>): Person[] {
@@ -220,6 +255,12 @@ function merge(db: Db, tallies: Tally[], own: ReadonlySet<string>): Person[] {
       name: card ?? signed,
       handles: group.map((t) => t.handle),
       channels: [...channels].sort(),
+      // Put aside is asked of the person, not of each handle they answer to:
+      // once the operator says they are done, a handle that joins them later
+      // (an address book edit merges one in) must not bring their whole
+      // history back with it (review, 2026-09-28). The latest moment any of
+      // their handles was put aside stands for all of them.
+      putAside: putAside(group),
       lastAt: Math.max(...group.map((t) => t.lastAt)),
       count: group.reduce((sum, t) => sum + t.count, 0),
       score: group.reduce((sum, t) => sum + t.score, 0),
@@ -236,10 +277,46 @@ function everyone(db: Db, at: number): Person[] {
   return people;
 }
 
+/**
+ * Done with this person, for now (operator, 2026-09-28: "should have the
+ * ability to delete someone off"). Every handle they answer to is marked with
+ * the moment, so a merged person goes as one; what they send after it counts
+ * as it always did, which is how they come back without being asked.
+ *
+ * Their mail is not touched. This is a row in a sidebar, not a blocklist.
+ */
+export function bumpPerson(db: Db, handles: string[], at: number = clockNow()): void {
+  const keys = [...new Set(handles.map((h) => h.trim().toLowerCase()).filter((h) => h !== ""))];
+  if (keys.length === 0) return;
+  // A person goes as one: every handle in the same transaction, so a failure
+  // halfway cannot leave them half put aside (review, 2026-09-28).
+  db.transaction((tx) => {
+    for (const handle of keys) {
+      tx.insert(peopleBumps)
+        .values({ handle, at })
+        .onConflictDoUpdate({ target: peopleBumps.handle, set: { at } })
+        .run();
+    }
+  });
+  forgetPeople(db);
+}
+
+/** Undo: the person stands exactly where they stood before (2026-09-28). */
+export function unbumpPerson(db: Db, handles: string[]): void {
+  const keys = handles.map((h) => h.trim().toLowerCase()).filter((h) => h !== "");
+  if (keys.length === 0) return;
+  db.delete(peopleBumps).where(inArray(peopleBumps.handle, keys)).run();
+  forgetPeople(db);
+}
+
+
 /** The people the operator deals with most, best first. */
 export function frequentPeople(db: Db, opts: { limit?: number; now?: number } = {}): Person[] {
   const at = opts.now ?? clockNow();
-  const people = everyone(db, at);
+  // Everyone the operator has not put aside. The rest are still gathered, and
+  // `personFor` still finds them: putting someone aside takes them off a list,
+  // it does not take away the way back to what was said.
+  const people = everyone(db, at).filter((p) => !p.putAside);
   return opts.limit === undefined ? people : people.slice(0, opts.limit);
 }
 

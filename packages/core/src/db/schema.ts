@@ -152,6 +152,19 @@ export const contacts = sqliteTable("contacts", {
   refreshedAt: integer("refreshed_at").notNull(),
 });
 
+/**
+ * When the operator last said they were done with someone (2026-09-28: "should
+ * have the ability to delete someone off" the People list). One row per handle
+ * they answer to, holding the moment: everything said before it stops counting
+ * towards how much the operator deals with them, so the person drops off the
+ * list and climbs back only if they write again. Nothing here touches the mail
+ * itself — it is a row in a sidebar, not a blocklist.
+ */
+export const peopleBumps = sqliteTable("people_bumps", {
+  handle: text("handle").primaryKey(),
+  at: integer("at").notNull(),
+});
+
 export const watermarks = sqliteTable("watermarks", {
   accountId: text("account_id").primaryKey().references(() => accounts.id),
   historyId: text("history_id").notNull(),

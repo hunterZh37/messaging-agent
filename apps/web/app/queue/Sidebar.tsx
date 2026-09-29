@@ -2,11 +2,14 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import type { Person } from "@messaging-agent/core";
+import { SIDEBAR_PEOPLE } from "@messaging-agent/core/people";
 import { activeTreeKey, rowsForSide, sideHref, sideOfPath, treeRows, type TreeIcon, type TreeSide, type ViewParams } from "@/lib/folders";
 import { useAsk } from "../ask/AskProvider";
+import { useSendGate } from "./SendProvider";
+import { bumpPersonAction, unbumpPersonAction } from "../inbox/actions";
 import { ArchitectureDialog } from "./ArchitectureDialog";
 import { ThemeToggle } from "./ThemeToggle";
 import { NotifyToggle } from "./NotifyToggle";
@@ -311,19 +314,78 @@ function Tree(props: { counts: TreeCounts; activeKey: string; params: ViewParams
  * person with no name in the address book is shown by their own handle, cut
  * off with CSS rather than the string itself, so the link underneath still
  * carries the whole thing.
+ *
+ * The Mail/Messages toggle narrows this the way it narrows the folders
+ * ("the toggle between email and message should also function as a filter"):
+ * the server sends enough for either side, and somebody reached both ways is
+ * on both, because they are one person and merging them was the point.
+ *
+ * The ✕ says the operator is done with someone for now. It is on the rail
+ * and not in the phone's drawer, by their word: a small target beside a link
+ * pressed often is a mis-tap on a phone. Nothing is deleted — what they send
+ * from now on still counts, which is how somebody comes back.
  */
-function People(props: { people: Person[]; pathname: string }) {
-  if (props.people.length === 0) return null;
+function People(props: { people: Person[]; pathname: string; side: TreeSide; inDrawer: boolean }) {
+  const { say } = useSendGate();
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+  // Taken off the moment it is pressed, rather than when the server answers:
+  // the rail is the thing the operator is looking at.
+  const [gone, setGone] = useState<string[]>([]);
+
+  const wanted = props.side === "messages" ? "chat" : "mail";
+  const people = props.people
+    .filter((p) => p.channels.includes(wanted) && !gone.includes(p.key))
+    .slice(0, SIDEBAR_PEOPLE);
+  if (people.length === 0) return null;
+
+  function bump(person: Person) {
+    setGone((were) => [...were, person.key]);
+    startTransition(async () => {
+      const r = await bumpPersonAction(person.handles);
+      if ("error" in r) {
+        setGone((were) => were.filter((k) => k !== person.key));
+        say(`Could not remove ${person.name ?? person.key}`);
+        return;
+      }
+      router.refresh();
+      say(`Removed ${person.name ?? person.key}`, {
+        // Two people can be called the same thing; the handle is what tells
+        // this notice from the other one (review, 2026-09-28).
+        key: `removed-${person.key}`,
+        undo: async () => {
+          await unbumpPersonAction(person.handles);
+          setGone((were) => were.filter((k) => k !== person.key));
+          router.refresh();
+        },
+      });
+    });
+  }
+
   return (
     <div className="tree people-tree">
       <div className="tree-section-label">People</div>
-      {props.people.map((p) => {
+      {people.map((p) => {
         const href = `/people/${encodeURIComponent(p.key)}`;
         const on = props.pathname === href;
+        const name = p.name ?? p.key;
         return (
-          <Link key={p.key} href={href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>
-            <span className="tree-label">{p.name ?? p.key}</span>
-          </Link>
+          <div key={p.key} className="people-row">
+            <Link href={href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>
+              <span className="tree-label">{name}</span>
+            </Link>
+            {props.inDrawer ? null : (
+              <button
+                type="button"
+                className="people-del"
+                onClick={() => bump(p)}
+                aria-label={`Remove ${name} from People`}
+                title="Remove from People"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         );
       })}
     </div>
@@ -447,7 +509,7 @@ export function Nav(props: { counts: TreeCounts; people: Person[]; params?: View
       </div>
       {hasTexts && !inDrawer ? <SideToggle side={side} counts={props.counts} params={props.params ?? {}} onPick={pickSide} /> : null}
       <Tree counts={props.counts} activeKey={activeKey} params={props.params ?? {}} side={hasTexts ? side : "mail"} />
-      <People people={props.people} pathname={pathname} />
+      <People people={props.people} pathname={pathname} side={hasTexts ? side : "mail"} inDrawer={inDrawer} />
       <div className="tree-spacer" />
       <div className="side-bottom">
         <button type="button" className={`ask-row${ask.open ? " on" : ""}`} onClick={ask.toggle} aria-pressed={ask.open}>

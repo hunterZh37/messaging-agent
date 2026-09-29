@@ -67,7 +67,15 @@ interface SendGate {
    * (stress audit, 2026-09-11: a page's own toast vanished when the action
    * it announced re-rendered the page around it). The Undo runs once.
    */
-  say: (label: string, opts?: { undo?: () => void | Promise<void> }) => void;
+  say: (label: string, opts?: {
+    undo?: () => void | Promise<void>;
+    /**
+     * What makes this notice its own, when the words alone do not. Two people
+     * can be called the same thing, and dropping the second notice as a
+     * repeat drops the Undo with it (review, 2026-09-28).
+     */
+    key?: string;
+  }) => void;
   /**
    * Mark the thread's latest inbound message handled, at once: the thread
    * sweeps off as the server is told (operator, 2026-09-11: Shift, "snappy,
@@ -365,10 +373,15 @@ export function SendProvider({ children }: { children: ReactNode }) {
   // The same words twice within a moment are one notice (phone stress audit,
   // 2026-09-11: "Put back in the inbox" showed twice from one press).
   const lastSaid = useRef<{ label: string; at: number } | null>(null);
-  const say = useCallback((label: string, opts: { undo?: () => void | Promise<void> } = {}) => {
+  const say = useCallback((label: string, opts: { undo?: () => void | Promise<void>; key?: string } = {}) => {
     const at = Date.now();
-    if (lastSaid.current && lastSaid.current.label === label && at - lastSaid.current.at < 1500) return;
-    lastSaid.current = { label, at };
+    // What was said, or what the caller says makes this its own: two people
+    // in the rail can be called the same thing, and swallowing the second
+    // "Removed Alex" as a repeat would swallow the only way back with it
+    // (review, 2026-09-28).
+    const said = opts.key ?? label;
+    if (lastSaid.current && lastSaid.current.label === said && at - lastSaid.current.at < 1500) return;
+    lastSaid.current = { label: said, at };
     const id = `say-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     if (opts.undo) undos.current.set(id, opts.undo);
     dispatch({ type: "notice", id, label, now: Date.now(), ...(opts.undo ? { undoJobId: id } : {}) });

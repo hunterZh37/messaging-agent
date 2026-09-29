@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { forgetPeople, frequentPeople, listPersonThreads, personFor, weight, HALF_LIFE_MS } from "../../src/contacts/people";
+import { bumpPerson, forgetPeople, frequentPeople, listPersonThreads, personFor, unbumpPerson, weight, HALF_LIFE_MS } from "../../src/contacts/people";
 import { testDb } from "../helpers/db";
-import { accounts, contacts, messages, threads } from "../../src/db/schema";
+import { accounts, contacts, messages, peopleBumps, threads } from "../../src/db/schema";
 
 /**
  * The people the operator deals with, gathered from their own mail and texts
@@ -304,5 +304,120 @@ describe("listPersonThreads", () => {
     const d = db();
     mail(d, { from: "ana@example.com", at: NOW });
     expect(listPersonThreads(d, [])).toEqual([]);
+  });
+});
+
+/**
+ * Done with someone, for now (operator, 2026-09-28: "should have the ability
+ * to delete someone off", and they come back if the traffic does). Pressing
+ * it forgets what came before rather than scoring a penalty nobody could
+ * predict the effect of: from that moment the person is ranked on what they
+ * send next, and on nothing else.
+ */
+describe("bumping someone off the list", () => {
+  it("drops someone the operator is done with, and leaves the rest standing", () => {
+    const d = db();
+    for (let i = 0; i < 30; i++) mail(d, { from: "loud@example.com", at: NOW - i * DAY });
+    for (let i = 0; i < 5; i++) mail(d, { from: "quiet@example.com", at: NOW - i * DAY });
+    expect(frequentPeople(d, { now: NOW })[0]?.key).toBe("loud@example.com");
+    bumpPerson(d, ["loud@example.com"], NOW);
+    expect(frequentPeople(d, { now: NOW }).map((p) => p.key)).toEqual(["quiet@example.com"]);
+  });
+
+  it("brings them back when they write again, without being asked", () => {
+    const d = db();
+    for (let i = 0; i < 30; i++) mail(d, { from: "loud@example.com", at: NOW - 10 * DAY - i * DAY });
+    for (let i = 0; i < 3; i++) mail(d, { from: "quiet@example.com", at: NOW - i * DAY });
+    bumpPerson(d, ["loud@example.com"], NOW - 5 * DAY);
+    expect(frequentPeople(d, { now: NOW }).map((p) => p.key)).toEqual(["quiet@example.com"]);
+    // They write four times since, which is more than the other has:
+    for (let i = 0; i < 4; i++) mail(d, { from: "loud@example.com", at: NOW - i * 60_000 });
+    expect(frequentPeople(d, { now: NOW })[0]?.key).toBe("loud@example.com");
+  });
+
+  it("puts them back exactly as they were when the operator presses Undo", () => {
+    const d = db();
+    for (let i = 0; i < 30; i++) mail(d, { from: "loud@example.com", at: NOW - i * DAY });
+    for (let i = 0; i < 5; i++) mail(d, { from: "quiet@example.com", at: NOW - i * DAY });
+    const before = frequentPeople(d, { now: NOW }).map((p) => `${p.key}:${p.count}`);
+    bumpPerson(d, ["loud@example.com"], NOW);
+    unbumpPerson(d, ["loud@example.com"]);
+    expect(frequentPeople(d, { now: NOW }).map((p) => `${p.key}:${p.count}`)).toEqual(before);
+  });
+
+  /**
+   * A handle that joins a person after they were put aside must not bring
+   * their whole history back with it (review, 2026-09-28): the address book
+   * gains a number, the two become one, and nobody has said anything since.
+   */
+  it("stays put aside when a second handle is merged in afterwards", () => {
+    const d = db();
+    mail(d, { from: "ana@example.com", at: NOW - 10 * DAY });
+    mail(d, { from: "14155550133@s.whatsapp.net", at: NOW - 10 * DAY, account: "a2" });
+    mail(d, { from: "other@example.com", at: NOW });
+    // Done with the address, before the address book knows the number is hers.
+    bumpPerson(d, ["ana@example.com"], NOW - 5 * DAY);
+    expect(frequentPeople(d, { now: NOW }).map((p) => p.key)).toEqual(["other@example.com", "14155550133@s.whatsapp.net"]);
+    // The operator files the number under the same card. Nothing was said in
+    // between, so she is still someone they are done with.
+    d.insert(contacts).values({ handle: "ana@example.com", name: "Ana Diaz", refreshedAt: NOW }).run();
+    d.insert(contacts).values({ handle: "+14155550133", name: "Ana Diaz", refreshedAt: NOW }).run();
+    forgetPeople(d);
+    expect(frequentPeople(d, { now: NOW }).map((p) => p.key)).toEqual(["other@example.com"]);
+  });
+
+  it("takes every handle a merged person answers to, not only the one pressed", () => {
+    const d = db();
+    d.insert(contacts).values({ handle: "ana@example.com", name: "Ana Diaz", refreshedAt: NOW }).run();
+    d.insert(contacts).values({ handle: "+14155550133", name: "Ana Diaz", refreshedAt: NOW }).run();
+    mail(d, { from: "ana@example.com", at: NOW });
+    mail(d, { from: "14155550133@s.whatsapp.net", at: NOW, account: "a2" });
+    mail(d, { from: "other@example.com", at: NOW });
+    const ana = frequentPeople(d, { now: NOW }).find((p) => p.name === "Ana Diaz")!;
+    bumpPerson(d, ana.handles, NOW);
+    expect(frequentPeople(d, { now: NOW }).map((p) => p.key)).toEqual(["other@example.com"]);
+  });
+
+  it("does not touch their mail: every conversation is still there", () => {
+    const d = db();
+    mail(d, { from: "ana@example.com", at: NOW, thread: "theirs" });
+    bumpPerson(d, ["ana@example.com"], NOW);
+    expect(listPersonThreads(d, ["ana@example.com"]).map((r) => r.thread.id)).toEqual(["theirs"]);
+    // And their own page still finds them.
+    expect(personFor(d, "ana@example.com", { now: NOW })?.key).toBe("ana@example.com");
+  });
+
+  /**
+   * Putting someone aside takes them off a list; it never takes away the way
+   * back to what was said. Their page is a link the operator may have open,
+   * in Alex, or in another window (own test, 2026-09-28).
+   */
+  it("keeps their page working, and says they are put aside", () => {
+    const d = db();
+    mail(d, { from: "ana@example.com", at: NOW - DAY, thread: "theirs" });
+    mail(d, { from: "other@example.com", at: NOW });
+    bumpPerson(d, ["ana@example.com"], NOW);
+    expect(frequentPeople(d, { now: NOW }).map((p) => p.key)).toEqual(["other@example.com"]);
+    const ana = personFor(d, "ana@example.com", { now: NOW });
+    expect(ana?.key).toBe("ana@example.com");
+    expect(ana?.putAside).toBe(true);
+    expect(listPersonThreads(d, ana!.handles).map((r) => r.thread.id)).toEqual(["theirs"]);
+  });
+
+
+  it("moves the moment rather than doubling up when pressed twice", () => {
+    const d = db();
+    mail(d, { from: "ana@example.com", at: NOW });
+    bumpPerson(d, ["ana@example.com"], NOW - DAY);
+    bumpPerson(d, ["ana@example.com"], NOW);
+    const rows = d.select().from(peopleBumps).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.at).toBe(NOW);
+  });
+
+  it("asks nothing of the database for nobody", () => {
+    const d = db();
+    bumpPerson(d, [], NOW);
+    expect(d.select().from(peopleBumps).all()).toHaveLength(0);
   });
 });
