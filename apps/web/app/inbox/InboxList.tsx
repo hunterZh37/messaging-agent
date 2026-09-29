@@ -65,8 +65,14 @@ function Row(props: { row: InboxRow; folder: FolderKey; params: ViewParams; sele
         </div>
       ) : null}
       <div className="inbox-sender">
-        {/* Sent mail is read by who it went to, not who wrote it. */}
-        <span>{folder === "sent" ? `to ${r.message.toAddresses[0] ?? "(no recipient)"}` : chat ? r.message.subject : (r.message.fromName ?? r.message.fromAddress)}</span>
+        {/* Mail of the operator's own is read by who it went to, not who
+            wrote it — in Sent, and anywhere else a list holds it. The People
+            page (2026-09-28) lists every conversation with somebody, and the
+            newest thing in one is as often the operator's own reply, which
+            read as a list of the operator's own name until this asked the row
+            rather than the folder. A chat is named after the person either
+            way, so it answers first. */}
+        <span>{chat ? r.message.subject : folder === "sent" || r.message.isFromOperator ? `to ${r.message.toAddresses[0] ?? "(no recipient)"}` : (r.message.fromName ?? r.message.fromAddress)}</span>
       </div>
       {/* A chat is named after the person, so the name is the sender line and
           the subject line would only repeat it; a text of the operator's own

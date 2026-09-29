@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { Person } from "@messaging-agent/core";
 import { activeTreeKey, rowsForSide, sideHref, sideOfPath, treeRows, type TreeIcon, type TreeSide, type ViewParams } from "@/lib/folders";
 import { useAsk } from "../ask/AskProvider";
 import { ArchitectureDialog } from "./ArchitectureDialog";
@@ -304,13 +305,39 @@ function Tree(props: { counts: TreeCounts; activeKey: string; params: ViewParams
 }
 
 /**
+ * The people the operator talks to most (operator, 2026-09-28: "there should
+ * be a feature where I can easily access to the most common thread with
+ * contacts I talk to a lot"), between the folder tree and Ask Celeste. A
+ * person with no name in the address book is shown by their own handle, cut
+ * off with CSS rather than the string itself, so the link underneath still
+ * carries the whole thing.
+ */
+function People(props: { people: Person[]; pathname: string }) {
+  if (props.people.length === 0) return null;
+  return (
+    <div className="tree people-tree">
+      <div className="tree-section-label">People</div>
+      {props.people.map((p) => {
+        const href = `/people/${encodeURIComponent(p.key)}`;
+        const on = props.pathname === href;
+        return (
+          <Link key={p.key} href={href} className={on ? "on" : undefined} aria-current={on ? "page" : undefined}>
+            <span className="tree-label">{p.name ?? p.key}</span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * The folder tree (spec 10a): a 220px labelled sidebar on desktop, a drawer
  * behind a menu button on phones. The inbox switcher now leads the header's
  * filters instead of sitting here (operator, 2026-09-15). `params` is the view the operator is
  * in, which every row carries, so picking a folder or a child row changes
  * that and leaves the window, the money side and the project alone.
  */
-export function Nav(props: { counts: TreeCounts; params?: ViewParams }) {
+export function Nav(props: { counts: TreeCounts; people: Person[]; params?: ViewParams }) {
   const pathname = usePathname() ?? "/";
   const params = useSearchParams();
   const [open, setOpen] = useState(false);
@@ -420,6 +447,7 @@ export function Nav(props: { counts: TreeCounts; params?: ViewParams }) {
       </div>
       {hasTexts && !inDrawer ? <SideToggle side={side} counts={props.counts} params={props.params ?? {}} onPick={pickSide} /> : null}
       <Tree counts={props.counts} activeKey={activeKey} params={props.params ?? {}} side={hasTexts ? side : "mail"} />
+      <People people={props.people} pathname={pathname} />
       <div className="tree-spacer" />
       <div className="side-bottom">
         <button type="button" className={`ask-row${ask.open ? " on" : ""}`} onClick={ask.toggle} aria-pressed={ask.open}>

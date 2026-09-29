@@ -5,6 +5,7 @@ import { conversationAboutLabel, conversationCostLabel, conversationTokensLabel 
 import { WINDOWS, type WindowKey } from "@/lib/selection";
 import { Nav } from "../queue/Sidebar";
 import { treeCounts } from "../queue/counts";
+import { sidebarPeople } from "../queue/people";
 import { resolveForTree, treeScope, viewSelection } from "../inbox/selection";
 import { inboxSwitcher } from "../queue/switcher";
 import { ThemeToggle } from "../queue/ThemeToggle";
@@ -251,7 +252,7 @@ export default async function UsagePage({ searchParams }: { searchParams: Promis
         Prices are Anthropic list prices; local models cost nothing. Cache reads are billed at 10%, writes at 125%.
       </div>
 
-      <Nav counts={treeCounts(selectedId, treeScope(resolveForTree(db, selectedId, await viewSelection(db, selectedId))))} />
+      <Nav counts={treeCounts(selectedId, treeScope(resolveForTree(db, selectedId, await viewSelection(db, selectedId))))} people={sidebarPeople()} />
     </main>
   );
 }

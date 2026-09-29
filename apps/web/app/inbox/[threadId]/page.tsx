@@ -8,6 +8,7 @@ import { formatTime, shortAccount } from "@/lib/format";
 import { groupByThread, neighbourThread, runAfter } from "@/lib/threads";
 import { Nav } from "../../queue/Sidebar";
 import { treeCounts } from "../../queue/counts";
+import { sidebarPeople } from "../../queue/people";
 import { inboxSwitcher } from "../../queue/switcher";
 import { Thread } from "../../queue/Thread";
 import { InboxList } from "../InboxList";
@@ -314,7 +315,7 @@ export default async function ThreadPage({
           <ScrollToEnd threadId={threadId} />
         </ThreadPane>
       </div>
-      <Nav counts={treeCounts(selectedId, treeScope(effective))} params={headerParams} />
+      <Nav counts={treeCounts(selectedId, treeScope(effective))} people={sidebarPeople()} params={headerParams} />
     </main>
   );
 }

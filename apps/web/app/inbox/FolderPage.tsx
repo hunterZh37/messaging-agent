@@ -7,6 +7,7 @@ import { FOLDER_PATHS, listLimit, parseStatus, viewHref, type FolderKey, type Vi
 import { shortAccount } from "@/lib/format";
 import { Nav } from "../queue/Sidebar";
 import { treeCounts } from "../queue/counts";
+import { sidebarPeople } from "../queue/people";
 import { inboxSwitcher } from "../queue/switcher";
 import { AddInbox } from "../inboxes/AddInbox";
 import { InboxList } from "./InboxList";
@@ -53,7 +54,7 @@ export async function FolderPage({ folder, searchParams }: { folder: FolderKey; 
           <AddInbox microsoftReady={Boolean(cfg.microsoft.clientId)} defaultOpen />
         </div>
         {/* No accounts yet: no window either, so the tree opens on its default. */}
-        <Nav counts={treeCounts(selectedId)} />
+        <Nav counts={treeCounts(selectedId)} people={sidebarPeople()} />
       </main>
     );
   }
@@ -233,7 +234,7 @@ export async function FolderPage({ folder, searchParams }: { folder: FolderKey; 
           <span>Select a message.</span>
         </div>
       </div>
-      <Nav counts={treeCountsForView} params={params} />
+      <Nav counts={treeCountsForView} people={sidebarPeople()} params={params} />
     </main>
   );
 }

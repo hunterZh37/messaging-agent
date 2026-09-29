@@ -4,6 +4,7 @@ import { backlogSorterIsTrickle, formatModelRef, inboxSilences, MODEL_ENV_VARS, 
 import { core } from "@/lib/core";
 import { Nav } from "../queue/Sidebar";
 import { treeCounts } from "../queue/counts";
+import { sidebarPeople } from "../queue/people";
 import { resolveForTree, treeScope, viewSelection } from "../inbox/selection";
 import { inboxSwitcher } from "../queue/switcher";
 import { ThemeToggle } from "../queue/ThemeToggle";
@@ -202,7 +203,7 @@ export default async function InboxesPage({ searchParams }: { searchParams: Prom
 
       <AlsoYou addresses={aliasesForForm()} />
 
-      <Nav counts={treeCounts(selectedId, treeScope(resolveForTree(db, selectedId, await viewSelection(db, selectedId))))} />
+      <Nav counts={treeCounts(selectedId, treeScope(resolveForTree(db, selectedId, await viewSelection(db, selectedId))))} people={sidebarPeople()} />
     </main>
   );
 }

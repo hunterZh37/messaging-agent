@@ -2,6 +2,7 @@ import { diagramFile } from "@/lib/diagram";
 import { core } from "@/lib/core";
 import { Nav } from "../queue/Sidebar";
 import { treeCounts } from "../queue/counts";
+import { sidebarPeople } from "../queue/people";
 import { inboxSwitcher } from "../queue/switcher";
 import { ThemeToggle } from "../queue/ThemeToggle";
 
@@ -26,7 +27,7 @@ export default async function ArchitecturePage({ searchParams }: { searchParams:
 
   return (
     <div className="shell">
-      <Nav counts={treeCounts(selectedId)} />
+      <Nav counts={treeCounts(selectedId)} people={sidebarPeople()} />
       <main className="architecture-page">
         <div className="head-row first">
           <span className="head-title">Architecture</span>

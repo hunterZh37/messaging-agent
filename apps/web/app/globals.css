@@ -299,7 +299,11 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 
 /* Folder tree (spec 10a): a labelled 220px sidebar on desktop, the same
    content in a drawer behind the phone top bar's menu button. */
-.side, .drawer { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; border-right: 1px solid var(--line); background: var(--card); flex-direction: column; padding: 14px 10px; z-index: 10; }
+/* Eight people is taller than some screens have to spare, and a fixed rail
+   that overflows puts Inboxes, Stats and Usage out of reach rather than
+   below the fold (2026-09-28). The rail scrolls when it has to; until then
+   nothing about it moves, since it never overflowed before. */
+.side, .drawer { overflow-y: auto; overscroll-behavior: contain; position: fixed; left: 0; top: 0; bottom: 0; width: 220px; border-right: 1px solid var(--line); background: var(--card); flex-direction: column; padding: 14px 10px; z-index: 10; }
 /* No scrolling here: the tree is nine rows, and clipping would cut off the
    switcher's panel, which is wider than the column on purpose. */
 .side { display: none; }
@@ -319,6 +323,15 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 .tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tree-count { margin-left: auto; font-size: 12px; color: var(--muted); flex-shrink: 0; }
 .tree a.on .tree-count { color: var(--fg); }
+/* The people block (operator, 2026-09-28: "the most common thread with
+   contacts I talk to a lot"), set apart from the folders the way the
+   switcher's pill is. */
+/* The people take whatever room is left and no more: eight names is taller
+   than some screens have to spare, and pushing Inboxes, Stats and Usage off
+   the bottom of a fixed rail put them out of reach altogether (2026-09-28).
+   They scroll among themselves instead, and the links below stay put. */
+.people-tree { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); flex: 0 0 auto; }
+.tree-section-label { padding: 0 8px 4px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 /* Pushes the Inboxes link and the theme toggle to the bottom of the column. */
 .tree-spacer { flex: 1; min-height: 12px; }
 .side-bottom { display: flex; flex-direction: column; padding-top: 8px; border-top: 1px solid var(--line); }
@@ -479,6 +492,12 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 
 /* Inbox: two-pane list + thread on desktop, one column on phone. */
 main.inbox-page { max-width: none; margin: 0; padding: 0; }
+
+/* A person's own page (operator, 2026-09-28): the content header's grammar
+   with none of the filters a folder needs. Several handles read together can
+   run long, so this one head-sub wraps instead of holding the folder
+   header's fixed single line. */
+.person-head .head-sub { white-space: normal; flex-shrink: 1; }
 
 /* Content header (spec 10a, 10d): one header across the whole content area,
    above both panes, holding every control the view has. Two rows, and the

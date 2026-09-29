@@ -88,6 +88,7 @@ export * from "./queue/actions";
 export * from "./queue/drafts";
 export * from "./queue/compose";
 export * from "./contacts/suggest";
+export * from "./contacts/people";
 export * from "./queue/inbox";
 export * from "./queue/silence";
 export * from "./queue/trash";

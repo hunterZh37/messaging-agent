@@ -9,6 +9,7 @@ import { RANGES, rangeKeyFrom, type RangeKey } from "@/lib/statsRanges";
 import { core } from "@/lib/core";
 import { Nav } from "../queue/Sidebar";
 import { treeCounts } from "../queue/counts";
+import { sidebarPeople } from "../queue/people";
 import { inboxSwitcher } from "../queue/switcher";
 import { ThemeToggle } from "../queue/ThemeToggle";
 
@@ -298,7 +299,7 @@ export default async function StatsPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="shell">
-      <Nav counts={treeCounts(selectedId)} />
+      <Nav counts={treeCounts(selectedId)} people={sidebarPeople()} />
       <main className="stats-page">
         <div className="head-row first">
           <span className="head-title">Stats</span>

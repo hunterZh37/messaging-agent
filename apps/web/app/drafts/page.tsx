@@ -3,6 +3,7 @@ import { core } from "@/lib/core";
 import { Queue } from "../queue/Queue";
 import { Nav } from "../queue/Sidebar";
 import { treeCounts } from "../queue/counts";
+import { sidebarPeople } from "../queue/people";
 import { AddInbox } from "../inboxes/AddInbox";
 import { resolveForTree, treeScope, viewSelection } from "../inbox/selection";
 import { inboxSwitcher } from "../queue/switcher";
@@ -29,7 +30,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
           <AddInbox microsoftReady={Boolean(cfg.microsoft.clientId)} defaultOpen />
         </div>
         {/* No accounts yet: no window either, so the tree opens on its default. */}
-        <Nav counts={treeCounts(selectedId)} />
+        <Nav counts={treeCounts(selectedId)} people={sidebarPeople()} />
       </main>
     );
   }
@@ -40,7 +41,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Promis
   return (
     <main className="inbox-page">
       <Queue items={items} selected={draft} account={account} switcher={switcher} />
-      <Nav counts={treeCounts(selectedId, treeScope(resolveForTree(db, selectedId, await viewSelection(db, selectedId))))} />
+      <Nav counts={treeCounts(selectedId, treeScope(resolveForTree(db, selectedId, await viewSelection(db, selectedId))))} people={sidebarPeople()} />
     </main>
   );
 }

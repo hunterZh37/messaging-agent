@@ -412,11 +412,14 @@ export function applyWaiting<T extends { message: Pick<MessageRow, "sentAt" | "b
   return rows.filter((r) => isWaitingReply(r) === waiting);
 }
 
-export function listInboxMessages(db: Db, opts: InboxScope = {}): InboxRow[] {
-  const limit = opts.limit ?? 100;
-  const conditions = scopeConditions(opts);
-
-  const rows = db
+/**
+ * The rows themselves, for whatever conditions the caller has built: one
+ * message with everything the lists read off it. The folder lists and the
+ * People page (2026-09-28) share this, so a row is the same row wherever it
+ * is shown and a change to what a row carries reaches both.
+ */
+export function inboxRowsWhere(db: Db, conditions: SQL[], limit: number): InboxRow[] {
+  return db
     .select({
       message: messages,
       account: accounts,
@@ -446,8 +449,10 @@ export function listInboxMessages(db: Db, opts: InboxScope = {}): InboxRow[] {
       handled: r.handledId !== null,
       unread: r.unread === 1,
     }));
+}
 
-  return applyWaiting(rows, opts);
+export function listInboxMessages(db: Db, opts: InboxScope = {}): InboxRow[] {
+  return applyWaiting(inboxRowsWhere(db, scopeConditions(opts), opts.limit ?? 100), opts);
 }
 
 /** What the tree's counts are taken over: the whole view, minus the folder and status each row sets. */
