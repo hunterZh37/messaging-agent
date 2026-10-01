@@ -37,7 +37,10 @@ export function markTrashed(db: Db, messageIds: string[], clock: () => number = 
   const at = clock();
   db.transaction((tx) => {
     for (let i = 0; i < messageIds.length; i += 400) {
-      tx.update(messages).set({ folder: "trash" }).where(inArray(messages.id, messageIds.slice(i, i + 400))).run();
+      // The moment it went, which is the order Deleted items is read in
+      // (operator, 2026-09-30: "the deleted email should be last in first
+      // out") — the message's own date cannot say when it was binned.
+      tx.update(messages).set({ folder: "trash", trashedAt: at }).where(inArray(messages.id, messageIds.slice(i, i + 400))).run();
     }
     for (const messageId of messageIds) recordAction(tx, { kind: "trash", messageId, payload: {} }, () => at);
   });
@@ -57,7 +60,8 @@ export function markHidden(db: Db, messageIds: string[], clock: () => number = n
     const rows = messageIds.length === 0 ? [] : tx.select({ id: messages.id, folder: messages.folder }).from(messages).where(inArray(messages.id, messageIds)).all();
     for (const row of rows) recordAction(tx, { kind: "hide", messageId: row.id, payload: { from: row.folder, ...(opts.auto ? { auto: true } : {}) } }, () => at);
     for (let i = 0; i < messageIds.length; i += 400) {
-      tx.update(messages).set({ folder: "trash" }).where(inArray(messages.id, messageIds.slice(i, i + 400))).run();
+      // Hidden lands in the same list and is read in the same order.
+      tx.update(messages).set({ folder: "trash", trashedAt: at }).where(inArray(messages.id, messageIds.slice(i, i + 400))).run();
     }
   });
 }
@@ -90,7 +94,7 @@ export function restoreHidden(db: Db, from: Map<string, MailFolder>, clock: () =
   const at = clock();
   db.transaction((tx) => {
     for (const [id, folder] of from) {
-      tx.update(messages).set({ folder }).where(eq(messages.id, id)).run();
+      tx.update(messages).set({ folder, trashedAt: null }).where(eq(messages.id, id)).run();
       recordAction(tx, { kind: "restore", messageId: id, payload: {} }, () => at);
     }
   });
@@ -180,7 +184,9 @@ export function markRestored(db: Db, messageIds: string[], clock: () => number =
   const at = clock();
   db.transaction((tx) => {
     for (let i = 0; i < messageIds.length; i += 400) {
-      tx.update(messages).set({ folder: "inbox" }).where(inArray(messages.id, messageIds.slice(i, i + 400))).run();
+      // Out of the bin, so the moment it went in means nothing any more: a
+      // later delete stamps a fresh one rather than inheriting the old.
+      tx.update(messages).set({ folder: "inbox", trashedAt: null }).where(inArray(messages.id, messageIds.slice(i, i + 400))).run();
     }
     for (const messageId of messageIds) recordAction(tx, { kind: "restore", messageId, payload: {} }, () => at);
   });

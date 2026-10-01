@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { writeBlob } from "../attachments/blobs";
 import type { Config } from "../config";
 import { type Db } from "../db/client";
@@ -96,7 +96,16 @@ export async function storeNormalizedMessage(
     .where(and(eq(messages.accountId, account.id), eq(messages.providerMessageId, n.providerMessageId)))
     .get();
   if (known) {
-    if (known.folder !== n.folder) db.update(messages).set({ folder: n.folder }).where(eq(messages.id, known.id)).run();
+    // Binned or restored somewhere else — the operator's phone, a mailbox
+    // rule — and the sync is how this learns of it. The moment it was found
+    // in the bin stands for when it went, which is the order Deleted items
+    // is read in (operator, 2026-09-30).
+    if (known.folder !== n.folder) {
+      db.update(messages)
+        .set({ folder: n.folder, trashedAt: n.folder === "trash" ? receivedAt : null })
+        .where(eq(messages.id, known.id))
+        .run();
+    }
     // A delta saying it was read since it was stored (2026-09-14): what
     // the operator read on their phone opens the thread up to it here.
     if (n.read === true && !known.isFromOperator) markThreadOpenedUpTo(db, known.threadId, n.sentAt);
@@ -111,7 +120,10 @@ export async function storeNormalizedMessage(
       .all();
     const moved = candidates.find((row) => (row.folder === "trash") !== (n.folder === "trash"));
     if (moved) {
-      db.update(messages).set({ providerMessageId: n.providerMessageId, folder: n.folder }).where(eq(messages.id, moved.id)).run();
+      db.update(messages)
+        .set({ providerMessageId: n.providerMessageId, folder: n.folder, trashedAt: n.folder === "trash" ? receivedAt : null })
+        .where(eq(messages.id, moved.id))
+        .run();
       return false;
     }
     // Hidden here, then deleted in the provider's own app (2026-09-14): the
@@ -183,6 +195,10 @@ export async function storeNormalizedMessage(
       folder: n.folder,
       sentAt: n.sentAt,
       receivedAt,
+      // Already in the bin when this first saw it: binned before Celeste knew
+      // the message at all. The moment it was found there is the best this
+      // can say about when it went (2026-09-30).
+      ...(n.folder === "trash" ? { trashedAt: receivedAt } : {}),
     })
     .onConflictDoNothing()
     .run();
@@ -269,7 +285,14 @@ export async function storeSentReply(
     to: string[];
     cc: string[];
     text: string;
-    attachmentNames: string[];
+    /**
+     * What the operator attached, with the blob each one is already stored in:
+     * the echo points at those bytes rather than writing them again, so the
+     * chips are on the message the moment it is sent rather than whenever the
+     * provider's own copy comes back (operator, 2026-09-30: "my last email to
+     * Victoria has an attachment to it but it's not displaying right now").
+     */
+    attachments: { filename: string; mimeType: string; size: number; sha256: string; path: string }[];
     rfcMessageId: string | null;
     sentAt: number;
   },
@@ -292,8 +315,18 @@ export async function storeSentReply(
       bodyText: stripMarkup(input.text),
       bodyHtml: hasMarkup(input.text) ? sanitizeHtml(markupToHtml(input.text)) : null,
       snippet: stripMarkup(input.text).replace(/\s+/g, " ").trim().slice(0, 200),
-      attachmentNames: input.attachmentNames,
-      attachments: [],
+      attachmentNames: input.attachments.map((a) => a.filename),
+      attachments: input.attachments.map((a, index) => ({
+        index,
+        filename: a.filename,
+        mimeType: a.mimeType,
+        size: a.size,
+        providerAttachmentId: null,
+        // Already on disk, under the name its own bytes give it: `kept` below
+        // takes the blob as it stands rather than writing it a second time.
+        kept: { sha256: a.sha256, path: a.path },
+        bytes: null,
+      })),
       folder: "sent",
       sentAt: input.sentAt,
       labelIds: [],
@@ -311,8 +344,11 @@ export async function storeSentReply(
  */
 async function storeAttachments(db: Db, cfg: Config, messageId: string, list: NormalizedAttachment[], at: number): Promise<void> {
   for (const a of list) {
-    let blob: { sha256: string; path: string } | null = null;
-    if (a.bytes) {
+    // Already on disk: the operator's own attachment, kept when they picked
+    // it. Blobs are named by their contents, so this is the same file the
+    // provider's copy would write later anyway (2026-09-30).
+    let blob: { sha256: string; path: string } | null = a.kept ?? null;
+    if (!blob && a.bytes) {
       try {
         blob = await writeBlob(cfg, a.bytes);
       } catch (err) {
@@ -333,7 +369,28 @@ async function storeAttachments(db: Db, cfg: Config, messageId: string, list: No
         path: blob?.path ?? null,
         fetchedAt: blob ? at : null,
       })
-      .onConflictDoNothing()
+      // The provider's own copy of a sent message lands on the row the echo
+      // wrote when the operator pressed Send, under the same id. Doing
+      // nothing on the conflict left that row frozen as the echo wrote it,
+      // for good (review, 2026-09-30) — so the provider wins on what it
+      // knows, and keeps the blob already on disk when it brought none of
+      // its own, since a fetched attachment must not become unfetched.
+      .onConflictDoUpdate({
+        target: attachments.id,
+        set: {
+          filename: a.filename,
+          mimeType: a.mimeType,
+          size: a.size,
+          providerAttachmentId: a.providerAttachmentId,
+          ...(blob ? { sha256: blob.sha256, path: blob.path, fetchedAt: at } : {}),
+        },
+      })
       .run();
+  }
+  // What the echo had and this copy does not: the operator attached two and
+  // the provider kept one. Rows past the end would otherwise sit there as
+  // attachments of a message that no longer claims them.
+  if (list.length > 0) {
+    db.delete(attachments).where(and(eq(attachments.messageId, messageId), gte(attachments.index, list.length))).run();
   }
 }

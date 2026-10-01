@@ -15,6 +15,13 @@ export interface NormalizedAttachment {
   size: number;
   providerAttachmentId: string | null;
   bytes: Buffer | null;
+  /**
+   * A blob these bytes are already stored in, for an attachment that came
+   * from the operator rather than from a provider: what they picked was
+   * written to disk when they attached it, and blobs are named by their own
+   * contents, so the sent copy points at the same file (2026-09-30).
+   */
+  kept?: { sha256: string; path: string };
 }
 
 /**

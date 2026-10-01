@@ -418,7 +418,17 @@ export function applyWaiting<T extends { message: Pick<MessageRow, "sentAt" | "b
  * People page (2026-09-28) share this, so a row is the same row wherever it
  * is shown and a change to what a row carries reaches both.
  */
-export function inboxRowsWhere(db: Db, conditions: SQL[], limit: number): InboxRow[] {
+/**
+ * How Deleted items is read: newest binned first, whoever binned it
+ * (operator, 2026-09-30: "the deleted email should be last in first out").
+ * A mail from last year thrown away a minute ago belongs at the top, and its
+ * own date cannot say that. Anything binned before this was kept has no
+ * moment to sort by, so it falls back to its date and keeps the place it
+ * has always had.
+ */
+export const trashOrder = sql`coalesce(${messages.trashedAt}, ${messages.sentAt}) desc`;
+
+export function inboxRowsWhere(db: Db, conditions: SQL[], limit: number, orderBy: SQL = desc(messages.sentAt)): InboxRow[] {
   return db
     .select({
       message: messages,
@@ -437,7 +447,7 @@ export function inboxRowsWhere(db: Db, conditions: SQL[], limit: number): InboxR
     .leftJoin(projects, eq(projects.id, projectAssignments.projectId))
     .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...conditions))
-    .orderBy(desc(messages.sentAt))
+    .orderBy(orderBy)
     .limit(limit)
     .all()
     .map((r) => ({
@@ -452,7 +462,8 @@ export function inboxRowsWhere(db: Db, conditions: SQL[], limit: number): InboxR
 }
 
 export function listInboxMessages(db: Db, opts: InboxScope = {}): InboxRow[] {
-  return applyWaiting(inboxRowsWhere(db, scopeConditions(opts), opts.limit ?? 100), opts);
+  const order = (opts.folder ?? "inbox") === "trash" ? trashOrder : desc(messages.sentAt);
+  return applyWaiting(inboxRowsWhere(db, scopeConditions(opts), opts.limit ?? 100, order), opts);
 }
 
 /** What the tree's counts are taken over: the whole view, minus the folder and status each row sets. */

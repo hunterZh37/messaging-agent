@@ -54,7 +54,10 @@ export async function sendAction(input: { draftId: string; finalText: string; to
         to: input.to,
         cc: input.cc,
         text: input.finalText,
-        attachmentNames: v.attachments.map((a) => a.filename),
+        // What they attached, pointing at the blobs it was already kept in,
+        // so the chips are on the message the moment it goes rather than
+        // whenever the provider's copy comes back (operator, 2026-09-30).
+        attachments: v.attachments.map((a) => ({ filename: a.filename, mimeType: a.mimeType, size: a.size, sha256: a.sha256, path: a.path })),
         rfcMessageId: v.account.provider === "imap" && sent.providerMessageId.startsWith("<") ? sent.providerMessageId : null,
         sentAt: Date.now(),
       });

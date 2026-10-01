@@ -77,6 +77,16 @@ export const messages = sqliteTable(
     folder: text("folder", { enum: ["inbox", "sent", "trash", "junk", "messages"] }).notNull().default("inbox"),
     sentAt: integer("sent_at").notNull(), // epoch ms
     receivedAt: integer("received_at").notNull(), // epoch ms when we stored it
+    /**
+     * When this message went to Deleted items, whoever moved it: the operator
+     * here, or the mailbox elsewhere and a sync that found it there. Deleted
+     * items is read newest-deleted first (operator, 2026-09-30: "the deleted
+     * email should be last in first out"), which the message's own date
+     * cannot say — a mail from last year binned a minute ago belongs at the
+     * top. Null for anything binned before this was kept, and for everything
+     * not in the bin.
+     */
+    trashedAt: integer("trashed_at"),
   },
   (t) => [
     index("messages_thread_idx").on(t.threadId),

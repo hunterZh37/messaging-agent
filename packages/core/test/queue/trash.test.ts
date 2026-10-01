@@ -713,3 +713,63 @@ describe("archiving what is already archived", () => {
     expect(archived(db, "a1:t1")).toBe(500);
   });
 });
+
+/**
+ * Deleted items is read newest-binned first (operator, 2026-09-30: "the
+ * deleted email should be last in first out"). A mail from last year thrown
+ * away a minute ago belongs at the top, which its own date cannot say.
+ */
+describe("Deleted items, last in first out", () => {
+  it("puts the one binned most recently first, whatever its own date", () => {
+    const db = testDb();
+    seed(db);
+    // m1 is the oldest mail (sentAt 100) and the last to be binned.
+    markTrashed(db, ["a1:m3"], () => 1_000);
+    markTrashed(db, ["a2:m4"], () => 2_000);
+    markTrashed(db, ["a1:m1"], () => 3_000);
+    const rows = listInboxMessages(db, { folder: "trash" });
+    expect(rows.map((r) => r.message.id)).toEqual(["a1:m1", "a2:m4", "a1:m3"]);
+  });
+
+  it("keeps a message binned before this was kept in its old place, by its own date", () => {
+    const db = testDb();
+    seed(db);
+    // Binned long ago, with nothing to say when: the message's own date stands.
+    db.update(messages).set({ folder: "trash", trashedAt: null }).where(eq(messages.id, "a2:m4")).run();
+    db.update(messages).set({ folder: "trash", trashedAt: null }).where(eq(messages.id, "a1:m1")).run();
+    const rows = listInboxMessages(db, { folder: "trash" });
+    // m4 was sent at 500, m1 at 100.
+    expect(rows.map((r) => r.message.id)).toEqual(["a2:m4", "a1:m1"]);
+  });
+
+  it("sorts the dated above an older undated one, and below a newer", () => {
+    const db = testDb();
+    seed(db);
+    db.update(messages).set({ folder: "trash", trashedAt: null }).where(eq(messages.id, "a2:m4")).run(); // sent 500
+    markTrashed(db, ["a1:m1"], () => 400); // binned at 400, sent 100
+    markTrashed(db, ["a1:m3"], () => 600); // binned at 600, sent 400
+    expect(listInboxMessages(db, { folder: "trash" }).map((r) => r.message.id)).toEqual(["a1:m3", "a2:m4", "a1:m1"]);
+  });
+
+  it("stamps a hidden message too, since it lands in the same list", () => {
+    const db = testDb();
+    seed(db);
+    markHidden(db, ["a1:m1"], () => 5_000);
+    expect(db.select({ at: messages.trashedAt }).from(messages).where(eq(messages.id, "a1:m1")).get()?.at).toBe(5_000);
+  });
+
+  it("forgets the moment when the message comes back out", () => {
+    const db = testDb();
+    seed(db);
+    markTrashed(db, ["a1:m1"], () => 3_000);
+    markRestored(db, ["a1:m1"], () => 4_000);
+    expect(db.select({ at: messages.trashedAt }).from(messages).where(eq(messages.id, "a1:m1")).get()?.at).toBeNull();
+  });
+
+  it("leaves every other folder in the order it always had", () => {
+    const db = testDb();
+    seed(db);
+    // Newest mail first, by its own date, in Inbox as before.
+    expect(listInboxMessages(db, { folder: "inbox" }).map((r) => r.message.id)).toEqual(["a2:m4", "a1:m3", "a1:m2", "a1:m1"]);
+  });
+});

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { eq } from "drizzle-orm";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -386,7 +386,7 @@ describe("storeSentReply: the sent reply shows at once (2026-09-15)", () => {
       to: ["bob@example.com"],
       cc: [],
       text: "Thanks Bob, here is my address.",
-      attachmentNames: [],
+      attachments: [],
       rfcMessageId: "<sent1@example.com>",
       sentAt: 1_000_000,
       ...overrides,
@@ -404,6 +404,44 @@ describe("storeSentReply: the sent reply shows at once (2026-09-15)", () => {
       ["sent", true, "Thanks Bob, here is my address."],
     ]);
     expect(testDbRef.select().from(threads).where(eq(threads.id, threadRowId("a1", "t1"))).get()?.lastFromOperator).toBe(true);
+  });
+
+  /**
+   * The operator attached a screenshot, sent it, and the thread showed their
+   * message with nothing on it: the echo carried the names and no rows, so
+   * the chips only appeared when the provider's own copy came back minutes
+   * later (operator, 2026-09-30: "my last email to Victoria has an attachment
+   * to it but it's not displaying right now").
+   */
+  it("carries the attachments the operator sent, at once", async () => {
+    testDbRef = testDb();
+    const account = seedAccount(testDbRef);
+    const bytes = Buffer.from("PNG!");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const blob = path.join(dir, "blobs", sha256);
+    await mkdir(path.join(dir, "blobs"), { recursive: true });
+    await writeFile(blob, bytes);
+    await sent(account, {
+      attachments: [{ filename: "shot.png", mimeType: "image/png", size: bytes.length, sha256, path: blob }],
+    });
+    const message = testDbRef.select().from(messages).get()!;
+    expect(message.attachmentNames).toEqual(["shot.png"]);
+    const rows = testDbRef.select().from(attachments).where(eq(attachments.messageId, message.id)).all();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ filename: "shot.png", mimeType: "image/png", size: bytes.length, sha256 });
+    // The bytes the operator picked are already on disk; the echo points at
+    // them rather than writing them again, so a preview works straight away.
+    expect(rows[0]!.path).toBe(blob);
+    expect(rows[0]!.fetchedAt).toBe(1_000_000);
+  });
+
+  it("has nothing to carry when the operator attached nothing", async () => {
+    testDbRef = testDb();
+    const account = seedAccount(testDbRef);
+    await sent(account);
+    const message = testDbRef.select().from(messages).get()!;
+    expect(message.attachmentNames).toEqual([]);
+    expect(testDbRef.select().from(attachments).all()).toHaveLength(0);
   });
 
   it("is taken over by the provider's copy with the same Message-ID, not shown twice", async () => {
@@ -424,6 +462,114 @@ describe("storeSentReply: the sent reply shows at once (2026-09-15)", () => {
     expect(rows[0]!.id).toBe(before[0]!.id);
     expect(rows[0]!.providerMessageId).toBe("sent:77");
     expect(rows[0]!.bodyText).toContain("On Tue Bob wrote");
+  });
+
+  /**
+   * The provider's own copy of the sent mail lands on the row the echo wrote.
+   * Doing nothing on that conflict left the attachment frozen as the echo had
+   * it, for good — the provider could never correct a name, a type or its own
+   * id for it (review, 2026-09-30).
+   */
+  it("lets the provider's own copy correct what the echo wrote", async () => {
+    testDbRef = testDb();
+    const account = seedAccount(testDbRef);
+    const bytes = Buffer.from("what the operator attached");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const blob = path.join(dir, "blobs", sha256);
+    await mkdir(path.join(dir, "blobs"), { recursive: true });
+    await writeFile(blob, bytes);
+    await sent(account, { attachments: [{ filename: "shot.png", mimeType: "image/png", size: bytes.length, sha256, path: blob }] });
+
+    const theirs = Buffer.from("what the provider kept");
+    await storeNormalizedMessage(
+      testDbRef,
+      cfg,
+      account,
+      n({
+        providerMessageId: "sent:77",
+        rfcMessageId: "<sent1@example.com>",
+        fromAddress: "me@example.com",
+        folder: "sent",
+        sentAt: 1_000_400,
+        attachments: [att({ filename: "shot.png", mimeType: "image/png", size: theirs.length, providerAttachmentId: "AAMk-1", bytes: theirs })],
+      }),
+      1_000_500,
+    );
+    const row = testDbRef.select().from(attachments).get()!;
+    expect(row.providerAttachmentId).toBe("AAMk-1");
+    expect(row.sha256).toBe(createHash("sha256").update(theirs).digest("hex"));
+  });
+
+  /** A copy that brings no bytes must not un-fetch what is already on disk. */
+  it("keeps the blob already on disk when their copy carries none", async () => {
+    testDbRef = testDb();
+    const account = seedAccount(testDbRef);
+    const bytes = Buffer.from("what the operator attached");
+    const sha256 = createHash("sha256").update(bytes).digest("hex");
+    const blob = path.join(dir, "blobs", sha256);
+    await mkdir(path.join(dir, "blobs"), { recursive: true });
+    await writeFile(blob, bytes);
+    await sent(account, { attachments: [{ filename: "shot.png", mimeType: "image/png", size: bytes.length, sha256, path: blob }] });
+
+    await storeNormalizedMessage(
+      testDbRef,
+      cfg,
+      account,
+      n({
+        providerMessageId: "sent:77",
+        rfcMessageId: "<sent1@example.com>",
+        fromAddress: "me@example.com",
+        folder: "sent",
+        sentAt: 1_000_400,
+        attachments: [att({ filename: "shot.png", mimeType: "image/png", size: bytes.length, providerAttachmentId: "AAMk-1", bytes: null })],
+      }),
+      1_000_500,
+    );
+    const row = testDbRef.select().from(attachments).get()!;
+    expect(row.providerAttachmentId).toBe("AAMk-1");
+    expect(row.path).toBe(blob);
+    expect(row.sha256).toBe(sha256);
+  });
+
+  /** Two attached, one kept: the one they dropped does not linger. */
+  it("drops a row the provider's copy no longer claims", async () => {
+    testDbRef = testDb();
+    const account = seedAccount(testDbRef);
+    const one = Buffer.from("first");
+    const two = Buffer.from("second");
+    await mkdir(path.join(dir, "blobs"), { recursive: true });
+    const write = async (b: Buffer) => {
+      const sha = createHash("sha256").update(b).digest("hex");
+      const at = path.join(dir, "blobs", sha);
+      await writeFile(at, b);
+      return { sha256: sha, path: at };
+    };
+    const a1 = await write(one);
+    const a2 = await write(two);
+    await sent(account, {
+      attachments: [
+        { filename: "one.png", mimeType: "image/png", size: one.length, ...a1 },
+        { filename: "two.png", mimeType: "image/png", size: two.length, ...a2 },
+      ],
+    });
+    expect(testDbRef.select().from(attachments).all()).toHaveLength(2);
+
+    await storeNormalizedMessage(
+      testDbRef,
+      cfg,
+      account,
+      n({
+        providerMessageId: "sent:77",
+        rfcMessageId: "<sent1@example.com>",
+        fromAddress: "me@example.com",
+        folder: "sent",
+        sentAt: 1_000_400,
+        attachments: [att({ filename: "one.png", mimeType: "image/png", size: one.length, bytes: one })],
+      }),
+      1_000_500,
+    );
+    const rows = testDbRef.select().from(attachments).all();
+    expect(rows.map((r) => r.filename)).toEqual(["one.png"]);
   });
 
   it("where the send gives no Message-ID (Outlook), is taken over by the operator's copy in the same thread that starts with the reply", async () => {
