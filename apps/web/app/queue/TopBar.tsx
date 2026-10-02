@@ -18,7 +18,12 @@ export function TopBar(props: { accountCount: number; needsSignin: string[] }) {
   // Once there is an inbox, every folder page and thread shows a project bar,
   // and that bar is where the refresh control lives.
   const ownsButton = !(props.accountCount > 0 && hasProjectBar(pathname));
-  const banners = pathname === "/drafts" ? props.needsSignin : [];
+  // On every page, not on Drafts alone: two of the operator's inboxes sat
+  // locked out for two and a half days and the only word of it was here, on a
+  // page they had no reason to open (operator, 2026-10-01: "right now they're
+  // hard to notice and I was wondering why I had not received any emails from
+  // these two inboxes").
+  const banners = props.needsSignin;
   if (!ownsButton && banners.length === 0) return null;
 
   return (

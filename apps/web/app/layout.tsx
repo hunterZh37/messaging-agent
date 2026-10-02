@@ -11,6 +11,7 @@ import { AskProvider } from "./ask/AskProvider";
 import { SendProvider } from "./queue/SendProvider";
 import { SyncProvider } from "./queue/sync";
 import { TopBar } from "./queue/TopBar";
+import { SignInDialog } from "./queue/SignInDialog";
 import { ThemeGuard } from "./queue/ThemeGuard";
 import "./globals.css";
 import "./phone.css";
@@ -83,6 +84,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <SyncProvider lastSyncAt={lastSyncAt} accountCount={accountCount}>
           <AskProvider initialOpen={askOpen} initialChat={initialChat}>
             <TopBar accountCount={accountCount} needsSignin={needsSignin} />
+            {/* An inbox that has stopped letting Celeste in is the one
+                failure here that hides as silence, so it is said over the
+                page rather than beside it (operator, 2026-10-01). */}
+            <SignInDialog emails={needsSignin} />
             {/* The send gate sits above the routes, so the six seconds and
                 the Undo go on counting while the operator reads something
                 else (spec 8, 2026-09-10). */}
