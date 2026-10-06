@@ -974,8 +974,20 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 .draft-marks-hint { font-size: 11.5px; color: var(--muted); }
 .draft-field { resize: none; overflow: hidden; min-height: 0; }
 /* The one-line instruction beside "Draft with Celeste" grows with the card; the button does not (spec 2026-09-22). */
+/* Writing a mail wants more room than reading a list of them (operator,
+   2026-10-05: "make both input boxes increase in length and vertical
+   length"). Wider than the rest of the app on a screen that has the room,
+   and never wider than the screen itself. */
+main.compose-page { max-width: 1040px; }
+/* What to tell Celeste is usually a paragraph — an order number, an address,
+   what is wrong with it — so it is a box that holds one and grows if the
+   operator drags it. */
+textarea.compose-instruction { min-height: 6.5rem; resize: vertical; }
+.compose-celeste-row { align-items: flex-start; }
 .compose-celeste-row .field { flex: 1 1 auto; min-width: 0; }
 .compose-celeste-row .btn { flex: none; }
+/* The mail itself: half as tall again as it was. */
+.compose-card .draft-field { min-height: 17rem; }
 @media (max-width: 560px) { .draft-marks-hint { display: none; } }
 /* Drawn in the card the moment the editing stops, and in the send preview. */
 .draft strong, .mail-body strong { font-weight: 650; }

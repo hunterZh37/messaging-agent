@@ -32,7 +32,7 @@ export default async function ComposePage() {
     .map((a) => ({ id: a.id, email: a.email, displayName: a.displayName }));
 
   return (
-    <main>
+    <main className="compose-page">
       <div className="page-header-row">
         <h1>Compose</h1>
         <ThemeToggle className="btn quiet icon-only theme-toggle-mobile" />

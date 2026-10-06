@@ -187,14 +187,24 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
 
       <label htmlFor="compose-instruction">Draft with Celeste</label>
       <div className="row compose-celeste-row">
-        <input
+        {/* What to say is often a paragraph, not a line: an order number, an
+            address, and what is wrong with it. On one line it scrolled out of
+            sight as they typed (operator, 2026-10-05: "make both input boxes
+            increase in length and vertical length"). Enter still asks Celeste,
+            as it always has; Shift with it is a new line. */}
+        <textarea
           id="compose-instruction"
-          className="field"
+          className="field compose-instruction"
           value={instruction}
           onChange={(e) => setInstruction(e.target.value)}
           placeholder="Tell Celeste what this email should say"
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !celesteBlock) {
+            // Mid-composition, Enter belongs to the IME: it is how a Chinese
+            // candidate is chosen, and taking it here cut the line off and
+            // sent Celeste off drafting half a sentence. The recipient field
+            // reads it the same way (review, 2026-10-05).
+            if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+            if (e.key === "Enter" && !e.shiftKey && !celesteBlock) {
               e.preventDefault();
               draftWithCeleste();
             }
