@@ -24,6 +24,27 @@ export function handleOfChat(chatGuid: string): string {
  * makes macOS ask, once, whether the app may control the computer
  * (Accessibility), on top of controlling Messages.
  */
+/**
+ * Messages brought to the front with the chat open in it.
+ *
+ * `reopen` is what the dock icon does, and it is here because running with
+ * every window closed is the common way for Messages to sit on a Mac:
+ * `activate` alone does not open one, so the wait below ran its ten seconds
+ * and gave up — twenty-five times across ten chats, each one a row that came
+ * back with no reason given (operator, 2026-10-06: "some messages for mobile
+ * views just seem to be unable to be deleted"). A locked Mac is beyond any of
+ * this; nothing can drive an app there.
+ */
+function openChat(url: string): string[] {
+  return [
+    `tell application "Messages" to activate`,
+    `tell application "Messages" to reopen`,
+    `delay 0.8`,
+    `tell application "Messages" to open location ${url}`,
+    `delay 1.5`,
+  ];
+}
+
 /** Waits for Messages' window, up to about ten seconds: after a delete the app is busy for a moment (2026-09-11: "no window"). */
 const WAIT_FOR_WINDOW = [
   `  set tries to 0`,
@@ -38,10 +59,7 @@ const WAIT_FOR_WINDOW = [
 export function openConversationScript(handle: string): string {
   const url = appleScriptString(`imessage://${handle}`);
   return returningToFront([
-    `tell application "Messages" to activate`,
-    `delay 0.8`,
-    `tell application "Messages" to open location ${url}`,
-    `delay 1.5`,
+    ...openChat(url),
     `tell application "System Events" to tell process "Messages"`,
     ...WAIT_FOR_WINDOW,
     `  return "title:" & (title of window 1)`,
@@ -52,10 +70,7 @@ export function openConversationScript(handle: string): string {
 export function deleteConversationScript(handle: string): string {
   const url = appleScriptString(`imessage://${handle}`);
   return returningToFront([
-    `tell application "Messages" to activate`,
-    `delay 0.8`,
-    `tell application "Messages" to open location ${url}`,
-    `delay 1.5`,
+    ...openChat(url),
     `tell application "System Events" to tell process "Messages"`,
     ...WAIT_FOR_WINDOW,
     `  set theItem to menu item "Delete Conversation…" of menu "Conversation" of menu bar 1`,

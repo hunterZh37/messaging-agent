@@ -30,6 +30,22 @@ describe("deleteConversationScript", () => {
     expect(s).toContain('return my done("window gone")');
   });
 
+  /**
+   * Messages running with every window closed is the common way for it to sit
+   * on a Mac, and `activate` alone does not open one: the script waited its
+   * ten seconds and gave up, twenty-five times across ten chats in the
+   * operator's own log, each one a row that came back with no reason given
+   * (operator, 2026-10-06: "some messages for mobile views just seem to be
+   * unable to be deleted").
+   */
+  it("asks Messages for a window before waiting for one", () => {
+    const s = deleteConversationScript("+14155550100");
+    expect(s).toContain('tell application "Messages" to reopen');
+    // Before the chat is asked for, and before anything waits on a window.
+    expect(s.indexOf("reopen")).toBeLessThan(s.indexOf("open location"));
+    expect(s.indexOf("reopen")).toBeLessThan(s.indexOf("count of windows"));
+  });
+
   it("escapes a handle for AppleScript", () => {
     expect(deleteConversationScript('a"b')).toContain('"imessage://a\\"b"');
   });
@@ -48,6 +64,12 @@ describe("titleNamesChat", () => {
 });
 
 describe("openConversationScript", () => {
+  it("asks for a window the same way the delete does", () => {
+    const s = openConversationScript("+14155550100");
+    expect(s).toContain('tell application "Messages" to reopen');
+    expect(s.indexOf("reopen")).toBeLessThan(s.indexOf("count of windows"));
+  });
+
   it("waits for the window and answers with its title", () => {
     const s = openConversationScript("+14155550100");
     expect(s).toContain('open location "imessage://+14155550100"');
