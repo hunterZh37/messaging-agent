@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { AlexItem, AlexItemRow, AlexSlot } from "@messaging-agent/core";
 import { addToAlexAction, alexFreeTimesAction, retryAlexItemAction } from "../actions";
 import { Floating, useAnchoredPanel } from "@/lib/anchored";
+import { buildAlexItem, localValue } from "./alexForm";
 
 function CalendarIcon() {
   return (
@@ -20,12 +21,6 @@ const KINDS = [
   { kind: "event" as const, label: "Event", hint: "A real calendar event, with no attendees. Only for a time already agreed." },
 ];
 
-/** `2026-09-18T17:00` in the browser's own zone, which is the operator's. */
-function localValue(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
 function dayValue(d: Date): string {
   return localValue(d).slice(0, 10);
 }
@@ -36,11 +31,6 @@ function nextHalfHour(): Date {
   d.setSeconds(0, 0);
   d.setMinutes(d.getMinutes() > 30 ? 60 : 30);
   return d;
-}
-
-/** A `datetime-local` or `date` value as the instant it names here, in ISO. */
-function iso(value: string): string {
-  return new Date(value).toISOString();
 }
 
 function whenLabel(row: AlexItemRow): string {
@@ -67,7 +57,10 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<AlexItem["kind"]>("actionable");
   const [title, setTitle] = useState("");
+  // An actionable's date is the Day field, with or without a clock; only an
+  // event has a date-time field of its own (operator, 2026-10-06).
   const [day, setDay] = useState(() => dayValue(new Date()));
+  const [time, setTime] = useState(() => localValue(nextHalfHour()).slice(11, 16));
   const [start, setStart] = useState(() => localValue(nextHalfHour()));
   const [minutes, setMinutes] = useState(30);
   const [timed, setTimed] = useState(false);
@@ -104,8 +97,8 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
     };
   }, [open]);
 
-  // Which day the times are for: the date half of whichever field is in use.
-  const onDay = kind === "actionable" && !timed ? day : start.slice(0, 10);
+  // Which day the times are for: the Day field, or an event's own date.
+  const onDay = kind === "actionable" ? day : start.slice(0, 10);
   const wantsTime = kind === "event" || timed;
 
   // Alex's free slots for that day, re-read when the day, the length or the
@@ -134,14 +127,7 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
   }
 
   function build(): AlexItem | string {
-    const text = title.trim();
-    if (!text) return "Give it a title.";
-    const from = new Date(start);
-    const to = new Date(from.getTime() + minutes * 60_000);
-    if (kind === "event") return { kind: "event", title: text, startISO: from.toISOString(), endISO: to.toISOString() };
-    // An actionable is the day it belongs to, and only carries a clock when asked.
-    if (!timed) return { kind: "actionable", title: text, dayISO: iso(`${day}T12:00`) };
-    return { kind: "actionable", title: text, dayISO: from.toISOString(), startISO: from.toISOString(), endISO: to.toISOString() };
+    return buildAlexItem({ kind, title, day, time, start, minutes, timed });
   }
 
   function add() {
@@ -192,7 +178,7 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
             <input className="field" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} autoFocus />
           </label>
 
-          {kind === "actionable" && !timed ? (
+          {kind === "actionable" ? (
             <label className="alex-field">
               <span className="meta">Day</span>
               <input className="field" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
@@ -203,6 +189,13 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
               <input className="field" type="datetime-local" value={start} onChange={(e) => setStart(e.target.value)} />
             </label>
           )}
+
+          {kind === "actionable" && timed ? (
+            <label className="alex-field">
+              <span className="meta">At</span>
+              <input className="field" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            </label>
+          ) : null}
 
           {kind === "event" || timed ? (
             <label className="alex-field">
@@ -231,12 +224,15 @@ export function AddToAlex({ threadId, subject, connected }: { threadId: string; 
                   {free.map((slot) => {
                     const at = new Date(slot.startISO);
                     const value = localValue(at);
+                    // A chip sets the clock of whichever field this kind uses.
+                    const clock = value.slice(11, 16);
+                    const on = kind === "actionable" ? clock === time : value === start;
                     return (
                       <button
                         key={slot.startISO}
                         type="button"
-                        className={`chip${value === start ? " on" : ""}`}
-                        onClick={() => setStart(value)}
+                        className={`chip${on ? " on" : ""}`}
+                        onClick={() => (kind === "actionable" ? setTime(clock) : setStart(value))}
                       >
                         {at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
                       </button>
