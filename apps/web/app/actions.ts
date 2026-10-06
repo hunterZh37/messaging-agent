@@ -26,6 +26,7 @@ import {
   type RecipientSuggestion,
 } from "@messaging-agent/core";
 import { eq } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { core } from "@/lib/core";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -64,6 +65,15 @@ export async function sendAction(input: { draftId: string; finalText: string; to
     } catch (err) {
       console.error(`sendAction: the sent reply will show after the next sync: ${(err as Error).message}`);
     }
+    // What the send just changed, said out loud the way every other action
+    // here says it (operator, 2026-10-04: "the sent email does not show up in
+    // the Sent inbox automatically. I have to refresh it"). This file was the
+    // only one in the app that changed something and told Next nothing, and
+    // nothing anywhere had ever marked Sent stale.
+    revalidatePath("/sent");
+    revalidatePath("/drafts");
+    revalidatePath("/inbox");
+    if (v.draft.threadId) revalidatePath(`/inbox/${v.draft.threadId}`);
     return { ok: true };
   } catch (err) {
     return { ok: false, error: (err as Error).message };
