@@ -55,14 +55,28 @@ const WAIT_FOR_WINDOW = [
   `  if (count of windows) = 0 then return "no window"`,
 ];
 
-/** Opens the chat and says what Messages titled its window, so the delete that follows is checked against the chat it is meant for. */
+/**
+ * Opens the chat and says what Messages titled its windows, so the delete
+ * that follows is checked against the chat it is meant for.
+ *
+ * Every window, not the first one: `window 1` was a Quick Look panel the one
+ * time it mattered, and the conversation Celeste had just opened sat in
+ * another window behind it, so a delete the operator asked for was refused
+ * (their log, 2026-10-06). The delete step learned this on 2026-09-14 and
+ * looks through every window for its button; this is the same lesson, which
+ * the title check never got.
+ */
 export function openConversationScript(handle: string): string {
   const url = appleScriptString(`imessage://${handle}`);
   return returningToFront([
     ...openChat(url),
     `tell application "System Events" to tell process "Messages"`,
     ...WAIT_FOR_WINDOW,
-    `  return "title:" & (title of window 1)`,
+    `  set out to ""`,
+    `  repeat with w in windows`,
+    `    set out to out & (title of w as text) & linefeed`,
+    `  end repeat`,
+    `  return "titles:" & out`,
     `end tell`,
   ]);
 }
@@ -157,9 +171,13 @@ export async function deleteConversation(
   let last = "";
   for (let attempt = 1; attempt <= attempts; attempt++) {
     const opened = (await run(openConversationScript(handle))).trim();
-    if (!opened.startsWith("title:")) throw new Error(`Messages did not open the chat with ${handle}: ${opened || "no answer"}`);
-    const title = opened.slice("title:".length);
-    if (!titleNamesChat(title, names)) throw new Error(`Messages opened "${title}" for ${handle}, not this chat`);
+    if (!opened.startsWith("titles:")) throw new Error(`Messages did not open the chat with ${handle}: ${opened || "no answer"}`);
+    // Any window of them: the chat is open if one of them names it, whatever
+    // else Messages happens to have on screen beside it.
+    const titles = opened.slice("titles:".length).split("\n").map((t) => t.trim()).filter((t) => t !== "");
+    if (!titles.some((title) => titleNamesChat(title, names))) {
+      throw new Error(`Messages opened ${titles.map((t) => `"${t}"`).join(", ") || "nothing"} for ${handle}, not this chat`);
+    }
     const out = (await run(deleteConversationScript(handle))).trim();
     if (DONE.has(out)) return out;
     last = out;

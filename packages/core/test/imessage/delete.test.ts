@@ -70,26 +70,46 @@ describe("openConversationScript", () => {
     expect(s.indexOf("reopen")).toBeLessThan(s.indexOf("count of windows"));
   });
 
-  it("waits for the window and answers with its title", () => {
+  it("waits for a window and answers with the title of every one of them", () => {
     const s = openConversationScript("+14155550100");
     expect(s).toContain('open location "imessage://+14155550100"');
     expect(s).toContain("repeat while (count of windows) = 0 and tries < 20");
-    expect(s).toContain('return my done("title:" & (title of window 1))');
+    // Never window 1 alone: it was a Quick Look panel the one time it
+    // mattered (their log, 2026-10-06).
+    expect(s).not.toContain("title of window 1");
+    expect(s).toContain("repeat with w in windows");
+    expect(s).toContain("(title of w as text)");
+    expect(s).toContain('"titles:"');
     expect(s).toContain("tell application prevApp to activate");
   });
 });
 
-/** A fake Messages: the title its window shows, then what the delete says. */
-function messagesThat(title: string, answer: string) {
+/** A fake Messages: the titles its windows show, then what the delete says. */
+function messagesThat(titles: string | string[], answer: string) {
   const ran: string[] = [];
   const run = async (script: string) => {
     ran.push(script);
-    return script.includes('"title:"') ? `title:${title}` : answer;
+    return script.includes('"titles:"') ? `titles:${[titles].flat().join("\n")}\n` : answer;
   };
   return { run, ran };
 }
 
 describe("deleteConversation", () => {
+  /**
+   * The operator's own log, 2026-10-06: `Messages opened "Quick Look" for
+   * +1833…, not this chat`. A Quick Look panel was window 1 and the
+   * conversation sat behind it, so a delete they had asked for was refused.
+   */
+  it("finds the chat in any window, not just the first one", async () => {
+    const m = messagesThat(["Quick Look", "+1 (415) 555-0100"], "deleted\n");
+    await expect(deleteConversation(m.run, "+14155550100", ["+14155550100"])).resolves.toBe("deleted");
+  });
+
+  it("still refuses when no window shows the chat, and says what it did see", async () => {
+    const m = messagesThat(["Quick Look", "Ben Brooks"], "deleted\n");
+    await expect(deleteConversation(m.run, "+14155550100", ["+14155550100"])).rejects.toThrow(/"Quick Look", "Ben Brooks".*not this chat/);
+  });
+
   it("is done when Messages deleted, or had nothing to delete", async () => {
     for (const answer of ["deleted", "no sheet", "nothing to delete"]) {
       const m = messagesThat("+1 (415) 555-0100", `${answer}\n`);
@@ -116,7 +136,7 @@ describe("deleteConversation", () => {
     const ran: string[] = [];
     const run = async (script: string) => {
       ran.push(script);
-      return script.includes('"title:"') ? "title:+1 (415) 555-0100" : answers.shift()!;
+      return script.includes('"titles:"') ? "titles:+1 (415) 555-0100\n" : answers.shift()!;
     };
     await expect(deleteConversation(run, "+14155550100", ["+14155550100"], { isGone: async () => false })).resolves.toBe("deleted");
     expect(ran.length).toBe(4);
