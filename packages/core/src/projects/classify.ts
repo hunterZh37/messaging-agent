@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import type { Config } from "../config";
 import { now, type Db } from "../db/client";
-import { embeddingState, messages, projectAssignments, projects, sorts, threads, type ProjectRow } from "../db/schema";
+import { accounts, embeddingState, messages, projectAssignments, projects, sorts, threads, type ProjectRow } from "../db/schema";
 import { applyWaiting, handledActions, scopeConditions, type CountScope } from "../queue/inbox";
 import { stripQuoted } from "../text/quoted";
 import { createOllamaEmbedder, EmbeddingsUnavailableError, type Embedder } from "./embedder";
@@ -152,25 +152,38 @@ function readVectors(db: Db, ids: string[]): Map<string, Float32Array> {
 }
 
 /**
- * Embeds inbound messages whose vector is missing or out of date, newest
- * first. Runs before every classify pass and after every sync, so the cost is
- * spread over the mail as it arrives. A message is out of date when the text
- * the rules above produce no longer hashes to what was embedded — which is
- * how a change to those rules reaches mail that was already filed — and a row
- * with no hash at all was written before they existed, so it counts as stale
- * too. Errors from the embedder propagate: a half-embedded inbox is fine, a
- * silently unembedded one is not.
+ * Embeds messages whose vector is missing or out of date, newest first. Runs
+ * before every classify pass and after every sync, so the cost is spread over
+ * the mail as it arrives. A message is out of date when the text the rules
+ * above produce no longer hashes to what was embedded — which is how a change
+ * to those rules reaches mail that was already filed — and a row with no hash
+ * at all was written before they existed, so it counts as stale too. Errors
+ * from the embedder propagate: a half-embedded inbox is fine, a silently
+ * unembedded one is not.
+ *
+ * Two different questions want vectors, and `scope` picks which one this call
+ * is for. The default, `"projects"`, is what every caller asked for before
+ * this scope existed and must keep asking for by not passing one: only
+ * inbound mail in the folders the operator files (spec 10a). `"search"` is
+ * wider, because looking something up by what it meant can mean any message
+ * they might ask about, their own sent mail and their texts included.
  */
 export async function embedPending(
   db: Db,
   embedder: Embedder,
-  opts: { accountId?: string; limit?: number } = {},
+  opts: { accountId?: string; limit?: number; scope?: "projects" | "search" } = {},
   clock: () => number = now,
 ): Promise<{ embedded: number; reembedded: number }> {
   requireVec(db);
-  // Only mail the operator lives in is worth a vector: Deleted items and
-  // Junk are never filed under a project (spec 10a).
-  const conditions = [eq(messages.isFromOperator, false), inArray(messages.folder, ["inbox", "sent"])];
+  // Two different questions want vectors. Filing a message under a project
+  // only ever concerned inbound mail in the folders the operator lives in.
+  // Searching by meaning concerns everything they might ask about, their own
+  // sent mail and their texts included (operator, 2026-10-07: "everything,
+  // email first"), and only junk is never worth the room.
+  const forSearch = opts.scope === "search";
+  const conditions = forSearch
+    ? [ne(messages.folder, "junk")]
+    : [eq(messages.isFromOperator, false), inArray(messages.folder, ["inbox", "sent"])];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
 
   const candidates = db
@@ -183,8 +196,15 @@ export async function embedPending(
     })
     .from(messages)
     .leftJoin(embeddingState, eq(embeddingState.messageId, messages.id))
+    .innerJoin(accounts, eq(accounts.id, messages.accountId))
     .where(and(...conditions))
-    .orderBy(desc(messages.sentAt))
+    // Email first, newest first within it (2026-10-07). Their mailbox is
+    // 86,210 texts to 7,939 emails, so newest-first alone would spend its
+    // first hour on texts while the complaint that started this was about
+    // email. Texts follow, and the clock keeps going until there are none.
+    // The projects scope has no texts to sort ahead of, so it keeps the
+    // single newest-first order it always had.
+    .orderBy(...(forSearch ? [sql`${accounts.provider} IN ('imessage', 'whatsapp')`] : []), desc(messages.sentAt))
     .limit(opts.limit ?? DEFAULT_EMBED_LIMIT)
     .all();
 

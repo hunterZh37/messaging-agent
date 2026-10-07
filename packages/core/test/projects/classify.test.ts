@@ -242,6 +242,45 @@ describe("embedPending", () => {
   });
 });
 
+describe("embedPending with scope: search", () => {
+  it("embeds mail the projects scope skips, and puts email before texts", async () => {
+    const db = testDb();
+    account(db);
+    // account(db) only ever makes imap accounts; a texting one needs its own row.
+    db.insert(accounts).values({ id: "a3", provider: "imessage", email: "+15555550100", displayName: null, createdAt: 1 }).run();
+
+    // Created oldest to newest, so the order below can only come from the
+    // email-first rule: a text newer than either email still sorts last.
+    const e2 = addMessage(db, { id: "e2", subject: "Re: Invoice", body: "paid", folder: "sent", fromOperator: true });
+    const e1 = addMessage(db, { id: "e1", subject: "Invoice", body: "due Friday" });
+    addMessage(db, { id: "t1", accountId: "a3", subject: "", body: "running late", folder: "messages" });
+
+    const embedder = new FakeEmbedder();
+    const r = await embedPending(db, embedder, { scope: "search", limit: 2 });
+    expect(r.embedded).toBe(2);
+    // Both email, though the text is the newest message in the mailbox, and
+    // the operator's own sent mail is in: the projects scope leaves it out.
+    expect(db.select().from(embeddingState).all().map((row) => row.messageId).sort()).toEqual([e1, e2].sort());
+    expect(embedder.calls[0]).toEqual([`${DOCUMENT_PREFIX}Invoice\n\ndue Friday`, `${DOCUMENT_PREFIX}Re: Invoice\n\npaid`]);
+  });
+
+  it("leaves junk alone", async () => {
+    const db = testDb();
+    account(db);
+    addMessage(db, { id: "j1", subject: "Receipt", body: "order", folder: "junk" });
+    const embedder = new FakeEmbedder();
+    expect((await embedPending(db, embedder, { scope: "search" })).embedded).toBe(0);
+  });
+
+  it("still embeds only the projects scope by default", async () => {
+    const db = testDb();
+    account(db);
+    addMessage(db, { id: "e3", subject: "Re: Invoice", body: "thanks", fromOperator: true });
+    const embedder = new FakeEmbedder();
+    expect((await embedPending(db, embedder)).embedded).toBe(0);
+  });
+});
+
 describe("projectVectors", () => {
   it("embeds each project once and re-embeds only on a reword", async () => {
     const db = testDb();
