@@ -1,5 +1,5 @@
 import { Ticker } from "@messaging-agent/core";
-import { fetchMail, processMail, syncAllChats } from "@/lib/syncAll";
+import { fetchMail, processMail, syncAllChats, syncModelBusy } from "@/lib/syncAll";
 import { notifyNeedsReply } from "@/lib/push";
 
 /** How often the server brings mail in (operator, 2026-09-14: option 1, "about 2 minutes, tab open or not"). */
@@ -52,8 +52,19 @@ export function startMailClock(): void {
   console.log(`mail clock: every ${MAIL_EVERY_MS / 1000}s`);
 }
 
-/** Whether the mail clock is mid-run, so the embedder can leave the model to it. */
-export function mailClockBusy(): boolean {
+/**
+ * Whether the one local model is in use right now, so another consumer of it
+ * (the embed clock) can leave it alone (2026-10-07, renamed from
+ * `mailClockBusy`: the embed clock never cared about the mail clock
+ * specifically, only about the model the two of them share). True for a
+ * fetch this clock's own ticker is mid-run on — `Ticker.running` is true
+ * only while a tick is actually in flight — or for a sort/draft `processMail`
+ * is mid-run on even after that tick has returned, since the mail clock's
+ * own tick does not await it (`processMail(fetched).then(...)` below is
+ * fire-and-forget on purpose, so a ninety-second sort never delays the next
+ * fetch).
+ */
+export function localModelBusy(): boolean {
   const g = globalThis as unknown as Record<symbol, Ticker | undefined>;
-  return g[KEY]?.running ?? false;
+  return (g[KEY]?.running ?? false) || syncModelBusy();
 }

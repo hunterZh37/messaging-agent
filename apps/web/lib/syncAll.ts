@@ -96,11 +96,26 @@ export function fetchMail(accountIds?: string[]): Promise<{ fetched: FetchedAcco
 let processing: Promise<PipelineResult> | null = null;
 let waiting: FetchedAccount[] | null = null;
 
+// Whether the one local model is mid-sort/draft via `processMail`, for
+// anything else that shares it to check before taking its own turn (2026-10-07:
+// the embed clock, through `localModelBusy()` in mailClock.ts, which also
+// folds in a fetch the mail clock's own ticker is mid-run on). Stays true
+// across a queued redo — the `waiting` round is the same job continuing, not
+// a new one — so it can't flicker false for the gap between rounds. Cleared
+// in `.finally()`, which runs whether `processPending` resolved or threw, so
+// a throwing sort can't leave this stuck true and starve the backlog forever.
+let modelBusy = false;
+
+export function syncModelBusy(): boolean {
+  return modelBusy;
+}
+
 export function processMail(fetched: FetchedAccount[]): Promise<PipelineResult> {
   if (processing) {
     waiting = [...(waiting ?? []), ...fetched];
     return processing;
   }
+  modelBusy = true;
   processing = (async () => {
     const { cfg, db } = core();
     const { criteria, voice, blocklist } = await loadPipelineInputs(cfg);
@@ -124,7 +139,11 @@ export function processMail(fetched: FetchedAccount[]): Promise<PipelineResult> 
     processing = null;
     const next = waiting;
     waiting = null;
-    if (next) void processMail(next);
+    if (next) {
+      void processMail(next);
+    } else {
+      modelBusy = false;
+    }
   });
   return processing;
 }

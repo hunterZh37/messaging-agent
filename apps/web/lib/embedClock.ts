@@ -1,6 +1,6 @@
 import { Ticker, embedPending, createOllamaEmbedder } from "@messaging-agent/core";
 import { core } from "@/lib/core";
-import { mailClockBusy } from "@/lib/mailClock";
+import { localModelBusy } from "@/lib/mailClock";
 
 /** How many messages one pass embeds. 200 is `embedPending`'s own batch. */
 export const EMBED_BATCH = 200;
@@ -30,8 +30,9 @@ export async function embedBatch(deps: {
   sorting: () => boolean;
   log?: (message: string) => void;
 }): Promise<{ embedded: number; resting: boolean }> {
-  // The sorter and this share one local model, and the operator is waiting on
-  // a sort in a way they are never waiting on a backfill (2026-10-07).
+  // The sorter and drafter share one local model with this, and the operator
+  // is waiting on a sort in a way they are never waiting on a backfill
+  // (2026-10-07).
   if (deps.sorting()) return { embedded: 0, resting: false };
   try {
     const { embedded } = await deps.embed();
@@ -76,7 +77,7 @@ export function startEmbedClock(): void {
   const run = async (): Promise<void> => {
     const { embedded, resting } = await embedBatch({
       embed: () => embedPending(db, embedder, { scope: "search", limit: EMBED_BATCH }),
-      sorting: mailClockBusy,
+      sorting: localModelBusy,
       log: console.log,
     });
     if (embedded > 0) console.log(`embed clock: ${embedded} embedded`);
