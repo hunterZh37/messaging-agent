@@ -1,3 +1,4 @@
+import type { Statement } from "better-sqlite3";
 import { sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { messages, type MessageRow } from "../db/schema";
@@ -22,23 +23,35 @@ export const MAX_SEARCH_LIMIT = 50;
 /** What the index stores per message. `MessageRow` satisfies it; a test can pass less. */
 export type IndexableMessage = Pick<MessageRow, "id" | "subject" | "fromName" | "fromAddress" | "bodyText">;
 
+/** Writes one row, with no assumption about whether it already exists. Shared by the idempotent path below and the backfill's bulk insert. */
+function insertSearchRow(stmt: Statement, message: IndexableMessage): void {
+  const body = stripQuoted(message.bodyText).slice(0, BODY_LIMIT);
+  stmt.run(message.id, message.subject, message.fromName ?? "", message.fromAddress, body);
+}
+
 /**
  * Puts one message in the keyword index (spec 10c). Idempotent: the old row
  * goes first, so a re-index after a body changes never leaves two copies of
  * the same message competing for the same rank.
  */
 export function indexMessageForSearch(db: Db, message: IndexableMessage): void {
-  const body = stripQuoted(message.bodyText).slice(0, BODY_LIMIT);
   db.$client.prepare("DELETE FROM messages_fts WHERE message_id = ?").run(message.id);
-  db.$client
-    .prepare("INSERT INTO messages_fts (message_id, subject, from_name, from_address, body) VALUES (?, ?, ?, ?, ?)")
-    .run(message.id, message.subject, message.fromName ?? "", message.fromAddress, body);
+  insertSearchRow(db.$client.prepare("INSERT INTO messages_fts (message_id, subject, from_name, from_address, body) VALUES (?, ?, ?, ?, ?)"), message);
 }
 
 /**
  * Indexes every message that has no row yet. Runs once at boot, so mail
  * stored before the index existed is searchable, and cheap on every boot
  * after that: what is already indexed is skipped, not rewritten.
+ *
+ * Inserts directly rather than through `indexMessageForSearch` (2026-10-07):
+ * the query above already selected only messages absent from the index, so
+ * the delete half of that function's idempotency would be a guaranteed
+ * no-op here, on every row — measured at 876.5 seconds for 94,242 messages,
+ * almost all of it the cost of ~188,000 separate autocommitted statements.
+ * One transaction around the whole pass, and one statement per row instead
+ * of two, is what a boot-time rebuild needs; a message already in the index
+ * never reaches this function; it keeps using the one above.
  */
 export function backfillSearchIndex(db: Db): number {
   const rows = db
@@ -46,7 +59,10 @@ export function backfillSearchIndex(db: Db): number {
     .from(messages)
     .where(sql`${messages.id} NOT IN (SELECT message_id FROM messages_fts)`)
     .all();
-  for (const row of rows) indexMessageForSearch(db, row);
+  const insert = db.$client.prepare("INSERT INTO messages_fts (message_id, subject, from_name, from_address, body) VALUES (?, ?, ?, ?, ?)");
+  db.$client.transaction(() => {
+    for (const row of rows) insertSearchRow(insert, row);
+  })();
   return rows.length;
 }
 
@@ -55,8 +71,12 @@ export function backfillSearchIndex(db: Db): number {
  * refills it (2026-10-07). `CREATE VIRTUAL TABLE IF NOT EXISTS` cannot change
  * the tokenizer of a table that already exists, and an index half stemmed
  * would answer differently depending on when a message happened to arrive.
- * Refilling 94,215 messages was measured at 1.2 seconds, so this costs one
- * slow boot, once.
+ * Refilling 94,242 messages was measured at about 1.0 second, so this costs
+ * one slow boot, once — but only because `backfillSearchIndex` below wraps
+ * the refill in one transaction (2026-10-07): the first shipped version did
+ * not, and the same refill measured 876.5 seconds against the operator's own
+ * mailbox before that fix, ~188,000 separate autocommitted statements
+ * instead of one.
  */
 export function rebuildSearchIndexIfStale(db: Db): boolean {
   const row = db.$client
