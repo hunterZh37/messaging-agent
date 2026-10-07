@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { Geist } from "next/font/google";
 import { conversationUsage, listChatMessages, openChatFor, schema } from "@messaging-agent/core";
 import { core } from "@/lib/core";
@@ -69,6 +69,11 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // thread's conversation.
   const generalChat = openChatFor(db, {});
   const initialChat = { chat: generalChat, turns: listChatMessages(db, generalChat.id), usage: conversationUsage(db, generalChat.id) };
+  // The newest moment any conversation changed, the same number the pulse
+  // watches. A draft's conversation is fetched once by the tab that shows it
+  // and handed down by nobody, so without this it is the one copy that
+  // another tab's question can never reach (review, 2026-10-07).
+  const chatsStamp = db.select({ at: sql<number | null>`max(${schema.chats.updatedAt})` }).from(schema.chats).get()?.at ?? 0;
   const askOpen = (await cookies()).get(ASK_COOKIE)?.value === "1";
 
   return (
@@ -82,7 +87,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <body suppressHydrationWarning>
         <ThemeGuard />
         <SyncProvider lastSyncAt={lastSyncAt} accountCount={accountCount}>
-          <AskProvider initialOpen={askOpen} initialChat={initialChat}>
+          <AskProvider initialOpen={askOpen} initialChat={initialChat} chatsStamp={chatsStamp}>
             <TopBar accountCount={accountCount} needsSignin={needsSignin} />
             {/* An inbox that has stopped letting Celeste in is the one
                 failure here that hides as silence, so it is said over the

@@ -16,6 +16,7 @@ import {
   actionDoneLabel,
   actionLabel,
   appliesToOpenDraft,
+  askContextKey,
   askEmptyLine,
   askPlaceholder,
   askTabs,
@@ -630,13 +631,18 @@ function AskFiles({
 export function AskPanel() {
   const {
     open, close, lookingAt, clearLookingAt, lookingAtDraft, clearLookingAtDraft, resumeLookingAt, onScreen,
-    askContext, chatId, chatTitle, chatUsage, turns, loadingChat, addTurn, newConversation, openConversation, forgetConversation,
+    askContext, chatId, chatTitle, chatUsage, turns, loadingChat, addTurn, newConversation, openConversation, beginAsk, endAsk, forgetConversation,
   } = useAsk();
   // What this conversation has cost so far, refreshed by every answer.
   const spent = conversationUsageLabel(chatUsage);
   const [showHistory, setShowHistory] = useState(false);
   const [question, setQuestion] = useState("");
-  const [pending, setPending] = useState(false);
+  // How many questions are out, not whether one is: a file dropped on the
+  // panel asks its own alongside one already being answered, and the first
+  // answer back used to clear "Thinking…" while the other was still running
+  // (review, 2026-10-07).
+  const [inFlight, setInFlight] = useState(0);
+  const pending = inFlight > 0;
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const scroller = useRef<HTMLDivElement | null>(null);
@@ -726,6 +732,11 @@ export function AskPanel() {
   async function ask(text: string, opts: { auto?: boolean } = {}) {
     if (!chatId) return;
     const contextThreadId = lookingAt?.threadId ?? null;
+    // The provider leaves this context's cache alone until the answer is
+    // back (2026-10-07): a pulse from another tab's question, or this one's
+    // own mail sync, landing mid-round-trip must not paint over the question
+    // just sent with a snapshot the server took before it was written.
+    const key = askContextKey(askContext);
     // The card as it stands, without the callback that puts text back on it:
     // that one is the browser's, and only the words cross to the server.
     const contextDraft = lookingAtDraft
@@ -738,19 +749,24 @@ export function AskPanel() {
         }
       : undefined;
     setError(null);
-    setPending(true);
-    // The question goes up straight away; only the answer is worth waiting for.
-    addTurn({
-      id: `local-${Date.now()}`,
-      role: "user",
-      content: text,
-      citations: [],
-      actions: [],
-      contextDraftId: contextDraft?.draftId ?? null,
-      model: null,
-      ...(opts.auto ? { auto: true } : {}),
-    });
+    // The count and the guard first, and everything that could throw inside
+    // the try below them: a question that went up without its matching way
+    // down would leave "Thinking…" on for good and this conversation shut to
+    // every other tab (review, 2026-10-07).
+    setInFlight((n) => n + 1);
+    beginAsk(key);
     try {
+      // The question goes up straight away; only the answer is worth waiting for.
+      addTurn({
+        id: `local-${Date.now()}`,
+        role: "user",
+        content: text,
+        citations: [],
+        actions: [],
+        contextDraftId: contextDraft?.draftId ?? null,
+        model: null,
+        ...(opts.auto ? { auto: true } : {}),
+      });
       const result = await askAction(chatId, text, contextThreadId, contextDraft);
       if ("error" in result) setError(result.error);
       else {
@@ -779,7 +795,8 @@ export function AskPanel() {
     } catch (err) {
       setError((err as Error).message);
     } finally {
-      setPending(false);
+      endAsk(key);
+      setInFlight((n) => n - 1);
     }
   }
 

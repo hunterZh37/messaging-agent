@@ -9,7 +9,11 @@ import {
   ASK_WIDTH_KEY,
   askContextKey,
   askContextThreadId,
+  beganAsking,
   clampAskWidth,
+  endedAsking,
+  isAsking,
+  isNewerChat,
   toTurn,
   opensAskForDraft,
   togglesAsk,
@@ -60,10 +64,17 @@ interface Conversation {
   turns: Turn[];
   /** What it has cost so far (spec 13, 2026-09-11), as of the last answer. */
   usage: ConversationUsage | null;
+  /**
+   * The chat row's own clock (`chats.updatedAt`), carried along so a later
+   * fetch for the same context can tell whether it is actually newer
+   * (2026-10-07) rather than a pulse that started before this tab's own
+   * question landed.
+   */
+  updatedAt: number;
 }
 
 function toConversation(key: string | null, open: OpenChat): Conversation {
-  return { key, chatId: open.chat.id, title: open.chat.title, turns: open.turns.map(toTurn), usage: open.usage ?? null };
+  return { key, chatId: open.chat.id, title: open.chat.title, turns: open.turns.map(toTurn), usage: open.usage ?? null, updatedAt: open.chat.updatedAt };
 }
 
 interface AskState {
@@ -109,8 +120,22 @@ interface AskState {
   openConversation: (chatId: string) => Promise<void>;
   /** A conversation the operator deleted: dropped from memory, and replaced if it was the one on screen. */
   forgetConversation: (chatId: string) => void;
-  /** A page handing over the conversation for its own context, fetched server-side. */
-  seedChat: (key: string, opened: OpenChat) => void;
+  /**
+   * A fresher copy of a context's conversation, whether handed over by a page
+   * on its first render or caught up on later by a pulse (2026-10-07): the
+   * single ground truth every tab and the phone read the same conversation
+   * from. Dropped by `syncChat` itself when it is not actually newer than
+   * what the tab already has, so the panel is never clobbered mid-question.
+   */
+  syncChat: (key: string, opened: OpenChat) => void;
+  /**
+   * The tab telling the provider it has sent a question into this context and
+   * is waiting on the answer (2026-10-07): a sync arriving in that window is
+   * a snapshot from before the question was written, and `syncChat` leaves it
+   * alone until `endAsk` says the round trip is over.
+   */
+  beginAsk: (key: string) => void;
+  endAsk: (key: string) => void;
   /** How wide the panel is, in pixels. The content beside it is inset by the same. */
   width: number;
   /** Live during a drag: moves the edge without writing it down. */
@@ -147,7 +172,9 @@ const AskContext = createContext<AskState>({
   addTurn: () => {},
   newConversation: async () => {},
   openConversation: async () => {},
-  seedChat: () => {},
+  syncChat: () => {},
+  beginAsk: () => {},
+  endAsk: () => {},
   forgetConversation: () => {},
   width: ASK_WIDTH_DEFAULT,
   resizeTo: () => {},
@@ -175,7 +202,7 @@ const useBeforePaint = typeof window === "undefined" ? useEffect : useLayoutEffe
  * here and is written to a cookie, so a reload finds the panel where it was
  * left.
  */
-export function AskProvider(props: { initialOpen: boolean; initialChat: OpenChat; children: ReactNode }) {
+export function AskProvider(props: { initialOpen: boolean; initialChat: OpenChat; chatsStamp: number; children: ReactNode }) {
   const [open, setOpen] = useState(props.initialOpen);
   // The open panel is remembered in a cookie the phone shares with the Mac.
   // On a phone it covers the whole screen, so opening Celeste there starts
@@ -321,6 +348,17 @@ export function AskProvider(props: { initialOpen: boolean; initialChat: OpenChat
   // One fetch at a time wins: a slow answer for the thread the operator has
   // already left must not land on top of the one they are looking at now.
   const request = useRef(0);
+  // How many questions this tab has in flight for each context (2026-10-07):
+  // `syncChat` leaves a context alone while that count is above zero, because
+  // a snapshot taken while a question was still being answered has not seen
+  // it yet, and the tab's own request is what will bring the real turn back.
+  //
+  // A count rather than one context, because two questions can be outstanding
+  // at once: a file dropped on the panel asks its own question without waiting
+  // for the one being typed to come back. With a single slot the first answer
+  // to land cleared the guard while the second was still in flight, and the
+  // next pulse painted the second question off the screen (review, 2026-10-07).
+  const asking = useRef(new Map<string, number>());
 
   const show = useCallback((next: Conversation) => {
     if (next.key) cache.set(next.key, next);
@@ -355,15 +393,76 @@ export function AskProvider(props: { initialOpen: boolean; initialChat: OpenChat
   }, [open, contextKey, loadContext]);
 
   /**
-   * A page handing over the conversation it already fetched on the server, so
+   * A conversation handed over by the server — on a page's first render, so
    * opening a thread paints what was said last time rather than fetching it
-   * after mount. Only when nothing is held for that context: what is in hand
-   * may carry a question asked seconds ago that the server has not been asked
-   * for again.
+   * after mount, or on a later one, so a pulse that found `chats.updatedAt`
+   * had moved catches this tab up on a question asked in another tab or on
+   * the phone (2026-10-07, "two tabs... should only share one ground truth").
+   * Never while this tab itself has a question in flight for that context
+   * (`asking`), and never with a snapshot no newer than what is already
+   * held: either way it is a fetch from before the newest turn landed, and
+   * applying it would erase that turn rather than add to it.
    */
-  const seedChat = useCallback((key: string, opened: OpenChat) => {
-    if (!cache.has(key)) cache.set(key, toConversation(key, opened));
+  const syncChat = useCallback((key: string, opened: OpenChat) => {
+    if (isAsking(asking.current, key)) return;
+    const held = cache.get(key);
+    if (!isNewerChat(held?.updatedAt, opened.chat.updatedAt)) return;
+    const next = toConversation(key, opened);
+    cache.set(key, next);
+    if (shown.current === key) setConversation(next);
   }, [cache]);
+
+  const beginAsk = useCallback((key: string) => {
+    beganAsking(asking.current, key);
+  }, []);
+
+  const endAsk = useCallback((key: string) => {
+    endedAsking(asking.current, key);
+  }, []);
+
+  // General is painted from the server at the root layout (spec 10c), and
+  // every router.refresh() re-runs that layout with a fresh copy — mail
+  // landing, a sync, or the pulse below catching `chats.updatedAt` having
+  // moved. `syncChat` is where a copy no newer than what is on screen gets
+  // dropped, so this can simply hand over whatever the server most recently
+  // sent without working out here whether anything in it actually changed.
+  useEffect(() => {
+    syncChat(ASK_GENERAL_CONTEXT, props.initialChat);
+  }, [props.initialChat, syncChat]);
+
+  /**
+   * The conversations no page hands down (review, 2026-10-07). General comes
+   * from the root layout above and a thread's from the thread page, so a
+   * pulse refreshes both; a draft's is fetched once by `loadContext` and held
+   * in this tab's cache, which nothing else would ever touch. Asking Celeste
+   * about a draft on the Mac and following it up on the phone left the Mac
+   * showing half the conversation for good, which is the operator's own
+   * complaint over again on the page they spend the day in.
+   *
+   * So when the newest moment any conversation changed moves, the one on
+   * screen is read again, and the rest are dropped so they are fetched afresh
+   * whenever they are next shown. A context with a question still in flight
+   * is left alone, exactly as `syncChat` leaves it alone.
+   */
+  useEffect(() => {
+    const here = shown.current;
+    for (const key of [...cache.keys()]) {
+      if (key !== here && !isAsking(asking.current, key)) cache.delete(key);
+    }
+    if (!here || isAsking(asking.current, here)) return;
+    const held = cache.get(here);
+    if (!held) return;
+    let dropped = false;
+    void (async () => {
+      const opened = await readChatAction(held.chatId);
+      if (dropped || "error" in opened) return;
+      syncChat(here, opened);
+    })();
+    return () => {
+      dropped = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.chatsStamp]);
 
   const addTurn = useCallback((turn: Turn, usage?: ConversationUsage) => {
     setConversation((prev) => {
@@ -414,14 +513,14 @@ export function AskProvider(props: { initialOpen: boolean; initialChat: OpenChat
       chatTitle: conversation?.title ?? "",
       chatUsage: conversation?.usage ?? null,
       turns: conversation?.turns ?? [],
-      loadingChat, addTurn, newConversation, openConversation, seedChat, forgetConversation,
+      loadingChat, addTurn, newConversation, openConversation, syncChat, beginAsk, endAsk, forgetConversation,
       width, resizeTo, rememberWidth, commitWidth,
     }),
     [
       open, toggle, close,
       lookingAt, clearLookingAt, setLookingAt, forgetLookingAt,
       lookingAtDraft, setLookingAtDraft, clearLookingAtDraft, forgetLookingAtDraft, resumeLookingAt, onScreen,
-      askContext, conversation, loadingChat, addTurn, newConversation, openConversation, seedChat, forgetConversation,
+      askContext, conversation, loadingChat, addTurn, newConversation, openConversation, syncChat, beginAsk, endAsk, forgetConversation,
       width, resizeTo, rememberWidth, commitWidth,
     ],
   );
@@ -469,15 +568,16 @@ export function ContextDraftCard(props: LookingAtDraft) {
  * unless another thread has already claimed it.
  */
 export function ContextThread({ threadId, subject, chat }: { threadId: string; subject: string; chat?: OpenChat }) {
-  const { setLookingAt, forgetLookingAt, seedChat } = useAsk();
-  // The conversation is handed over first and once. `chat` is a fresh object
-  // on every render of the page, so it cannot be a dependency of the effect
-  // below: re-registering the thread would drop the chip and put it back.
-  const seeded = useRef<string | null>(null);
+  const { setLookingAt, forgetLookingAt, syncChat } = useAsk();
+  // The conversation is handed over on the first render of this page, and
+  // again on every one after — a reload, or router.refresh() finding the
+  // pulse had caught `chats.updatedAt` moving (2026-10-07). `chat` is a fresh
+  // object on every render of the page even when the server sent the same
+  // data back, so it cannot be a dependency here the way `threadId` and
+  // `subject` are below: `syncChat` is what tells a genuinely newer copy from
+  // one that is not, and running this on every render is cheap next to that.
   useBeforePaint(() => {
-    if (!chat || seeded.current === threadId) return;
-    seeded.current = threadId;
-    seedChat(threadId, chat);
+    if (chat) syncChat(threadId, chat);
   });
   // Before the paint, for the same reason the draft card's is.
   useBeforePaint(() => {

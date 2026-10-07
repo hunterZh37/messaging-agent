@@ -87,6 +87,12 @@ export function SyncProvider(props: { lastSyncAt: number | null; accountCount: n
   // and the open list move on their own. What brings mail in is the server's
   // own clock since 2026-09-14 (lib/mailClock.ts), not this tab.
   const latest = useRef<number | null>(null);
+  // The same watermark for Ask Celeste's conversation (2026-10-07): one more
+  // number on the pulse this tab already sends every three seconds, not a
+  // second clock. A tab backgrounded when a question lands elsewhere is not
+  // missed either — the `visibilitychange` listener below pulses again the
+  // moment it is looked at, same as it already does for mail.
+  const chatLatest = useRef<number | null>(null);
   useEffect(() => {
     if (props.accountCount === 0) return;
     const visible = () => document.visibilityState === "visible";
@@ -112,10 +118,16 @@ export function SyncProvider(props: { lastSyncAt: number | null; accountCount: n
           drop();
           return;
         }
-        const { latest: now, net } = (await r.json()) as { latest: number; net?: boolean };
+        const { latest: now, chat, net } = (await r.json()) as { latest: number; chat?: number; net?: boolean };
         setConn((c) => afterPulse(c, { ok: true, net }));
-        if (latest.current !== null && now > latest.current) router.refresh();
+        const chatNow = chat ?? 0;
+        // Either clock moving is reason enough to read the page again: mail
+        // arriving, or a question answered in another tab or on the phone.
+        // One refresh covers both, same as it always covered just the one.
+        const moved = (latest.current !== null && now > latest.current) || (chatLatest.current !== null && chatNow > chatLatest.current);
+        if (moved) router.refresh();
         latest.current = now;
+        chatLatest.current = chatNow;
       } catch {
         drop();
       } finally {

@@ -189,6 +189,20 @@ export interface Turn {
   auto?: boolean;
 }
 
+/**
+ * Whether a conversation fetched from the server should replace what a tab
+ * already has for that context (2026-10-07: "no matter how many tabs we
+ * open, they should only share one ground truth of chat history"). `chats
+ * .updatedAt` is the chat's own clock, bumped by every turn (schema.ts); a
+ * fetch stamped no later than what is already on screen is a pulse that was
+ * in flight before the newest turn landed, and showing it would erase that
+ * turn rather than add to it. Nothing is held yet the first time a context is
+ * seen, so anything at all is newer than that.
+ */
+export function isNewerChat(heldUpdatedAt: number | undefined, nextUpdatedAt: number): boolean {
+  return heldUpdatedAt === undefined || nextUpdatedAt > heldUpdatedAt;
+}
+
 /** A stored turn as the panel paints it. */
 export function toTurn(row: ChatMessageRow): Turn {
   return {
@@ -486,4 +500,31 @@ export function actionDoneLabel(kind: ProposedAction["kind"], done: number, fail
 export function citationChipLabel(citation: { subject: string; from: string }): string {
   const sender = citation.from.replace(/\s*<[^>]*>\s*$/, "").trim() || citation.from;
   return `${citation.subject} · ${sender}`;
+}
+
+/**
+ * How many questions a tab has out for each context, and whether a context is
+ * closed to the server's copy because of them (2026-10-07).
+ *
+ * One flag was not enough. Two questions can be outstanding for the same
+ * conversation at once — a file dropped on the panel asks its own without
+ * waiting for the one being typed to come back — and the first answer to land
+ * cleared the flag while the second was still in flight. The next three-second
+ * pulse then handed over a server copy written before the second question
+ * existed, and the question went off the screen in front of the operator
+ * (review, 2026-10-07). Counting means the last answer back is what reopens
+ * the context, not the first.
+ */
+export function beganAsking(counts: Map<string, number>, key: string): void {
+  counts.set(key, (counts.get(key) ?? 0) + 1);
+}
+
+export function endedAsking(counts: Map<string, number>, key: string): void {
+  const left = (counts.get(key) ?? 0) - 1;
+  if (left > 0) counts.set(key, left);
+  else counts.delete(key);
+}
+
+export function isAsking(counts: Map<string, number>, key: string): boolean {
+  return (counts.get(key) ?? 0) > 0;
 }
