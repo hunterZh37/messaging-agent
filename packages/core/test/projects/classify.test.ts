@@ -203,17 +203,37 @@ describe("embedPending", () => {
   it("drains a backlog larger than the limit over repeated calls, rather than re-reading the same page forever", async () => {
     const db = testDb();
     account(db);
-    const ids = ["m1", "m2", "m3", "m4", "m5"].map((id) => addMessage(db, { id, subject: id, body: "x" }));
+    // A limit well above the reserved recheck slice, as every real caller's
+    // is: the slice is sized against a limit of 200, not one this close to it.
+    const ids = Array.from({ length: 25 }, (_, i) => addMessage(db, { id: `m${i}`, subject: `m${i}`, body: "x" }));
     const embedder = new FakeEmbedder();
 
-    // Five candidates, a limit of two: three calls to clear them, a fourth
-    // finding nothing left. A window that re-fetched the same top rows every
-    // time would report embedded: 2 forever and never reach the rest.
-    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 2, reembedded: 0 });
-    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 2, reembedded: 0 });
-    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 1, reembedded: 0 });
-    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 0, reembedded: 0 });
+    // 25 candidates, a limit of 20: two calls to clear them, a third finding
+    // nothing left. A window that re-fetched the same top rows every time
+    // would report embedded: 20 forever and never reach the rest.
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 20 })).toEqual({ embedded: 20, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 20 })).toEqual({ embedded: 5, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 20 })).toEqual({ embedded: 0, reembedded: 0 });
     expect(db.select().from(embeddingState).all().map((r) => r.messageId).sort()).toEqual([...ids].sort());
+  });
+
+  it("keeps rechecking every call, instead of only once a never-embedded backlog bigger than the limit has drained", async () => {
+    const db = testDb();
+    account(db);
+    const stale = addMessage(db, { id: "stale", subject: "SOW", body: "signed" });
+    await embedPending(db, new FakeEmbedder(), { accountId: "a1" });
+    db.update(embeddingState).set({ textHash: "stale" }).where(eq(embeddingState.messageId, stale)).run();
+
+    // Ten never-embedded messages: more than the limit below, so a design
+    // that filled the window from this bucket first would not reach the
+    // stale one until the tenth message had drained it to nothing, three
+    // calls away (2026-10-07, the reviewer's repro). The reserved recheck
+    // slice is taken first instead, so it is reached on the very next call.
+    for (let i = 0; i < 10; i++) addMessage(db, { id: `m${i}`, subject: `m${i}`, body: "x" });
+
+    const embedder = new FakeEmbedder();
+    const r = await embedPending(db, embedder, { accountId: "a1", limit: 3 });
+    expect(r.reembedded).toBe(1);
   });
 
   it("still re-embeds a changed message once newer mail has pushed it out of the top of the window", async () => {

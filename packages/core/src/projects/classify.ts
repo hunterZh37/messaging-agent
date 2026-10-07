@@ -105,6 +105,18 @@ const MAX_EXEMPLARS = 200;
 /** How many messages one `embedPending` call puts through Ollama. */
 const DEFAULT_EMBED_LIMIT = 200;
 
+/**
+ * Out of every batch, how many slots a never-embedded backlog can never
+ * crowd out (2026-10-07). Without a reserved slice, a backlog at or above
+ * `limit` starves the recheck sweep completely — at 94,149 messages and a
+ * limit of 200 that is roughly 471 calls, about eight hours at the clock's
+ * cadence, before a changed message's vector is touched even once, and
+ * never if new mail keeps arriving a batch at a time. Most of this slice
+ * hashes as still current and is dropped by the check below, so the usual
+ * cost of reserving it is one small SELECT, not wasted embeddings.
+ */
+const RECHECK_SLICE = 10;
+
 function requireVec(db: Db): void {
   if (!db.vecAvailable) throw new EmbeddingsUnavailableError("sqlite-vec failed to load");
 }
@@ -213,14 +225,34 @@ export async function embedPending(
   // page and skip another on the next.
   const order = [...(forSearch ? [sql`${accounts.provider} IN ('imessage', 'whatsapp')`] : []), desc(messages.sentAt), messages.id];
 
+  // A small slice of every batch goes to rechecking mail that already has a
+  // vector, oldest-checked first, before the never-embedded bucket below
+  // gets a chance to claim the rest of the limit. Taken second, this would
+  // starve outright rather than merely slow down once the never-embedded
+  // backlog reached `limit` on its own: 94,149 messages at a limit of 200
+  // is some 471 calls, about eight hours at the clock's cadence, before a
+  // changed message's vector was touched even once (2026-10-07). Most of
+  // this slice hashes as still current; the comparison below is what
+  // decides which of it actually needs a new vector.
+  const recheck = db
+    .select(select)
+    .from(messages)
+    .innerJoin(embeddingState, eq(embeddingState.messageId, messages.id))
+    .innerJoin(accounts, eq(accounts.id, messages.accountId))
+    .where(and(...conditions, isNotNull(embeddingState.textHash)))
+    .orderBy(asc(embeddingState.embeddedAt), messages.id)
+    .limit(Math.min(RECHECK_SLICE, limit))
+    .all();
+
   // A message with no embedding_state row, or one whose hash was blanked by
   // the "no hash at all" rule above, is stale with no need to check: it is
-  // selected directly rather than through the window below, so a backlog
-  // many pages deep keeps surfacing new mail call after call instead of the
-  // same page's already-current rows (2026-10-07: without this, a limited
-  // window plus the hash check done in JS meant every repeat call re-read
-  // whatever was already embedded, found it current, and reported nothing
-  // left to do while unembedded mail further down was never reached).
+  // selected directly rather than through a window the recheck slice above
+  // has already taken a bite out of, so a backlog many pages deep keeps
+  // surfacing new mail call after call instead of the same page's
+  // already-current rows (2026-10-07: without this, a limited window plus
+  // the hash check done in JS meant every repeat call re-read whatever was
+  // already embedded, found it current, and reported nothing left to do
+  // while unembedded mail further down was never reached).
   const neverEmbedded = db
     .select(select)
     .from(messages)
@@ -228,26 +260,8 @@ export async function embedPending(
     .innerJoin(accounts, eq(accounts.id, messages.accountId))
     .where(and(...conditions, or(isNull(embeddingState.messageId), isNull(embeddingState.textHash))))
     .orderBy(...order)
-    .limit(limit)
+    .limit(limit - recheck.length)
     .all();
-
-  // Room left in the batch is spent rechecking mail that already has a
-  // vector, oldest-checked first, so the recheck sweep rotates through the
-  // whole backlog instead of sticking to whichever rows sort first in the
-  // scope's own order. Most of these are still current; the hash comparison
-  // below is what decides which of them actually needs a new vector.
-  const recheck =
-    neverEmbedded.length >= limit
-      ? []
-      : db
-          .select(select)
-          .from(messages)
-          .innerJoin(embeddingState, eq(embeddingState.messageId, messages.id))
-          .innerJoin(accounts, eq(accounts.id, messages.accountId))
-          .where(and(...conditions, isNotNull(embeddingState.textHash)))
-          .orderBy(asc(embeddingState.embeddedAt), messages.id)
-          .limit(limit - neverEmbedded.length)
-          .all();
 
   const pending = [...neverEmbedded, ...recheck]
     .map((m) => ({ ...m, text: embedTextFor(m) }))
