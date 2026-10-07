@@ -203,17 +203,19 @@ describe("embedPending", () => {
   it("drains a backlog larger than the limit over repeated calls, rather than re-reading the same page forever", async () => {
     const db = testDb();
     account(db);
-    // A limit well above the reserved recheck slice, as every real caller's
-    // is: the slice is sized against a limit of 200, not one this close to it.
-    const ids = Array.from({ length: 25 }, (_, i) => addMessage(db, { id: `m${i}`, subject: `m${i}`, body: "x" }));
+    const ids = ["m1", "m2", "m3", "m4", "m5"].map((id) => addMessage(db, { id, subject: id, body: "x" }));
     const embedder = new FakeEmbedder();
 
-    // 25 candidates, a limit of 20: two calls to clear them, a third finding
-    // nothing left. A window that re-fetched the same top rows every time
-    // would report embedded: 20 forever and never reach the rest.
-    expect(await embedPending(db, embedder, { accountId: "a1", limit: 20 })).toEqual({ embedded: 20, reembedded: 0 });
-    expect(await embedPending(db, embedder, { accountId: "a1", limit: 20 })).toEqual({ embedded: 5, reembedded: 0 });
-    expect(await embedPending(db, embedder, { accountId: "a1", limit: 20 })).toEqual({ embedded: 0, reembedded: 0 });
+    // Five candidates, a limit of two. The recheck slice is capped at half
+    // of `limit` (2026-10-07), so one slot of each call after the first
+    // drains a never-embedded row and the other rechecks an already-current
+    // one; a window that re-fetched the same top rows every time would
+    // report embedded: 2 forever and never reach the rest.
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 2, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 1, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 1, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 1, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 0, reembedded: 0 });
     expect(db.select().from(embeddingState).all().map((r) => r.messageId).sort()).toEqual([...ids].sort());
   });
 

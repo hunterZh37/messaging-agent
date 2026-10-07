@@ -240,7 +240,11 @@ export async function embedPending(
   // is some 471 calls, about eight hours at the clock's cadence, before a
   // changed message's vector was touched even once (2026-10-07). Most of
   // this slice hashes as still current; the comparison below is what
-  // decides which of it actually needs a new vector.
+  // decides which of it actually needs a new vector. Capped at half of
+  // `limit` rather than taken absolutely, so a caller whose batch is
+  // smaller than `RECHECK_SLICE` cannot have the slice claim the whole
+  // thing and stall the drain outright: draining is the primary job, so at
+  // `limit: 1` there is no slack to spare and the recheck gets none of it.
   const recheck = db
     .select(select)
     .from(messages)
@@ -248,7 +252,7 @@ export async function embedPending(
     .innerJoin(accounts, eq(accounts.id, messages.accountId))
     .where(and(...conditions, isNotNull(embeddingState.textHash)))
     .orderBy(asc(embeddingState.embeddedAt), messages.id)
-    .limit(Math.min(RECHECK_SLICE, limit))
+    .limit(Math.min(RECHECK_SLICE, Math.floor(limit / 2)))
     .all();
 
   // A message with no embedding_state row, or one whose hash was blanked by
