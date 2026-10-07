@@ -3,6 +3,7 @@ import { testDb } from "../helpers/db";
 import { EmbeddingsUnavailableError, type Embedder } from "../../src/projects/embedder";
 import { EMBEDDING_DIMENSIONS, type Db } from "../../src/db/client";
 import { accounts, messages, threads } from "../../src/db/schema";
+import { MAX_SEARCH_LIMIT } from "../../src/chat/search";
 import { searchByMeaning } from "../../src/chat/meaning";
 
 /** An embedder that answers with whatever vector the test names, or refuses. */
@@ -141,5 +142,27 @@ describe("searchByMeaning", () => {
     seedEmbedded(db, "theirs", unit(0), { accountId: "a2" });
     const hits = await searchByMeaning(db, embedderOf(unit(0)), "invoice", { accountId: "a1" });
     expect(hits.map((h) => h.messageId)).toEqual(["mine"]);
+  });
+
+  // 2026-10-07: an unclamped limit here once meant `limit * OVERSAMPLE` bound
+  // parameters in the filtered query below -- caller-controlled, same field
+  // `searchMessages` already caps at MAX_SEARCH_LIMIT.
+  it("caps a caller's limit the same way the keyword half does", async () => {
+    const db = testDbWithVectors();
+    for (let i = 0; i < MAX_SEARCH_LIMIT + 5; i++) seedEmbedded(db, `m${i}`, unit(0));
+    const hits = await searchByMeaning(db, embedderOf(unit(0)), "invoice", { limit: 10_000 });
+    expect(hits.length).toBe(MAX_SEARCH_LIMIT);
+  });
+
+  it("comes back empty, not thrown, when the filtered query itself fails", async () => {
+    const db = testDbWithVectors();
+    seedEmbedded(db, "near", unit(0));
+    // Whatever breaks the filtered query -- here, a schema missing a table it
+    // joins against -- is a miss, not a crash, the same rule `searchMessages`
+    // already keeps for a query the index refuses. Foreign keys are off
+    // first, or SQLite refuses to drop a table `messages` still points at.
+    db.$client.exec("PRAGMA foreign_keys = OFF");
+    db.$client.exec("DROP TABLE accounts");
+    await expect(searchByMeaning(db, embedderOf(unit(0)), "invoice")).resolves.toEqual([]);
   });
 });

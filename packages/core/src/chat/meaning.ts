@@ -1,7 +1,7 @@
 import type { Db } from "../db/client";
 import { EmbeddingsUnavailableError, type Embedder } from "../projects/embedder";
 import { QUERY_PREFIX } from "../projects/classify";
-import { ACCOUNT, COLUMNS, ftsQuery, narrow, toHits, type SearchFilters, type SearchRow } from "./search";
+import { ACCOUNT, COLUMNS, DEFAULT_LIMIT, MAX_SEARCH_LIMIT, ftsQuery, narrow, toHits, type SearchFilters, type SearchRow } from "./search";
 import type { SearchHit } from "./types";
 
 /**
@@ -42,7 +42,12 @@ export async function searchByMeaning(db: Db, embedder: Embedder, query: string,
     throw err;
   }
 
-  const limit = opts.limit ?? 8;
+  // Clamped the same way the keyword half clamps it (search.ts): the two
+  // halves of one search must not disagree about what a caller's `limit`
+  // means, and an unclamped limit here once meant `limit * OVERSAMPLE`
+  // bound parameters in `hitsFor`'s query below — enough of them, unguarded,
+  // to throw "too many SQL variables" (2026-10-07).
+  const limit = Math.min(opts.limit ?? DEFAULT_LIMIT, MAX_SEARCH_LIMIT);
   let near: { message_id: string }[];
   try {
     near = db.$client
@@ -70,13 +75,23 @@ function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number): 
   const { join, where, params } = narrow(filters);
   const holes = ids.map(() => "?").join(", ");
   const bound: (string | number)[] = [...(filters.projectId ? [filters.projectId] : []), ...ids, ...params];
-  const rows = db.$client
-    .prepare(
-      `SELECT ${COLUMNS}, substr(replace(m.body_text, char(10), ' '), 1, 160) AS snippet
-       FROM messages m${ACCOUNT}${join}
-       WHERE m.id IN (${holes})${where.length > 0 ? ` AND ${where.join(" AND ")}` : ""}`,
-    )
-    .all(...bound) as SearchRow[];
+  let rows: SearchRow[];
+  try {
+    rows = db.$client
+      .prepare(
+        `SELECT ${COLUMNS}, substr(replace(m.body_text, char(10), ' '), 1, 160) AS snippet
+         FROM messages m${ACCOUNT}${join}
+         WHERE m.id IN (${holes})${where.length > 0 ? ` AND ${where.join(" AND ")}` : ""}`,
+      )
+      .all(...bound) as SearchRow[];
+  } catch {
+    // A query the database refuses is a miss, not a crash, here exactly as
+    // on the keyword side (searchMessages): the clamp above keeps `ids`
+    // short enough that this cannot overflow SQLite's bound-parameter limit
+    // today, but the next person to raise OVERSAMPLE or the ceiling should
+    // not be able to turn that back into a thrown error (2026-10-07).
+    return [];
+  }
   const byId = new Map(rows.map((r) => [r.message_id, r]));
   const kept: SearchRow[] = [];
   for (const id of ids) {

@@ -7,8 +7,14 @@ import type { SearchHit } from "./types";
 /** How much of a body goes into the index. Past this a mail is a document, not a message. */
 const BODY_LIMIT = 20_000;
 
-/** Default hits handed back to the model: enough to choose from, few enough to read. */
-const DEFAULT_LIMIT = 8;
+/**
+ * Default hits handed back to the model: enough to choose from, few enough
+ * to read. Exported so `meaning.ts` clamps a caller's `limit` by the same
+ * default and ceiling as the keyword half (2026-10-07): two halves of one
+ * search disagreeing about what `limit` means would be a bug waiting to
+ * happen once `mergeHits` combines them.
+ */
+export const DEFAULT_LIMIT = 8;
 
 /** The most any one search returns. "All the mail from Victoria" is a list, not a mailbox. */
 export const MAX_SEARCH_LIMIT = 50;
