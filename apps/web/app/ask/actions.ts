@@ -11,6 +11,7 @@ import {
   composeDraft,
   composeText,
   createOllamaEmbedder,
+  QUERY_EMBED_TIMEOUT_MS,
   operatorNameFor,
   createDrafter,
   draftForThread,
@@ -199,8 +200,11 @@ export async function askAction(
         operatorName: cfg.operatorName,
         // The same local embedder the sorter uses, so a question finds mail by
         // what it meant (2026-10-07). Not reaching Ollama costs nothing here:
-        // the search falls back to words.
-        embedder: createOllamaEmbedder(cfg.ollamaUrl, cfg.embedModel, { db }),
+        // the search falls back to words — and a short timeout is what makes
+        // "not reaching" cover a stuck or cold-loading Ollama too, not only a
+        // refused connection, since this is the path the operator is waiting
+        // on.
+        embedder: createOllamaEmbedder(cfg.ollamaUrl, cfg.embedModel, { db }, QUERY_EMBED_TIMEOUT_MS),
       },
       { chatId, question: trimmed, contextThreadId, contextFiles, ...(accountId ? { accountId } : {}), ...(draft ? { contextDraft: draft } : {}) },
     );
