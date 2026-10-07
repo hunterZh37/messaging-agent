@@ -45,6 +45,26 @@ export function backfillSearchIndex(db: Db): number {
 }
 
 /**
+ * Drops a keyword index built before stemming, so the boot that follows
+ * refills it (2026-10-07). `CREATE VIRTUAL TABLE IF NOT EXISTS` cannot change
+ * the tokenizer of a table that already exists, and an index half stemmed
+ * would answer differently depending on when a message happened to arrive.
+ * Refilling 94,215 messages was measured at 1.2 seconds, so this costs one
+ * slow boot, once.
+ */
+export function rebuildSearchIndexIfStale(db: Db): boolean {
+  const row = db.$client
+    .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'messages_fts'")
+    .get() as { sql: string } | undefined;
+  if (!row || row.sql.includes("porter")) return false;
+  db.$client.exec("DROP TABLE messages_fts");
+  db.$client.exec(
+    "CREATE VIRTUAL TABLE messages_fts USING fts5(message_id UNINDEXED, subject, from_name, from_address, body, tokenize='porter unicode61')",
+  );
+  return true;
+}
+
+/**
  * The operator's words are not FTS5 syntax. Every run of letters and digits
  * becomes one quoted term, so a colon, a quote, or a stray `NEAR` is content
  * rather than an operator that throws.

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb } from "../helpers/db";
-import { backfillSearchIndex, ftsQuery, indexMessageForSearch, searchMessages } from "../../src/chat/search";
+import { backfillSearchIndex, ftsQuery, indexMessageForSearch, rebuildSearchIndexIfStale, searchMessages } from "../../src/chat/search";
 import { accounts, messages, projectAssignments } from "../../src/db/schema";
 import { createProject } from "../../src/projects/projects";
 import { seedMail } from "./seed";
@@ -198,5 +198,33 @@ describe("searchMessages over chats", () => {
     expect(searchMessages(db, "", { from: "keith", accountId: "a2" }).map((h) => h.messageId)).toEqual(["wa:w1"]);
     // Inside one inbox, still one inbox for mail.
     expect(searchMessages(db, "password", { accountId: "a1", channel: "mail" }).map((h) => h.messageId)).toEqual(["a1:m1"]);
+  });
+});
+
+describe("stemming", () => {
+  it("answers one word for a word's other endings (operator, 2026-10-07)", () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "Invoicing for September", fromName: "Sam", fromAddress: "sam@example.com", bodyText: "The invoices are attached." }]);
+    expect(searchMessages(db, "invoice").map((h) => h.messageId)).toEqual(["a1:m1"]);
+    expect(searchMessages(db, "invoicing").map((h) => h.messageId)).toEqual(["a1:m1"]);
+    expect(searchMessages(db, "invoices").map((h) => h.messageId)).toEqual(["a1:m1"]);
+  });
+
+  it("still finds an identifier exactly, which stemming must not mangle", () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m2", subject: "Receipt", fromName: null, fromAddress: "noreply@example.com", bodyText: "Your case number is IOE8022910507." }]);
+    expect(searchMessages(db, "IOE8022910507").map((h) => h.messageId)).toEqual(["a1:m2"]);
+  });
+});
+
+describe("rebuildSearchIndexIfStale", () => {
+  it("drops an index built with the old tokenizer, and leaves a current one alone", () => {
+    const db = testDb();
+    db.$client.exec("DROP TABLE messages_fts");
+    db.$client.exec(
+      "CREATE VIRTUAL TABLE messages_fts USING fts5(message_id UNINDEXED, subject, from_name, from_address, body, tokenize='unicode61')",
+    );
+    expect(rebuildSearchIndexIfStale(db)).toBe(true);
+    expect(rebuildSearchIndexIfStale(db)).toBe(false);
   });
 });
