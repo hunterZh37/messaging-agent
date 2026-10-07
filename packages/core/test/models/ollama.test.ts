@@ -43,6 +43,21 @@ function stubFetch(script: Response[]): Sent[] {
   return sent;
 }
 
+/** One deferred per call, in call order, so a test can settle each independently. */
+function deferredFetch(): { resolve: (res: Response) => void; reject: (err: unknown) => void }[] {
+  const pending: { resolve: (res: Response) => void; reject: (err: unknown) => void }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    () =>
+      new Promise<Response>((resolve, reject) => {
+        pending.push({ resolve, reject });
+      }),
+  );
+  return pending;
+}
+
+const textCall = (content: string) => createOllamaProvider(URL, MODEL).text({ system: [], messages: [{ role: "user", content }], maxTokens: 10 });
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -265,6 +280,59 @@ describe("ollamaChatBusy", () => {
     const p = createOllamaProvider(URL, MODEL).text({ system: [], messages: [{ role: "user", content: "x" }], maxTokens: 10 });
     expect(ollamaChatBusy()).toBe(true);
     await expect(p).rejects.toBeInstanceOf(ModelUnavailableError);
+    expect(ollamaChatBusy()).toBe(false);
+  });
+
+  /**
+   * The whole point of a counter rather than a boolean: a single in-flight
+   * call finishing must not clear it while another is still on the wire. A
+   * sort makes many model calls, and the mail clock's own trickle sort can
+   * overlap a manual Re-sort or a revise — exactly the case a boolean would
+   * get wrong, by reading not-busy the moment either call settled.
+   */
+  it("stays busy while a second overlapping call is still in flight, and only clears once both finish", async () => {
+    const pending = deferredFetch();
+
+    const a = textCall("a");
+    const b = textCall("b");
+    expect(ollamaChatBusy()).toBe(true);
+
+    pending[0]!.resolve(reply("a"));
+    await a;
+    expect(ollamaChatBusy()).toBe(true); // b is still in flight
+
+    pending[1]!.resolve(reply("b"));
+    await b;
+    expect(ollamaChatBusy()).toBe(false);
+
+    // A later call reads busy correctly — if the pair above had left the
+    // count negative instead of exactly zero, this would read false while
+    // c is still in flight.
+    const c = textCall("c");
+    expect(ollamaChatBusy()).toBe(true);
+    pending[2]!.resolve(reply("c"));
+    await c;
+    expect(ollamaChatBusy()).toBe(false);
+  });
+
+  it("stays busy while a second overlapping call is still in flight after the first throws, and reaches exactly zero rather than negative", async () => {
+    const pending = deferredFetch();
+
+    const a = textCall("a");
+    const b = textCall("b");
+
+    pending[0]!.reject(new TypeError("fetch failed"));
+    await expect(a).rejects.toBeInstanceOf(ModelUnavailableError);
+    expect(ollamaChatBusy()).toBe(true); // b is still in flight, a's throw didn't double-decrement
+
+    pending[1]!.resolve(reply("b"));
+    await b;
+    expect(ollamaChatBusy()).toBe(false);
+
+    const c = textCall("c");
+    expect(ollamaChatBusy()).toBe(true);
+    pending[2]!.resolve(reply("c"));
+    await c;
     expect(ollamaChatBusy()).toBe(false);
   });
 });
