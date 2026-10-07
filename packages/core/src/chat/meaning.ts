@@ -19,15 +19,20 @@ const OVERSAMPLE = 6;
  * instead: the question is embedded by the same local model that embedded
  * the mail, and the table answers with what is nearest.
  *
- * It never throws. The vectors may not have loaded, Ollama may not be
- * running, and the operator is still owed whatever the words alone can find.
+ * It never throws. `null` and `[]` answer two different questions, and
+ * `searchHybrid` treats them differently: `null` is every way the meaning
+ * half could not even be asked — the vectors never loaded, Ollama is not
+ * running, the extension itself is missing, nothing is embedded yet — and
+ * the operator is still owed whatever the words alone can find, exactly as
+ * before this half of search existed. `[]` is the other thing: it was asked,
+ * and genuinely nothing in the mailbox reads anything like the question.
  */
-export async function searchByMeaning(db: Db, embedder: Embedder, query: string, opts: SearchFilters = {}): Promise<SearchHit[]> {
-  if (!db.vecAvailable) return [];
+export async function searchByMeaning(db: Db, embedder: Embedder, query: string, opts: SearchFilters = {}): Promise<SearchHit[] | null> {
+  if (!db.vecAvailable) return null;
   // A question with no words in it has no meaning to match. An embedding of
   // "???" is a direction like any other, and it would rank arbitrary mail
   // highly rather than nothing at all.
-  if (!ftsQuery(query, "AND")) return [];
+  if (!ftsQuery(query, "AND")) return null;
 
   let vector: Float32Array;
   try {
@@ -35,10 +40,10 @@ export async function searchByMeaning(db: Db, embedder: Embedder, query: string,
     // prefixes is what nomic was trained on, and mixing them up quietly
     // costs accuracy rather than failing.
     const [v] = await embedder.embed([`${QUERY_PREFIX}${query}`]);
-    if (!v) return [];
+    if (!v) return null;
     vector = v;
   } catch (err) {
-    if (err instanceof EmbeddingsUnavailableError) return [];
+    if (err instanceof EmbeddingsUnavailableError) return null;
     throw err;
   }
 
@@ -54,12 +59,15 @@ export async function searchByMeaning(db: Db, embedder: Embedder, query: string,
       .prepare("SELECT message_id FROM message_embeddings WHERE embedding MATCH ? AND k = ?")
       .all(Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength), limit * OVERSAMPLE) as { message_id: string }[];
   } catch {
-    return [];
+    return null;
   }
-  if (near.length === 0) return [];
+  // Nothing embedded yet is the same situation as no vector table at all.
+  if (near.length === 0) return null;
 
   // The rows, in the order the vectors put them: a message deleted since it
   // was embedded simply does not come back, and the filters narrow the rest.
+  // Genuinely zero of them surviving the filters below is answered, not
+  // unanswerable — that is `[]`, same as `hitsFor` returns it.
   return hitsFor(db, near.map((r) => r.message_id), opts, limit);
 }
 
@@ -69,9 +77,11 @@ export async function searchByMeaning(db: Db, embedder: Embedder, query: string,
  * search to one inbox narrows both halves alike; a message deleted since it
  * was embedded has no row and simply does not come back. There is no
  * matched term to centre a snippet on, so it is the opening of the body, as
- * a search with filters and no words already does.
+ * a search with filters and no words already does. `null` only for a query
+ * the database refuses outright — an id every one of these filters excludes
+ * is answered, and answered with `[]`.
  */
-function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number): SearchHit[] {
+function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number): SearchHit[] | null {
   const { join, where, params } = narrow(filters);
   const holes = ids.map(() => "?").join(", ");
   const bound: (string | number)[] = [...(filters.projectId ? [filters.projectId] : []), ...ids, ...params];
@@ -85,12 +95,12 @@ function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number): 
       )
       .all(...bound) as SearchRow[];
   } catch {
-    // A query the database refuses is a miss, not a crash, here exactly as
-    // on the keyword side (searchMessages): the clamp above keeps `ids`
-    // short enough that this cannot overflow SQLite's bound-parameter limit
-    // today, but the next person to raise OVERSAMPLE or the ceiling should
-    // not be able to turn that back into a thrown error (2026-10-07).
-    return [];
+    // A query the database refuses is a miss that could not be asked, here
+    // exactly as on the keyword side (searchMessages): the clamp above keeps
+    // `ids` short enough that this cannot overflow SQLite's bound-parameter
+    // limit today, but the next person to raise OVERSAMPLE or the ceiling
+    // should not be able to turn that back into a thrown error (2026-10-07).
+    return null;
   }
   const byId = new Map(rows.map((r) => [r.message_id, r]));
   const kept: SearchRow[] = [];
@@ -103,11 +113,10 @@ function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number): 
 }
 
 /**
- * What `search_inbox` runs (2026-10-07). Both halves at once, because they
- * take about the same time and neither waits on the other: the words come
- * from an index that answers in under ten milliseconds, the meaning from one
- * embed call of about forty. Without an embedder, or with one that cannot
- * reach Ollama, this is exactly the search Celeste has always had.
+ * What `search_inbox` runs (2026-10-07). Without an embedder, or with one
+ * that cannot reach Ollama, this is exactly the search Celeste has always
+ * had: the meaning half is asked first, specifically so the keyword half
+ * can be told whether it actually got an answer — see `fallback` below.
  *
  * Always returned through `mergeHits`, even with no meaning half to merge:
  * that is the one place a hit is marked how it was found, and a hit that
@@ -119,11 +128,19 @@ export async function searchHybrid(db: Db, embedder: Embedder | undefined, query
   // (search.ts): `mergeHits` is handed the limit it returns at, not the
   // caller's raw one.
   const limit = Math.min(opts.limit ?? DEFAULT_LIMIT, MAX_SEARCH_LIMIT);
-  const words = searchMessages(db, query, opts);
-  if (!embedder) return mergeHits(words, [], limit);
   // `searchByMeaning` already never throws for the reasons it says above;
-  // this catch is only for an embedder that throws something of its own,
-  // so a search is never worse off for having asked the vectors too.
-  const meaning = await searchByMeaning(db, embedder, query, opts).catch(() => [] as SearchHit[]);
-  return mergeHits(words, meaning, limit);
+  // this catch is only for an embedder that throws something of its own, so
+  // asking the vectors first never costs the keyword half its own answer.
+  const meaning = embedder ? await searchByMeaning(db, embedder, query, opts).catch(() => null) : null;
+  // `meaning === null` is every way the meaning half could not answer at
+  // all (no embedder included) — and a sentence-shaped query's OR fallback
+  // only stops being trusted as "words" once a second half has actually
+  // answered it, so `null` here must fall back exactly as `searchMessages`
+  // always has: a machine with no Ollama must not search worse than it did
+  // before semantic search existed (2026-10-07, measured against the
+  // operator's own mailbox: "what did Victoria say about the invoice" is 0
+  // AND hits and 26,506 OR hits on "what", "did" and "the" alone — the
+  // fallback this guards is not hypothetical).
+  const words = searchMessages(db, query, opts, meaning === null ? "always" : "short-only");
+  return mergeHits(words, meaning ?? [], limit);
 }

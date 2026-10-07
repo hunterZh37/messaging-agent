@@ -107,6 +107,11 @@ export function ftsQuery(query: string, join: "AND" | "OR"): string | null {
   return terms.map((t) => `"${t}"`).join(` ${join} `);
 }
 
+/** The same split `ftsQuery` makes, just counted rather than joined. */
+function wordCount(query: string): number {
+  return (query.match(/[\p{L}\p{N}_]+/gu) ?? []).length;
+}
+
 export interface SearchRow {
   message_id: string;
   thread_id: string;
@@ -235,6 +240,17 @@ function runFilters(db: Db, filters: SearchFilters, limit: number): SearchHit[] 
 }
 
 /**
+ * Terms an OR fallback can still trust as "the operator's words were in
+ * this message" rather than "this message happens to share one word with
+ * the question" (2026-10-07). A query of a few real terms is still mostly
+ * content when matched on any one of them — "invoice acme march" missing
+ * "acme" is still about an invoice. A sentence has function words in it
+ * too, and OR's "any one of these" then just as happily matches on "the"
+ * or "what" as on the one word that mattered.
+ */
+const OR_FALLBACK_MAX_TERMS = 3;
+
+/**
  * Keyword search over subject, sender and body (spec 10c), the tool behind
  * "search the whole inbox". Every term has to appear; when nothing matches
  * all of them the same terms are tried as alternatives, because half an
@@ -242,14 +258,26 @@ function runFilters(db: Db, filters: SearchFilters, limit: number): SearchHit[] 
  * and stand on their own when there are no words: "everything from Victoria"
  * is a question about a sender, not about a subject. Bad syntax never
  * throws — it comes back empty.
+ *
+ * `fallback` is "always" by default: the OR fallback above ran for any
+ * query, which was the whole of "half an answer beats none" when the words
+ * were the only half there was. `"short-only"` is what `searchHybrid` asks
+ * for once the meaning half has actually answered a question (2026-10-07):
+ * the fallback's job changed the day a second half arrived able to answer
+ * a sentence-shaped question on its own, so a query longer than
+ * `OR_FALLBACK_MAX_TERMS` terms no longer OR-falls-back at all rather than
+ * matching on whichever of its words happens to be commonest in the
+ * mailbox. A short query — still mostly content words either way — falls
+ * back exactly as it always has.
  */
-export function searchMessages(db: Db, query: string, opts: SearchFilters = {}): SearchHit[] {
+export function searchMessages(db: Db, query: string, opts: SearchFilters = {}, fallback: "always" | "short-only" = "always"): SearchHit[] {
   const limit = Math.min(opts.limit ?? DEFAULT_LIMIT, MAX_SEARCH_LIMIT);
   try {
     const all = ftsQuery(query, "AND");
     if (!all) return runFilters(db, opts, limit);
     const hits = runMatch(db, all, opts, limit);
     if (hits.length > 0) return hits;
+    if (fallback === "short-only" && wordCount(query) > OR_FALLBACK_MAX_TERMS) return [];
     const any = ftsQuery(query, "OR");
     return any ? runMatch(db, any, opts, limit) : [];
   } catch {

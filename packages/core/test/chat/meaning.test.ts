@@ -118,7 +118,7 @@ describe("searchByMeaning", () => {
     seedEmbedded(db, "near", unit(0));
     seedEmbedded(db, "far", unit(1));
     const hits = await searchByMeaning(db, embedderOf(unit(0)), "anything");
-    expect(hits.map((h) => h.messageId)).toEqual(["near", "far"]);
+    expect(hits?.map((h) => h.messageId)).toEqual(["near", "far"]);
   });
 
   it("asks as a question, not as a document", async () => {
@@ -137,14 +137,20 @@ describe("searchByMeaning", () => {
     expect(seen).toEqual(["search_query: where is the invoice"]);
   });
 
-  it("is empty, never an error, when Ollama is not running", async () => {
+  /**
+   * `null`, not `[]`: Ollama being down is "could not be asked", the same
+   * answer as no embedder at all, and `searchHybrid` tells the two apart
+   * from "asked, found nothing" so it knows whether the keyword half's OR
+   * fallback is still the only answer there is (2026-10-07).
+   */
+  it("could not be asked, not merely found nothing, when Ollama is not running", async () => {
     const db = testDbWithVectors();
-    await expect(searchByMeaning(db, embedderOf(new EmbeddingsUnavailableError("no ollama")), "invoice")).resolves.toEqual([]);
+    await expect(searchByMeaning(db, embedderOf(new EmbeddingsUnavailableError("no ollama")), "invoice")).resolves.toBeNull();
   });
 
-  it("is empty when the vector extension did not load", async () => {
+  it("could not be asked when the vector extension did not load", async () => {
     const db = testDbWithoutVectors();
-    await expect(searchByMeaning(db, embedderOf(unit(0)), "invoice")).resolves.toEqual([]);
+    await expect(searchByMeaning(db, embedderOf(unit(0)), "invoice")).resolves.toBeNull();
   });
 
   /** An embedding of "???" ranks arbitrary mail highly; better to say nothing. */
@@ -162,13 +168,15 @@ describe("searchByMeaning", () => {
       "???",
     );
     expect(asked).toBe(false);
-    expect(hits).toEqual([]);
+    expect(hits).toBeNull();
   });
 
   it("drops a vector whose message has gone", async () => {
     const db = testDbWithVectors();
     seedEmbedded(db, "ghost", unit(0));
     db.$client.prepare("DELETE FROM messages WHERE id = ?").run("ghost");
+    // Asked, and genuinely nothing survives the join to a deleted message:
+    // `[]`, not `null` -- this was answered, not unanswerable.
     await expect(searchByMeaning(db, embedderOf(unit(0)), "invoice")).resolves.toEqual([]);
   });
 
@@ -177,7 +185,7 @@ describe("searchByMeaning", () => {
     seedEmbedded(db, "mine", unit(0), { accountId: "a1" });
     seedEmbedded(db, "theirs", unit(0), { accountId: "a2" });
     const hits = await searchByMeaning(db, embedderOf(unit(0)), "invoice", { accountId: "a1" });
-    expect(hits.map((h) => h.messageId)).toEqual(["mine"]);
+    expect(hits?.map((h) => h.messageId)).toEqual(["mine"]);
   });
 
   // 2026-10-07: an unclamped limit here once meant `limit * OVERSAMPLE` bound
@@ -187,19 +195,19 @@ describe("searchByMeaning", () => {
     const db = testDbWithVectors();
     for (let i = 0; i < MAX_SEARCH_LIMIT + 5; i++) seedEmbedded(db, `m${i}`, unit(0));
     const hits = await searchByMeaning(db, embedderOf(unit(0)), "invoice", { limit: 10_000 });
-    expect(hits.length).toBe(MAX_SEARCH_LIMIT);
+    expect(hits?.length).toBe(MAX_SEARCH_LIMIT);
   });
 
-  it("comes back empty, not thrown, when the filtered query itself fails", async () => {
+  it("could not be asked, not thrown, when the filtered query itself fails", async () => {
     const db = testDbWithVectors();
     seedEmbedded(db, "near", unit(0));
     // Whatever breaks the filtered query -- here, a schema missing a table it
-    // joins against -- is a miss, not a crash, the same rule `searchMessages`
+    // joins against -- could not be asked, the same rule `searchMessages`
     // already keeps for a query the index refuses. Foreign keys are off
     // first, or SQLite refuses to drop a table `messages` still points at.
     db.$client.exec("PRAGMA foreign_keys = OFF");
     db.$client.exec("DROP TABLE accounts");
-    await expect(searchByMeaning(db, embedderOf(unit(0)), "invoice")).resolves.toEqual([]);
+    await expect(searchByMeaning(db, embedderOf(unit(0)), "invoice")).resolves.toBeNull();
   });
 });
 
@@ -258,7 +266,7 @@ describe("searchHybrid", () => {
   /**
    * The third way the meaning half can be absent (2026-10-07): an embedder
    * was given and Ollama answers, but the extension itself never loaded
-   * (`searchByMeaning` returns `[]` for this one at its very first line).
+   * (`searchByMeaning` returns `null` for this one at its very first line).
    * The other two -- no embedder, and an embedder that throws -- are above;
    * all three are composition, not asserted by `searchHybrid` itself, and
    * all three are owed their own test so nothing downstream of
@@ -268,5 +276,57 @@ describe("searchHybrid", () => {
     const db = testDbWithoutVectors();
     seedIndexed(db, "w1", { body: "the invoice is attached" });
     await expect(searchHybrid(db, embedderOf(unit(0)), "invoice").then((h) => h.map((x) => x.messageId))).resolves.toEqual(["w1"]);
+  });
+
+  /**
+   * The hedge the operator asked for, made reachable (2026-10-07, review of
+   * finding 3/5). A sentence shares real words with mail it is not about --
+   * "what", "about", "the" -- which an unconditional OR fallback would have
+   * matched and tagged "words", the one tag that tells Celeste her own
+   * words were found. "noise" shares three such words with the question and
+   * nothing else; once the meaning half has actually answered (finding
+   * "near" instead), the fallback that would have surfaced "noise" does not
+   * run, and only the honest "meaning" hit comes back.
+   */
+  it("does not let a sentence-shaped query's stray word overlap pass as a word match once meaning has answered", async () => {
+    const db = testDbWithVectors();
+    seedIndexed(db, "noise", { body: "What a day. I forgot about the meeting entirely." });
+    seedEmbedded(db, "near", unit(0));
+
+    const hits = await searchHybrid(db, embedderOf(unit(0)), "what did Victoria say about the invoice");
+    expect(hits.map((h) => h.messageId)).toEqual(["near"]);
+    expect(hits[0]?.match).toBe("meaning");
+  });
+
+  /**
+   * The fallback still earns its place for a short query (2026-10-07): a
+   * query of a couple of real terms is still mostly content even matched on
+   * only one of them, so it keeps OR-falling-back exactly as it always has,
+   * whether or not the meaning half also answered this call.
+   */
+  it("still lets a short query fall back to OR once meaning has answered, same as before", async () => {
+    const db = testDbWithVectors();
+    seedIndexed(db, "fruit", { body: "I bought some apples yesterday" });
+    seedEmbedded(db, "m1", unit(5));
+
+    const hits = await searchHybrid(db, embedderOf(unit(5)), "apples bananas");
+    const byId = new Map(hits.map((h) => [h.messageId, h.match]));
+    expect(byId.get("fruit")).toBe("words");
+  });
+
+  /**
+   * The regression this whole fix must not cause (2026-10-07): a machine
+   * with no Ollama has no meaning half to answer, so the sentence-shaped
+   * query above must still OR-fall-back exactly as `searchMessages` always
+   * has -- "noise" comes back, imperfect as that hit is, because an
+   * imperfect answer is what this machine has always given and still owes.
+   */
+  it("still OR-falls-back for a sentence-shaped query with no embedder, same as before this branch", async () => {
+    const db = testDbWithVectors();
+    seedIndexed(db, "noise", { body: "What a day. I forgot about the meeting entirely." });
+
+    const hits = await searchHybrid(db, undefined, "what did Victoria say about the invoice");
+    expect(hits.map((h) => h.messageId)).toEqual(["noise"]);
+    expect(hits[0]?.match).toBe("words");
   });
 });
