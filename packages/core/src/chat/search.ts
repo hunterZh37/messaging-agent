@@ -56,11 +56,17 @@ export function rebuildSearchIndexIfStale(db: Db): boolean {
   const row = db.$client
     .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'messages_fts'")
     .get() as { sql: string } | undefined;
-  if (!row || row.sql.includes("porter")) return false;
-  db.$client.exec("DROP TABLE messages_fts");
-  db.$client.exec(
-    "CREATE VIRTUAL TABLE messages_fts USING fts5(message_id UNINDEXED, subject, from_name, from_address, body, tokenize='porter unicode61')",
-  );
+  if (!row || row.sql.includes("tokenize='porter")) return false;
+  // `celeste run` opens this same file in another connection and indexes as
+  // it syncs, with no try/catch (apps/cli/src/main.ts). Drop and create as
+  // one transaction, not two autocommit statements, so that connection never
+  // sees a window with no `messages_fts` table to insert into (2026-10-07).
+  db.$client.transaction(() => {
+    db.$client.exec("DROP TABLE messages_fts");
+    db.$client.exec(
+      "CREATE VIRTUAL TABLE messages_fts USING fts5(message_id UNINDEXED, subject, from_name, from_address, body, tokenize='porter unicode61')",
+    );
+  })();
   return true;
 }
 

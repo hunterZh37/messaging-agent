@@ -210,10 +210,28 @@ describe("stemming", () => {
     expect(searchMessages(db, "invoices").map((h) => h.messageId)).toEqual(["a1:m1"]);
   });
 
-  it("still finds an identifier exactly, which stemming must not mangle", () => {
+  it("tells two identifiers apart, so a stemmer that collapsed them would fail here", () => {
+    // Querying the literal indexed text proves nothing on its own — the
+    // query is stemmed the same way as the index, so both sides would be
+    // mangled identically. Two distinct identifiers, and a search for one
+    // that must not return the other, is what actually pins the property.
     const db = testDb();
-    seedMail(db, [{ id: "m2", subject: "Receipt", fromName: null, fromAddress: "noreply@example.com", bodyText: "Your case number is IOE8022910507." }]);
+    seedMail(db, [
+      { id: "m2", subject: "Receipt", fromName: null, fromAddress: "noreply@example.com", bodyText: "Your case number is IOE8022910507." },
+      { id: "m3", subject: "Receipt", fromName: null, fromAddress: "noreply@example.com", bodyText: "Your case number is IOE8022910599." },
+    ]);
     expect(searchMessages(db, "IOE8022910507").map((h) => h.messageId)).toEqual(["a1:m2"]);
+    expect(searchMessages(db, "IOE8022910599").map((h) => h.messageId)).toEqual(["a1:m3"]);
+  });
+
+  it("tells two senders apart by address the same way", () => {
+    const db = testDb();
+    seedMail(db, [
+      { id: "m4", fromName: "Sam", fromAddress: "sam@example.com", bodyText: "see attached" },
+      { id: "m5", fromName: "Jordan", fromAddress: "jordan@example.com", bodyText: "see attached" },
+    ]);
+    expect(searchMessages(db, "sam@example.com").map((h) => h.messageId)).toEqual(["a1:m4"]);
+    expect(searchMessages(db, "jordan@example.com").map((h) => h.messageId)).toEqual(["a1:m5"]);
   });
 });
 
