@@ -51,3 +51,9 @@ export function startMailClock(): void {
   g[KEY] = ticker;
   console.log(`mail clock: every ${MAIL_EVERY_MS / 1000}s`);
 }
+
+/** Whether the mail clock is mid-run, so the embedder can leave the model to it. */
+export function mailClockBusy(): boolean {
+  const g = globalThis as unknown as Record<symbol, Ticker | undefined>;
+  return g[KEY]?.running ?? false;
+}

@@ -519,6 +519,20 @@
       ]
     },
     {
+      "id": "embedclock",
+      "type": "backend",
+      "label": "Embed clock",
+      "sublabel": "fills vectors via Ollama",
+      "pos": [
+        350,
+        480
+      ],
+      "size": [
+        170,
+        64
+      ]
+    },
+    {
       "id": "push",
       "type": "external",
       "label": "Push service",
@@ -619,6 +633,7 @@
         "lock",
         "watcher",
         "mailclock",
+        "embedclock",
         "tsserve"
       ]
     },
