@@ -111,9 +111,16 @@ const DEFAULT_EMBED_LIMIT = 200;
  * `limit` starves the recheck sweep completely — at 94,149 messages and a
  * limit of 200 that is roughly 471 calls, about eight hours at the clock's
  * cadence, before a changed message's vector is touched even once, and
- * never if new mail keeps arriving a batch at a time. Most of this slice
- * hashes as still current and is dropped by the check below, so the usual
- * cost of reserving it is one small SELECT, not wasted embeddings.
+ * never if new mail keeps arriving a batch at a time. A message whose body
+ * changed, or whose text the rules above now read differently, cannot be
+ * made to wait behind that backlog for its vector to catch up. Most of this
+ * slice hashes as still current and is dropped by the check below, so the
+ * usual cost of reserving it is one small SELECT, not wasted embeddings —
+ * but whatever it is spent on is not spent draining the backlog, so this
+ * number is sized against `limit`, not fixed on its own: raise the batch
+ * size and the staleness delay this bounds grows with it unless this grows
+ * too, and shrink the batch toward this number and the backlog's drain
+ * slows correspondingly, down to a crawl if the two are ever close.
  */
 const RECHECK_SLICE = 10;
 
