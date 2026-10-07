@@ -104,7 +104,7 @@ const TOOLS: ChatToolDef[] = [
     input_schema: {
       type: "object",
       properties: {
-        query: { type: "string", description: "Keywords to look for, e.g. 'invoice acme march'. May be omitted when `from` or `project` is given." },
+        query: { type: "string", description: "What the operator asked, in their own words — a question or a description is fine, e.g. 'what did Victoria say about the invoice'. May be omitted when `from` or `project` is given." },
         from: { type: "string", description: "Part of the sender's name or address, e.g. 'victoria'." },
         channel: { type: "string", enum: ["mail", "imessage", "whatsapp"], description: "Only mail, only Messages (iMessage) chats, or only WhatsApp chats. Omit to search everything." },
         project: { type: "string", description: "Only mail filed under this project, by the operator's name for it." },

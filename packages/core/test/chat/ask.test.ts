@@ -471,6 +471,14 @@ describe("askCeleste", () => {
       const tool = request.tools.find((t) => t.name === "search_inbox")!;
       expect(tool.description).not.toContain("Keyword search");
       expect(tool.description.toLowerCase()).toContain("meant");
+      // The `query` parameter's own description is what the model actually
+      // reads when filling the argument -- a tool description that invites
+      // a question, sitting over a parameter that still says "Keywords",
+      // would have her second-guess the very thing she was just told to
+      // stop doing (2026-10-07).
+      const queryParam = (tool.input_schema.properties as Record<string, { description?: string }>).query!;
+      expect(queryParam.description).not.toContain("Keywords");
+      expect(queryParam.description?.toLowerCase()).toContain("question");
     };
 
     await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "When is the invoice due?", contextThreadId: null });
