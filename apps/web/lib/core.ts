@@ -1,5 +1,5 @@
 import path from "node:path";
-import { backfillFolders, backfillSearchIndex, convertLegacyHides, loadConfig, openDb, seedCategoriesIfEmpty, type Db, type Config } from "@messaging-agent/core";
+import { backfillFolders, backfillSearchIndex, convertLegacyHides, loadConfig, openDb, rebuildSearchIndexIfStale, seedCategoriesIfEmpty, type Db, type Config } from "@messaging-agent/core";
 
 export const ENV_PATH = path.resolve(process.cwd(), "../../.env");
 
@@ -23,7 +23,10 @@ export function core(): { cfg: Config; db: Db } {
     // Threads hidden before 2026-09-15 sat in Deleted items; Hide now keeps them in Inbox.
     convertLegacyHides(db);
     // Mail stored before the keyword index existed is not findable until it
-    // is in there, and Ask Celeste searches through it (spec 10c).
+    // is in there, and Ask Celeste searches through it (spec 10c). An index
+    // built before stemming is dropped first, so the backfill below rebuilds
+    // it the new way (2026-10-07).
+    rebuildSearchIndexIfStale(db);
     backfillSearchIndex(db);
     cached = { cfg, db };
   }

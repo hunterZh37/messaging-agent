@@ -15,6 +15,10 @@ export async function register(): Promise<void> {
   startNotifying();
   const { startMailClock } = await import("./lib/mailClock");
   startMailClock();
+  // Fills in the vectors search by meaning needs, a batch at a time, behind
+  // the mail clock above (2026-10-07).
+  const { startEmbedClock } = await import("./lib/embedClock");
+  startEmbedClock();
   // The stats page is a second of scanning per range. Doing all four now,
   // once the server has settled, means the first press of a chip is as quick
   // as the second (operator, 2026-09-17). Detached: nothing waits on it, and

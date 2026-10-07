@@ -519,6 +519,20 @@
       ]
     },
     {
+      "id": "embedclock",
+      "type": "backend",
+      "label": "Embed clock",
+      "sublabel": "embeds via Ollama",
+      "pos": [
+        565,
+        140
+      ],
+      "size": [
+        110,
+        64
+      ]
+    },
+    {
       "id": "push",
       "type": "external",
       "label": "Push service",
@@ -619,6 +633,7 @@
         "lock",
         "watcher",
         "mailclock",
+        "embedclock",
         "tsserve"
       ]
     },
@@ -1228,6 +1243,33 @@
       "fromSide": "top",
       "toSide": "bottom",
       "variant": "dashed"
+    },
+    {
+      "id": "embed-read",
+      "from": "db",
+      "to": "embedclock",
+      "label": "unembedded mail in, vectors out",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [
+        [715, 220],
+        [620, 220]
+      ],
+      "labelAt": [690, 222]
+    },
+    {
+      "id": "embed-ollama",
+      "from": "embedclock",
+      "to": "ollama",
+      "label": "embed",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [
+        [620, 125],
+        [685, 125]
+      ],
+      "labelAt": [650, 125]
     }
   ],
   "cards": [

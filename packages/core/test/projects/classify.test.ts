@@ -200,6 +200,62 @@ describe("embedPending", () => {
     expect(await embedPending(db, new FakeEmbedder(), {})).toEqual({ embedded: 2, reembedded: 0 });
   });
 
+  it("drains a backlog larger than the limit over repeated calls, rather than re-reading the same page forever", async () => {
+    const db = testDb();
+    account(db);
+    const ids = ["m1", "m2", "m3", "m4", "m5"].map((id) => addMessage(db, { id, subject: id, body: "x" }));
+    const embedder = new FakeEmbedder();
+
+    // Five candidates, a limit of two. The recheck slice is capped at half
+    // of `limit` (2026-10-07), so one slot of each call after the first
+    // drains a never-embedded row and the other rechecks an already-current
+    // one; a window that re-fetched the same top rows every time would
+    // report embedded: 2 forever and never reach the rest.
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 2, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 1, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 1, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 1, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 0, reembedded: 0 });
+    expect(db.select().from(embeddingState).all().map((r) => r.messageId).sort()).toEqual([...ids].sort());
+  });
+
+  it("keeps rechecking every call, instead of only once a never-embedded backlog bigger than the limit has drained", async () => {
+    const db = testDb();
+    account(db);
+    const stale = addMessage(db, { id: "stale", subject: "SOW", body: "signed" });
+    await embedPending(db, new FakeEmbedder(), { accountId: "a1" });
+    db.update(embeddingState).set({ textHash: "stale" }).where(eq(embeddingState.messageId, stale)).run();
+
+    // Ten never-embedded messages: more than the limit below, so a design
+    // that filled the window from this bucket first would not reach the
+    // stale one until the tenth message had drained it to nothing, three
+    // calls away (2026-10-07, the reviewer's repro). The reserved recheck
+    // slice is taken first instead, so it is reached on the very next call.
+    for (let i = 0; i < 10; i++) addMessage(db, { id: `m${i}`, subject: `m${i}`, body: "x" });
+
+    const embedder = new FakeEmbedder();
+    const r = await embedPending(db, embedder, { accountId: "a1", limit: 3 });
+    expect(r.reembedded).toBe(1);
+  });
+
+  it("still re-embeds a changed message once newer mail has pushed it out of the top of the window", async () => {
+    const db = testDb();
+    account(db);
+    const stale = addMessage(db, { id: "m1", subject: "SOW", body: "signed" });
+    await embedPending(db, new FakeEmbedder(), { accountId: "a1" });
+    db.update(embeddingState).set({ textHash: "stale" }).where(eq(embeddingState.messageId, stale)).run();
+
+    // Three newer, never-embedded messages, which fill the window ahead of
+    // it under the scope's own newest-first order.
+    addMessage(db, { id: "m2", subject: "two", body: "b" });
+    addMessage(db, { id: "m3", subject: "three", body: "c" });
+    addMessage(db, { id: "m4", subject: "four", body: "d" });
+
+    const embedder = new FakeEmbedder();
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 4 })).toEqual({ embedded: 4, reembedded: 1 });
+    expect(db.select().from(embeddingState).all().map((r) => r.messageId).sort()).toEqual(["a1:m1", "a1:m2", "a1:m3", "a1:m4"]);
+  });
+
   it("re-embeds a message whose text no longer hashes to what was embedded", async () => {
     const db = testDb();
     account(db);
@@ -239,6 +295,79 @@ describe("embedPending", () => {
     };
     await expect(embedPending(db, broken, {})).rejects.toThrow("Ollama is not running");
     expect(db.select().from(embeddingState).all()).toEqual([]);
+  });
+});
+
+describe("embedPending with scope: search", () => {
+  it("embeds mail the projects scope skips, and puts email before texts", async () => {
+    const db = testDb();
+    account(db);
+    // account(db) only ever makes imap accounts; a texting one needs its own row.
+    db.insert(accounts).values({ id: "a3", provider: "imessage", email: "+15555550100", displayName: null, createdAt: 1 }).run();
+
+    // Created oldest to newest, so the order below can only come from the
+    // email-first rule: a text newer than either email still sorts last.
+    const e2 = addMessage(db, { id: "e2", subject: "Re: Invoice", body: "paid", folder: "sent", fromOperator: true });
+    const e1 = addMessage(db, { id: "e1", subject: "Invoice", body: "due Friday" });
+    addMessage(db, { id: "t1", accountId: "a3", subject: "", body: "running late", folder: "messages" });
+
+    const embedder = new FakeEmbedder();
+    const r = await embedPending(db, embedder, { scope: "search", limit: 2 });
+    expect(r.embedded).toBe(2);
+    // Both email, though the text is the newest message in the mailbox, and
+    // the operator's own sent mail is in: the projects scope leaves it out.
+    expect(db.select().from(embeddingState).all().map((row) => row.messageId).sort()).toEqual([e1, e2].sort());
+    expect(embedder.calls[0]).toEqual([`${DOCUMENT_PREFIX}Invoice\n\ndue Friday`, `${DOCUMENT_PREFIX}Re: Invoice\n\npaid`]);
+  });
+
+  it("leaves junk alone", async () => {
+    const db = testDb();
+    account(db);
+    addMessage(db, { id: "j1", subject: "Receipt", body: "order", folder: "junk" });
+    const embedder = new FakeEmbedder();
+    expect((await embedPending(db, embedder, { scope: "search" })).embedded).toBe(0);
+  });
+
+  it("still embeds only the projects scope by default", async () => {
+    const db = testDb();
+    account(db);
+    addMessage(db, { id: "e3", subject: "Re: Invoice", body: "thanks", fromOperator: true });
+    const embedder = new FakeEmbedder();
+    expect((await embedPending(db, embedder)).embedded).toBe(0);
+  });
+
+  /**
+   * The embed clock rests on `more`, not on `embedded` reaching the batch
+   * size: the recheck slice reserved out of every batch means a
+   * backlog-draining call can report well under `limit` and still have a
+   * backlog (2026-10-07, the whole-branch review this guards). Four never-
+   * embedded messages against a limit of two must say there is more left,
+   * even though `embedded` (2) looks like "a short pass" by the old,
+   * now-removed `embedded < limit` rule.
+   */
+  it("says there is more when the never-embedded bucket fills its allocation", async () => {
+    const db = testDb();
+    account(db);
+    for (let i = 0; i < 4; i++) addMessage(db, { id: `m${i}`, subject: `m${i}`, body: "x" });
+    const r = await embedPending(db, new FakeEmbedder(), { scope: "search", limit: 2 });
+    expect(r).toEqual({ embedded: 2, reembedded: 0, more: true });
+  });
+
+  it("says there is nothing more once the never-embedded bucket comes up short of its allocation", async () => {
+    const db = testDb();
+    account(db);
+    addMessage(db, { id: "m1", subject: "m1", body: "x" });
+    const r = await embedPending(db, new FakeEmbedder(), { scope: "search", limit: 50 });
+    expect(r).toEqual({ embedded: 1, reembedded: 0, more: false });
+  });
+
+  it("leaves `more` out for the projects scope, which no clock asks", async () => {
+    const db = testDb();
+    account(db);
+    addMessage(db, { id: "m1", subject: "m1", body: "x" });
+    const r = await embedPending(db, new FakeEmbedder(), { accountId: "a1" });
+    expect(r).toEqual({ embedded: 1, reembedded: 0 });
+    expect(r.more).toBeUndefined();
   });
 });
 

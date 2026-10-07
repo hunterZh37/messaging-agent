@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb } from "../helpers/db";
-import { backfillSearchIndex, ftsQuery, indexMessageForSearch, searchMessages } from "../../src/chat/search";
+import { backfillSearchIndex, ftsQuery, indexMessageForSearch, mergeHits, rebuildSearchIndexIfStale, searchMessages } from "../../src/chat/search";
+import type { SearchHit } from "../../src/chat/types";
 import { accounts, messages, projectAssignments } from "../../src/db/schema";
 import { createProject } from "../../src/projects/projects";
 import { seedMail } from "./seed";
@@ -198,5 +199,106 @@ describe("searchMessages over chats", () => {
     expect(searchMessages(db, "", { from: "keith", accountId: "a2" }).map((h) => h.messageId)).toEqual(["wa:w1"]);
     // Inside one inbox, still one inbox for mail.
     expect(searchMessages(db, "password", { accountId: "a1", channel: "mail" }).map((h) => h.messageId)).toEqual(["a1:m1"]);
+  });
+});
+
+describe("stemming", () => {
+  it("answers one word for a word's other endings (operator, 2026-10-07)", () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "Invoicing for September", fromName: "Sam", fromAddress: "sam@example.com", bodyText: "The invoices are attached." }]);
+    expect(searchMessages(db, "invoice").map((h) => h.messageId)).toEqual(["a1:m1"]);
+    expect(searchMessages(db, "invoicing").map((h) => h.messageId)).toEqual(["a1:m1"]);
+    expect(searchMessages(db, "invoices").map((h) => h.messageId)).toEqual(["a1:m1"]);
+  });
+
+  it("tells two identifiers apart, so a stemmer that collapsed them would fail here", () => {
+    // Querying the literal indexed text proves nothing on its own — the
+    // query is stemmed the same way as the index, so both sides would be
+    // mangled identically. Two distinct identifiers, and a search for one
+    // that must not return the other, is what actually pins the property.
+    const db = testDb();
+    seedMail(db, [
+      { id: "m2", subject: "Receipt", fromName: null, fromAddress: "noreply@example.com", bodyText: "Your case number is IOE8022910507." },
+      { id: "m3", subject: "Receipt", fromName: null, fromAddress: "noreply@example.com", bodyText: "Your case number is IOE8022910599." },
+    ]);
+    expect(searchMessages(db, "IOE8022910507").map((h) => h.messageId)).toEqual(["a1:m2"]);
+    expect(searchMessages(db, "IOE8022910599").map((h) => h.messageId)).toEqual(["a1:m3"]);
+  });
+
+  it("tells two senders apart by address the same way", () => {
+    const db = testDb();
+    seedMail(db, [
+      { id: "m4", fromName: "Sam", fromAddress: "sam@example.com", bodyText: "see attached" },
+      { id: "m5", fromName: "Jordan", fromAddress: "jordan@example.com", bodyText: "see attached" },
+    ]);
+    expect(searchMessages(db, "sam@example.com").map((h) => h.messageId)).toEqual(["a1:m4"]);
+    expect(searchMessages(db, "jordan@example.com").map((h) => h.messageId)).toEqual(["a1:m5"]);
+  });
+});
+
+describe("rebuildSearchIndexIfStale", () => {
+  it("drops an index built with the old tokenizer, and leaves a current one alone", () => {
+    const db = testDb();
+    db.$client.exec("DROP TABLE messages_fts");
+    db.$client.exec(
+      "CREATE VIRTUAL TABLE messages_fts USING fts5(message_id UNINDEXED, subject, from_name, from_address, body, tokenize='unicode61')",
+    );
+    expect(rebuildSearchIndexIfStale(db)).toBe(true);
+    expect(rebuildSearchIndexIfStale(db)).toBe(false);
+  });
+});
+
+describe("mergeHits", () => {
+  const hit = (id: string): SearchHit => ({ messageId: id, threadId: `t-${id}`, subject: id, from: "sam@example.com", sentAt: 0, snippet: "", channel: "mail" });
+
+  it("leads with the best word match, so an identifier is never pushed off", () => {
+    const merged = mergeHits([hit("w1"), hit("w2")], [hit("m1"), hit("m2")], 10);
+    expect(merged.map((h) => h.messageId)).toEqual(["w1", "m1", "w2", "m2"]);
+  });
+
+  it("shows a message found both ways once, at its better place", () => {
+    const merged = mergeHits([hit("a")], [hit("a"), hit("b")], 10);
+    expect(merged.map((h) => h.messageId)).toEqual(["a", "b"]);
+  });
+
+  /**
+   * Celeste's one cue for telling a message that merely reads alike from
+   * one that actually has the operator's words (2026-10-07): a message
+   * found only by the keyword half is "words", only by the meaning half is
+   * "meaning", and found by both — genuinely stronger evidence than either
+   * alone — is "both", however the two halves happened to overlap.
+   */
+  it("marks each hit with how it was found: words, meaning, or both", () => {
+    const merged = mergeHits([hit("w1"), hit("both1")], [hit("both1"), hit("m1")], 10);
+    const byId = new Map(merged.map((h) => [h.messageId, h.match]));
+    expect(byId.get("w1")).toBe("words");
+    expect(byId.get("m1")).toBe("meaning");
+    expect(byId.get("both1")).toBe("both");
+  });
+
+  /**
+   * `hit()` above is exactly the shape a `SearchHit` had before `match`
+   * existed: no such field at all. A hit from before this branch, were one
+   * ever to reach `mergeHits`, is shaped the same way, and must pass
+   * through tagged rather than this function assuming the field is already
+   * there to read (2026-10-07).
+   */
+  it("tags a hit that arrived with no match field of its own", () => {
+    const merged = mergeHits([hit("w1")], [], 10);
+    expect(merged).toEqual([{ ...hit("w1"), match: "words" }]);
+  });
+
+  it("fills from whichever half has more when the other runs out", () => {
+    expect(mergeHits([hit("w1")], [hit("m1"), hit("m2"), hit("m3")], 10).map((h) => h.messageId)).toEqual(["w1", "m1", "m2", "m3"]);
+    expect(mergeHits([hit("w1"), hit("w2")], [], 10).map((h) => h.messageId)).toEqual(["w1", "w2"]);
+  });
+
+  it("never returns more than asked for, and keeps the best of each half within it", () => {
+    const merged = mergeHits([hit("w1"), hit("w2"), hit("w3")], [hit("m1"), hit("m2")], 3);
+    expect(merged.map((h) => h.messageId)).toEqual(["w1", "m1", "w2"]);
+  });
+
+  it("is empty when neither half found anything", () => {
+    expect(mergeHits([], [], 10)).toEqual([]);
   });
 });

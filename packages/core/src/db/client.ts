@@ -23,9 +23,15 @@ const VECTOR_TABLE_SQL = `CREATE VIRTUAL TABLE IF NOT EXISTS message_embeddings 
  * Keyword search over the mailbox, the tool behind Ask Celeste (spec 10c).
  * Virtual too, so drizzle cannot express it either; unlike the vector table
  * it needs no extension, so it is always there.
+ *
+ * `porter` on top of `unicode61`, so invoice, invoices and invoicing are one
+ * word in the index (operator, 2026-10-07: "sometimes when I ask to find
+ * content for certain emails, it will take two tries"). Measured against
+ * their own mailbox, "invoicing" found 3 messages where "invoice" found 297;
+ * stemmed, all three spellings answer with the same 354.
  */
 const SEARCH_TABLE_SQL =
-  "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(message_id UNINDEXED, subject, from_name, from_address, body, tokenize='unicode61')";
+  "CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(message_id UNINDEXED, subject, from_name, from_address, body, tokenize='porter unicode61')";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = path.resolve(here, "../../drizzle");

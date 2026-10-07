@@ -38,7 +38,16 @@ index answers those perfectly today and keeps doing so.
 **Stemming on the word half.** `tokenize='porter unicode61'` instead of
 `unicode61` collapses invoice/invoices/invoicing to one entry; measured, that
 turns the 3 above into 354 and the 194 into 2,614. One word of schema, and the
-index rebuilds in 1.2 seconds.
+index rebuilds in about 1.0 second, measured against 94,242 real messages
+after wrapping the refill in one transaction. (94,242, not the 94,215 in
+§1: the mailbox grew between the two measurements, days apart — each count
+is as of when it was taken.)
+
+This line used to say 1.2 seconds, estimated rather than measured against
+the shipped code. The code that shipped did not wrap the refill in a
+transaction, so the real cost was 876.5 seconds — about 188,000 separate
+autocommitted statements instead of one — until that was fixed (2026-10-07).
+Measure what ships, not what a plan predicted.
 
 **Newest first, trickling in the background** (operator's choice, 2026-10-07).
 About 92,500 messages are unembedded, at roughly 37ms each: an hour of work if

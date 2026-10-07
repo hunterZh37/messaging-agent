@@ -4,8 +4,17 @@ import { askCeleste, citedMessageIds } from "../../src/chat/ask";
 import { getOrCreateChat, appendChatMessage, listChatMessages } from "../../src/chat/store";
 import { actions, drafts, projectAssignments } from "../../src/db/schema";
 import { listProjects } from "../../src/projects/projects";
+import { EMBEDDING_DIMENSIONS } from "../../src/db/client";
+import { EmbeddingsUnavailableError, type Embedder } from "../../src/projects/embedder";
 import { FakeChatClient, textResponse, toolResponse } from "./fake";
 import { seedMail } from "./seed";
+
+/** A unit vector with 1 at index `i`, the same shape `meaning.test.ts` uses to make two vectors provably near or far. */
+function unit(i: number): Float32Array {
+  const v = new Float32Array(EMBEDDING_DIMENSIONS);
+  v[i] = 1;
+  return v;
+}
 
 function clockFrom(start: number): () => number {
   let t = start;
@@ -37,6 +46,90 @@ describe("askCeleste", () => {
     expect(result.role).toBe("user");
     expect(JSON.stringify(result.content)).toContain("a1:m1");
     expect(JSON.stringify(result.content)).toContain("tool_result");
+  });
+
+  /** `search_inbox` with `deps.embedder` given: a meaning hit comes back beside the word hit (2026-10-07). */
+  it("finds a meaning hit too, when deps.embedder is given", async () => {
+    const db = testDb();
+    seedMail(db, [
+      { id: "m1", subject: "March invoice", bodyText: "The invoice for March is due on the 30th." },
+      { id: "m2", bodyText: "unrelated filler" },
+    ]);
+    // Worded nothing like "invoice", so only the embedder -- not the keyword
+    // index -- can find it.
+    const vector = unit(0);
+    db.$client.prepare("INSERT INTO message_embeddings(message_id, embedding) VALUES (?, ?)").run("a1:m2", Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength));
+    const chat = getOrCreateChat(db);
+    const embedder: Embedder = { embed: async () => [vector] };
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "search_inbox", input: { query: "invoice" } }]),
+      textResponse("It is due on the 30th. [msg:a1:m1]"),
+    ]);
+
+    await askCeleste(db, { client, clock: clockFrom(1000), embedder }, { chatId: chat.id, question: "When is the invoice due?", contextThreadId: null });
+
+    const content = JSON.stringify(client.requests[1]!.messages.at(-1)!.content);
+    expect(content).toContain("a1:m1");
+    expect(content).toContain("a1:m2");
+  });
+
+  /**
+   * Two `search_inbox` calls genuinely in flight together: both tool uses
+   * are in the same `toolResponse`, so the tool loop's `Promise.all` runs
+   * them concurrently rather than one after another the way every other
+   * multi-search test in this file does (2026-10-07). One is findable only
+   * by the word it contains, the other only by what the embedder says it
+   * means -- the embedder answers by the question's own wording, not a
+   * constant, so each call's meaning half is independent of the other's.
+   * `Promise.all` is documented to resolve positionally, but the model
+   * matches a result to its tool_use by `tool_use_id` too, and that id is
+   * set from `use.id` inside each callback's own closure -- a mistake that
+   * swapped two callbacks' closures over `use` would still look right by
+   * position and wrong by id. Pinning both catches that.
+   */
+  it("keeps two concurrent search_inbox calls each matched to its own result", async () => {
+    const db = testDb();
+    seedMail(db, [
+      { id: "m1", bodyText: "Invoice IOE8022910507 is attached." },
+      { id: "m2", bodyText: "The courier left it at the front desk." },
+    ]);
+    // Seeded directly, as `meaning.test.ts` seeds a vector: `m2` means
+    // "package", and nothing else in this mailbox does.
+    const packageVector = unit(0);
+    db.$client
+      .prepare("INSERT INTO message_embeddings(message_id, embedding) VALUES (?, ?)")
+      .run("a1:m2", Buffer.from(packageVector.buffer, packageVector.byteOffset, packageVector.byteLength));
+    // `m2` is the only vector in the table, so a KNN query returns it as
+    // "nearest" no matter how far the asked-about vector actually is --
+    // there is nothing nearer to lose to. Isolating `tu1` to the keyword
+    // half, then, is not a distant vector but the embedder refusing that
+    // one call outright, the way it genuinely can per call.
+    const embedder: Embedder = {
+      embed: async (texts) => {
+        if (!(texts[0] ?? "").includes("package")) throw new EmbeddingsUnavailableError("no vector for that one");
+        return [packageVector];
+      },
+    };
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([
+        { id: "tu1", name: "search_inbox", input: { query: "IOE8022910507" } },
+        { id: "tu2", name: "search_inbox", input: { query: "package shipment status" } },
+      ]),
+      textResponse("Answered."),
+    ]);
+
+    await askCeleste(db, { client, clock: clockFrom(1000), embedder }, { chatId: chat.id, question: "two things", contextThreadId: null });
+
+    const blocks = client.requests[1]!.messages.at(-1)!.content as { type: string; tool_use_id: string; content: string }[];
+    // Position and id agree: `Promise.all` did not reorder them, and
+    // neither callback answered under the other's identity.
+    expect(blocks.map((b) => b.tool_use_id)).toEqual(["tu1", "tu2"]);
+    const byId = new Map(blocks.map((b) => [b.tool_use_id, b.content]));
+    expect(byId.get("tu1")).toContain("a1:m1");
+    expect(byId.get("tu1")).not.toContain("a1:m2");
+    expect(byId.get("tu2")).toContain("a1:m2");
+    expect(byId.get("tu2")).not.toContain("a1:m1");
   });
 
   it("says so when the search finds nothing", async () => {
@@ -354,6 +447,73 @@ describe("askCeleste", () => {
     const turn = await askCeleste(db, { client, clock: clockFrom(1000), operatorName: "Robin Doe" }, { chatId: chat.id, question: "What is this?", contextThreadId: "a1:t-m1" });
     expect(turn.actions).toEqual([]);
     expect(client.requests).toHaveLength(1);
+  });
+
+  /**
+   * search_inbox now matches meaning as well as words (this branch). A
+   * prompt that still called it a keyword search and told Celeste to
+   * translate a question into mailbox words first would make the operator
+   * ask twice for nothing: the whole point of the meaning half is that
+   * asking in their own words already works (2026-10-07).
+   */
+  it("tells Celeste search_inbox matches meaning too, not only the words a message used", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "due on the 30th" }]);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "search_inbox", input: { query: "invoice" } }]),
+      textResponse("It is due on the 30th. [msg:a1:m1]"),
+    ]);
+    client.inspect = (request) => {
+      const rules = request.system[0]!.text;
+      expect(rules).not.toContain("not a question");
+      expect(rules.toLowerCase()).toContain("meaning");
+      const tool = request.tools.find((t) => t.name === "search_inbox")!;
+      expect(tool.description).not.toContain("Keyword search");
+      expect(tool.description.toLowerCase()).toContain("meant");
+      // The `query` parameter's own description is what the model actually
+      // reads when filling the argument -- a tool description that invites
+      // a question, sitting over a parameter that still says "Keywords",
+      // would have her second-guess the very thing she was just told to
+      // stop doing (2026-10-07).
+      const queryParam = (tool.input_schema.properties as Record<string, { description?: string }>).query!;
+      expect(queryParam.description).not.toContain("Keywords");
+      expect(queryParam.description?.toLowerCase()).toContain("question");
+    };
+
+    await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "When is the invoice due?", contextThreadId: null });
+    expect(client.requests).toHaveLength(2);
+  });
+
+  /**
+   * The other half of finding 3's hazard (2026-10-07): the meaning half has
+   * no distance floor, so a question whose words matched nothing still
+   * comes back with up to a limit's worth of merely nearest-anything mail.
+   * Without being told to tell a "meaning" hit apart from a "words" one,
+   * Celeste could answer from it as confidently as an exact hit, where she
+   * used to say plainly that nothing matched.
+   */
+  it("tells Celeste to say when nothing matched the operator's words, not just what came close", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "due on the 30th" }]);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "search_inbox", input: { query: "invoice" } }]),
+      textResponse("It is due on the 30th. [msg:a1:m1]"),
+    ]);
+    client.inspect = (request) => {
+      const rules = request.system[0]!.text;
+      // The literal field name a hit carries it in, and the instruction to
+      // use it: a hedge that only said "meaning" and "words" somewhere in
+      // the prompt — both words this prompt already used before this fix,
+      // for the words half alone — would pass without Celeste ever being
+      // told to say so plainly when nothing matched.
+      expect(rules).toContain('"match":');
+      expect(rules.toLowerCase()).toContain("nothing matched their words");
+    };
+
+    await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "When is the invoice due?", contextThreadId: null });
+    expect(client.requests).toHaveLength(2);
   });
 
   it("cites the messages it named, whether by marker or by id from a tool", async () => {

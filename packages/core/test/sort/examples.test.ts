@@ -251,6 +251,48 @@ describe("findExamples", () => {
     await embedAll(db);
     expect(await findExamples(db, new FakeEmbedder(), input(), { trickleModel: TRICKLE })).toEqual([]);
   });
+
+  /**
+   * The vector table now holds every message, not just project mail
+   * (2026-10-07), so the KNN's oversampled window can fill entirely with
+   * chats and untrusted mail that read alike, pushing a genuinely trusted
+   * but differently-worded message out of it. `nearestTrusted` then returns
+   * `[]` — not `null` — so the old `?? recentTrusted` fallback never ran:
+   * `[]` is not nullish. Four identical-text, untrusted messages exactly
+   * fill the window (k=1, so 1 * KNN_OVERSAMPLE = 4 neighbours); the one
+   * trusted message reads nothing alike and so is never a KNN candidate at
+   * all. Only a top-up keyed on "fewer than k trusted ids", not on
+   * nullishness, reaches it.
+   */
+  it("tops up with recency when the KNN window fills with untrusted neighbours and returns []", async () => {
+    const db = testDb();
+    seed(db, [
+      { id: "noise1", from: "billing@acme.com", subject: "Invoice 1002 from Acme", body: INVOICE, sort: { model: TRICKLE } },
+      { id: "noise2", from: "billing@acme.com", subject: "Invoice 1002 from Acme", body: INVOICE, sort: { model: TRICKLE } },
+      { id: "noise3", from: "billing@acme.com", subject: "Invoice 1002 from Acme", body: INVOICE, sort: { model: TRICKLE } },
+      { id: "noise4", from: "billing@acme.com", subject: "Invoice 1002 from Acme", body: INVOICE, sort: { model: TRICKLE } },
+      { id: "m-old", from: "someone@elsewhere.com", subject: "Totally unrelated", body: "Nothing alike at all.", sort: { model: BACKLOG } },
+    ]);
+    await embedAll(db);
+    const found = await findExamples(db, new FakeEmbedder(), input(), { trickleModel: TRICKLE, k: 1 });
+    expect(found.map((e) => e.subject)).toEqual(["Totally unrelated"]);
+  });
+
+  /**
+   * With exactly one trusted message in the whole account, the KNN finds it
+   * (`nearest = [that message]`, one short of k=2) and the recency top-up
+   * goes looking for a second. Unexcluded, the same-domain recency query
+   * would find that very message again — it is, after all, the most recent
+   * trusted acme.com mail there is — and hand the trickle model the same
+   * example twice (2026-10-07).
+   */
+  it("does not offer the same message twice when recency tops up a partial KNN result", async () => {
+    const db = testDb();
+    seed(db, [{ id: "m1", from: "billing@acme.com", subject: "Invoice 1001 from Acme", body: INVOICE, sort: { model: BACKLOG } }]);
+    await embedAll(db);
+    const found = await findExamples(db, new FakeEmbedder(), input(), { trickleModel: TRICKLE, k: 2 });
+    expect(found.map((e) => e.subject)).toEqual(["Invoice 1001 from Acme"]);
+  });
 });
 
 describe("renderExamples", () => {

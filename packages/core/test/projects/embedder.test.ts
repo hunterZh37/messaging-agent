@@ -88,6 +88,42 @@ describe("createOllamaEmbedder", () => {
     await createOllamaEmbedder(`${URL}/`, MODEL).embed(["one"]);
     expect(urls[0]).toBe(`${URL}/api/embed`);
   });
+
+  /**
+   * `askCeleste`'s query embed is the only caller that passes a timeout: a
+   * hung or still-loading Ollama must not block it forever (2026-10-07).
+   * The background backfill passes none and so must wait as long as Ollama
+   * takes, which the first assertion below is what tells the two apart.
+   */
+  it("signals an abort only when a timeout was asked for", async () => {
+    const signals: (AbortSignal | undefined)[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+      signals.push(init.signal ?? undefined);
+      return jsonResponse({ embeddings: [vector(1)] });
+    });
+    await createOllamaEmbedder(URL, MODEL).embed(["one"]);
+    await createOllamaEmbedder(URL, MODEL, undefined, 2_000).embed(["one"]);
+    expect(signals[0]).toBeUndefined();
+    expect(signals[1]).toBeInstanceOf(AbortSignal);
+  });
+
+  it("gives up on a hung Ollama after its own timeout, not forever, and says so rather than 'not running'", async () => {
+    vi.stubGlobal("fetch", (_url: string, init: RequestInit) => {
+      // The hang itself: nothing here ever resolves on its own, the way a
+      // wedged or still-loading Ollama would not either. Only the abort
+      // signal `AbortSignal.timeout` fires ends it — exactly what a real
+      // fetch does when the signal it was given times out.
+      return new Promise((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(new DOMException("The operation was aborted.", "TimeoutError")));
+      });
+    });
+
+    const error = await createOllamaEmbedder(URL, MODEL, undefined, 20)
+      .embed(["one"])
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(EmbeddingsUnavailableError);
+    expect((error as Error).message).toBe(`Ollama did not answer within 20ms at ${URL}`);
+  });
 });
 
 describe("the embedder's ledger rows", () => {

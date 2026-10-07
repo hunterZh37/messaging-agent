@@ -148,6 +148,16 @@ In `packages/core/src/chat/search.ts`, after `backfillSearchIndex`:
  * slow boot, once.
  */
 export function rebuildSearchIndexIfStale(db: Db): boolean {
+```
+
+Measured after shipping, against a real mailbox copy: that 1.2 seconds was an estimate,
+never checked against this code. `backfillSearchIndex`'s loop ran one autocommitted
+statement at a time, and the real cost was 876.5 seconds for 94,242 messages. Wrapping
+the loop in one transaction (Task 8) brought it to about 1.0 second — close to the
+original guess, but only after the guess was treated as a claim to verify rather than a
+fact.
+
+```ts
   const row = db.$client
     .prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'messages_fts'")
     .get() as { sql: string } | undefined;
@@ -962,6 +972,13 @@ check three things, recording the numbers:
 
 1. Boot drops and refills the keyword index, and the log says how long it took
    (expected: about 1.2 seconds for 94,215 messages).
+
+   Measured, before Task 8: 876.5 seconds for 94,242 messages, not 1.2 — the
+   figure above was never checked against the shipped `backfillSearchIndex`,
+   which ran one autocommitted statement at a time. After wrapping that loop
+   in one transaction (Task 8), the same measurement came back about 1.0
+   second. Anyone re-running this step should expect the latter, not the
+   expectation as originally written here.
 2. `invoice`, `invoices` and `invoicing` return the same count.
 3. The embed clock embeds email before texts: after the first pass, every embedded
    message's account is a mail provider.

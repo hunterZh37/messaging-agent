@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import type { Config } from "../config";
 import { now, type Db } from "../db/client";
-import { embeddingState, messages, projectAssignments, projects, sorts, threads, type ProjectRow } from "../db/schema";
+import { accounts, embeddingState, messages, projectAssignments, projects, sorts, threads, type ProjectRow } from "../db/schema";
 import { applyWaiting, handledActions, scopeConditions, type CountScope } from "../queue/inbox";
 import { stripQuoted } from "../text/quoted";
 import { createOllamaEmbedder, EmbeddingsUnavailableError, type Embedder } from "./embedder";
@@ -105,6 +105,25 @@ const MAX_EXEMPLARS = 200;
 /** How many messages one `embedPending` call puts through Ollama. */
 const DEFAULT_EMBED_LIMIT = 200;
 
+/**
+ * Out of every batch, how many slots a never-embedded backlog can never
+ * crowd out (2026-10-07). Without a reserved slice, a backlog at or above
+ * `limit` starves the recheck sweep completely — at 94,149 messages and a
+ * limit of 200 that is roughly 471 calls, about eight hours at the clock's
+ * cadence, before a changed message's vector is touched even once, and
+ * never if new mail keeps arriving a batch at a time. A message whose body
+ * changed, or whose text the rules above now read differently, cannot be
+ * made to wait behind that backlog for its vector to catch up. Most of this
+ * slice hashes as still current and is dropped by the check below, so the
+ * usual cost of reserving it is one small SELECT, not wasted embeddings —
+ * but whatever it is spent on is not spent draining the backlog, so this
+ * number is sized against `limit`, not fixed on its own: raise the batch
+ * size and the staleness delay this bounds grows with it unless this grows
+ * too, and shrink the batch toward this number and the backlog's drain
+ * slows correspondingly, down to a crawl if the two are ever close.
+ */
+const RECHECK_SLICE = 10;
+
 function requireVec(db: Db): void {
   if (!db.vecAvailable) throw new EmbeddingsUnavailableError("sqlite-vec failed to load");
 }
@@ -152,46 +171,130 @@ function readVectors(db: Db, ids: string[]): Map<string, Float32Array> {
 }
 
 /**
- * Embeds inbound messages whose vector is missing or out of date, newest
- * first. Runs before every classify pass and after every sync, so the cost is
- * spread over the mail as it arrives. A message is out of date when the text
- * the rules above produce no longer hashes to what was embedded — which is
- * how a change to those rules reaches mail that was already filed — and a row
- * with no hash at all was written before they existed, so it counts as stale
- * too. Errors from the embedder propagate: a half-embedded inbox is fine, a
- * silently unembedded one is not.
+ * Embeds messages whose vector is missing or out of date, newest first. Runs
+ * before every classify pass and after every sync, so the cost is spread over
+ * the mail as it arrives. A message is out of date when the text the rules
+ * above produce no longer hashes to what was embedded — which is how a change
+ * to those rules reaches mail that was already filed — and a row with no hash
+ * at all was written before they existed, so it counts as stale too. Errors
+ * from the embedder propagate: a half-embedded inbox is fine, a silently
+ * unembedded one is not.
+ *
+ * Two different questions want vectors, and `scope` picks which one this call
+ * is for. The default, `"projects"`, is what every caller asked for before
+ * this scope existed and must keep asking for by not passing one: only
+ * inbound mail in the folders the operator files (spec 10a). `"search"` is
+ * wider, because looking something up by what it meant can mean any message
+ * they might ask about, their own sent mail and their texts included.
+ *
+ * A backlog bigger than `limit` is meant to be cleared by calling this
+ * again and again (2026-10-07, for the clock that will do exactly that):
+ * each call must reach mail the last one did not, which is why what is
+ * definitely unembedded is selected directly rather than through the
+ * window a plain `ORDER BY ... LIMIT` would fix in place — a limit and a
+ * hash check applied only after the window was already decided would keep
+ * re-reading the same already-current rows at the top of it forever.
+ *
+ * `more`, returned only for the `"search"` scope, is whether the
+ * never-embedded bucket filled every slot it was given this call — i.e.
+ * whether there is almost certainly more unembedded mail waiting. The embed
+ * clock rests on this rather than on comparing `embedded` to its batch size,
+ * which the recheck slice above makes `embedPending` structurally unable to
+ * return in full (2026-10-07: at the clock's batch of 200 the recheck slice
+ * takes up to 10 of it, so `embedded` tops out at 190 even mid-backlog, and
+ * a clock resting on "less than 200" rested after its very first pass). The
+ * projects scope has no clock asking, so it is left undefined rather than
+ * returned as a boolean nobody reads.
  */
 export async function embedPending(
   db: Db,
   embedder: Embedder,
-  opts: { accountId?: string; limit?: number } = {},
+  opts: { accountId?: string; limit?: number; scope?: "projects" | "search" } = {},
   clock: () => number = now,
-): Promise<{ embedded: number; reembedded: number }> {
+): Promise<{ embedded: number; reembedded: number; more?: boolean }> {
   requireVec(db);
-  // Only mail the operator lives in is worth a vector: Deleted items and
-  // Junk are never filed under a project (spec 10a).
-  const conditions = [eq(messages.isFromOperator, false), inArray(messages.folder, ["inbox", "sent"])];
+  // Two different questions want vectors. Filing a message under a project
+  // only ever concerned inbound mail in the folders the operator lives in.
+  // Searching by meaning concerns everything they might ask about, their own
+  // sent mail and their texts included (operator, 2026-10-07: "everything,
+  // email first"), and only junk is never worth the room.
+  const forSearch = opts.scope === "search";
+  const conditions = forSearch
+    ? [ne(messages.folder, "junk")]
+    : [eq(messages.isFromOperator, false), inArray(messages.folder, ["inbox", "sent"])];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
 
-  const candidates = db
-    .select({
-      id: messages.id,
-      subject: messages.subject,
-      bodyText: messages.bodyText,
-      embeddedHash: embeddingState.textHash,
-      embeddedAt: embeddingState.embeddedAt,
-    })
+  const limit = opts.limit ?? DEFAULT_EMBED_LIMIT;
+  const select = {
+    id: messages.id,
+    subject: messages.subject,
+    bodyText: messages.bodyText,
+    embeddedHash: embeddingState.textHash,
+    embeddedAt: embeddingState.embeddedAt,
+  };
+  // Email first, newest first within it (2026-10-07). Their mailbox is
+  // 86,210 texts to 7,939 emails, so newest-first alone would spend its
+  // first hour on texts while the complaint that started this was about
+  // email. Texts follow, and the clock keeps going until there are none. The
+  // projects scope has no texts to sort ahead of, so it keeps the single
+  // newest-first order it always had. `messages.id` breaks the tie between
+  // two messages sent in the same second, so the order is total: without it
+  // the two queries below could hand the same message back twice on one
+  // page and skip another on the next.
+  const order = [...(forSearch ? [sql`${accounts.provider} IN ('imessage', 'whatsapp')`] : []), desc(messages.sentAt), messages.id];
+
+  // A small slice of every batch goes to rechecking mail that already has a
+  // vector, oldest-checked first, before the never-embedded bucket below
+  // gets a chance to claim the rest of the limit. Taken second, this would
+  // starve outright rather than merely slow down once the never-embedded
+  // backlog reached `limit` on its own: 94,149 messages at a limit of 200
+  // is some 471 calls, about eight hours at the clock's cadence, before a
+  // changed message's vector was touched even once (2026-10-07). Most of
+  // this slice hashes as still current; the comparison below is what
+  // decides which of it actually needs a new vector. Capped at half of
+  // `limit` rather than taken absolutely, so a caller whose batch is
+  // smaller than `RECHECK_SLICE` cannot have the slice claim the whole
+  // thing and stall the drain outright: draining is the primary job, so at
+  // `limit: 1` there is no slack to spare and the recheck gets none of it.
+  const recheck = db
+    .select(select)
     .from(messages)
-    .leftJoin(embeddingState, eq(embeddingState.messageId, messages.id))
-    .where(and(...conditions))
-    .orderBy(desc(messages.sentAt))
-    .limit(opts.limit ?? DEFAULT_EMBED_LIMIT)
+    .innerJoin(embeddingState, eq(embeddingState.messageId, messages.id))
+    .innerJoin(accounts, eq(accounts.id, messages.accountId))
+    .where(and(...conditions, isNotNull(embeddingState.textHash)))
+    .orderBy(asc(embeddingState.embeddedAt), messages.id)
+    .limit(Math.min(RECHECK_SLICE, Math.floor(limit / 2)))
     .all();
 
-  const pending = candidates
+  // A message with no embedding_state row, or one whose hash was blanked by
+  // the "no hash at all" rule above, is stale with no need to check: it is
+  // selected directly rather than through a window the recheck slice above
+  // has already taken a bite out of, so a backlog many pages deep keeps
+  // surfacing new mail call after call instead of the same page's
+  // already-current rows (2026-10-07: without this, a limited window plus
+  // the hash check done in JS meant every repeat call re-read whatever was
+  // already embedded, found it current, and reported nothing left to do
+  // while unembedded mail further down was never reached).
+  const neverEmbeddedCap = limit - recheck.length;
+  const neverEmbedded = db
+    .select(select)
+    .from(messages)
+    .leftJoin(embeddingState, eq(embeddingState.messageId, messages.id))
+    .innerJoin(accounts, eq(accounts.id, messages.accountId))
+    .where(and(...conditions, or(isNull(embeddingState.messageId), isNull(embeddingState.textHash))))
+    .orderBy(...order)
+    .limit(neverEmbeddedCap)
+    .all();
+
+  // See the doc comment: cap <= 0 means the recheck slice alone claimed the
+  // whole limit, so this call says nothing about the never-embedded bucket
+  // either way — assume there is more rather than risk resting on a guess.
+  const more = forSearch ? neverEmbeddedCap <= 0 || neverEmbedded.length >= neverEmbeddedCap : undefined;
+
+  const pending = [...neverEmbedded, ...recheck]
     .map((m) => ({ ...m, text: embedTextFor(m) }))
     .filter((m) => m.embeddedAt === null || m.embeddedHash === null || m.embeddedHash !== embedTextHash(m.text));
-  if (pending.length === 0) return { embedded: 0, reembedded: 0 };
+  if (pending.length === 0) return { embedded: 0, reembedded: 0, more };
 
   const vectors = await embedder.embed(pending.map((m) => `${DOCUMENT_PREFIX}${m.text}`));
   const at = clock();
@@ -213,6 +316,7 @@ export async function embedPending(
   return {
     embedded: pending.length,
     reembedded: pending.filter((m) => m.embeddedAt !== null).length,
+    more,
   };
 }
 

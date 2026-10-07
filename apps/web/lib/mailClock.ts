@@ -1,5 +1,5 @@
-import { Ticker } from "@messaging-agent/core";
-import { fetchMail, processMail, syncAllChats } from "@/lib/syncAll";
+import { Ticker, ollamaChatBusy } from "@messaging-agent/core";
+import { fetchMail, processMail, syncAllChats, syncModelBusy } from "@/lib/syncAll";
 import { notifyNeedsReply } from "@/lib/push";
 
 /** How often the server brings mail in (operator, 2026-09-14: option 1, "about 2 minutes, tab open or not"). */
@@ -50,4 +50,37 @@ export function startMailClock(): void {
   ticker.start();
   g[KEY] = ticker;
   console.log(`mail clock: every ${MAIL_EVERY_MS / 1000}s`);
+}
+
+/**
+ * Whether the one local model is in use right now, so another consumer of it
+ * (the embed clock) can leave it alone (2026-10-07, renamed from
+ * `mailClockBusy`: the embed clock never cared about the mail clock
+ * specifically, only about the model the two of them share). The OR of three
+ * signals, because none alone covers every path to the model:
+ *
+ * - This clock's own ticker, `Ticker.running` — true only while a fetch is
+ *   actually in flight.
+ * - `syncModelBusy()` — true for the whole of a `processMail` run, which
+ *   outlives the tick that kicked it off (`processMail(fetched).then(...)`
+ *   below is fire-and-forget on purpose, so a ninety-second sort never
+ *   delays the next fetch) but says nothing about the manual actions
+ *   (Re-sort, draft, revise) that call the sorter/drafter directly, bypassing
+ *   `processMail` entirely.
+ * - `ollamaChatBusy()` (fix round 2) — true for as long as any chat call to
+ *   Ollama is actually on the wire, from *any* caller, manual actions
+ *   included, since every one of them goes through `createOllamaProvider`'s
+ *   one `post()`.
+ *
+ * Residual, accepted rather than missed: `ollamaChatBusy()` is instantaneous,
+ * not held for a whole manual sort the way `syncModelBusy()` holds a
+ * `processMail` run — so between two model calls inside one manual sort (the
+ * gap where the sorter is writing a verdict to the database, say), this
+ * reads false and the embed clock can start one batch there, delaying the
+ * manual sort's next step by roughly that batch's length. Bounded, and far
+ * better than the previous unbounded overlap.
+ */
+export function localModelBusy(): boolean {
+  const g = globalThis as unknown as Record<symbol, Ticker | undefined>;
+  return (g[KEY]?.running ?? false) || syncModelBusy() || ollamaChatBusy();
 }
