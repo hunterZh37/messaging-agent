@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { z } from "zod";
-import { createOllamaProvider } from "../../src/models/ollama";
+import { createOllamaProvider, ollamaChatBusy } from "../../src/models/ollama";
 import { ModelOutputError, ModelUnavailableError } from "../../src/models/types";
 import type { ChatRequest } from "../../src/chat/types";
 
@@ -234,5 +234,37 @@ describe("createOllamaProvider errors", () => {
     await expect(
       createOllamaProvider(URL, MODEL).text({ system: [], messages: [{ role: "user", content: "x" }], maxTokens: 10 }),
     ).rejects.toBeInstanceOf(ModelUnavailableError);
+  });
+});
+
+/**
+ * Module-level across every provider instance (2026-10-07, fix round 2):
+ * every sorter/drafter/ask caller goes through this file's one `post()`, so
+ * this is what `apps/web`'s `localModelBusy()` actually reads — not a
+ * per-call-site flag that a new caller could forget to set.
+ */
+describe("ollamaChatBusy", () => {
+  it("is busy while a chat call is in flight, and clears once it resolves", async () => {
+    let resolve!: (res: Response) => void;
+    vi.stubGlobal("fetch", () => new Promise<Response>((r) => (resolve = r)));
+
+    expect(ollamaChatBusy()).toBe(false);
+    const p = createOllamaProvider(URL, MODEL).text({ system: [], messages: [{ role: "user", content: "x" }], maxTokens: 10 });
+    // `post()` reaches `fetch()` synchronously, before yielding back here —
+    // no microtask wait needed before resolving it.
+    expect(ollamaChatBusy()).toBe(true);
+    resolve(reply("hi"));
+    await p;
+    expect(ollamaChatBusy()).toBe(false);
+  });
+
+  it("clears even when the call throws, so a dead Ollama can't wedge it on forever", async () => {
+    vi.stubGlobal("fetch", async () => {
+      throw new TypeError("fetch failed");
+    });
+    const p = createOllamaProvider(URL, MODEL).text({ system: [], messages: [{ role: "user", content: "x" }], maxTokens: 10 });
+    expect(ollamaChatBusy()).toBe(true);
+    await expect(p).rejects.toBeInstanceOf(ModelUnavailableError);
+    expect(ollamaChatBusy()).toBe(false);
   });
 });

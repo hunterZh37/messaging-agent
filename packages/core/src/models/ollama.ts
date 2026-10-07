@@ -105,29 +105,52 @@ export function toOllamaMessages(system: ChatSystemBlock[], messages: ChatApiMes
   return out;
 }
 
+/**
+ * How many `/api/chat` calls are in flight right now, across every provider
+ * this process has created — not a per-instance count, since the sorter,
+ * the drafter, and Ask Celeste can each hold their own `createOllamaProvider`
+ * and still share the one model underneath (2026-10-07, fix round 2). The
+ * embed clock reads `ollamaChatBusy()` before taking its own turn with it;
+ * deliberately not touched by the embedder's own fetch
+ * (`projects/embedder.ts`), so embedding does not read as "something else is
+ * using the model" and have the embed clock call itself busy.
+ */
+let inFlight = 0;
+
+export function ollamaChatBusy(): boolean {
+  return inFlight > 0;
+}
+
 export function createOllamaProvider(url: string, model: string): ModelProvider {
   const base = url.replace(/\/+$/, "");
   const endpoint = `${base}/api/chat`;
   let callCounter = 0;
 
   async function post(body: Record<string, unknown>): Promise<OllamaResponse> {
-    let res: Response;
+    inFlight++;
     try {
-      res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        // qwen3 emits its thinking into the answer unless this is off, and a
-        // streamed answer would have to be reassembled for no gain here.
-        body: JSON.stringify({ model, stream: false, think: false, ...body }),
-      });
-    } catch {
-      // Connection refused is the everyday case: Ollama is not running,
-      // which is a setup step rather than an error to report.
-      throw new ModelUnavailableError(`Ollama is not running at ${url}`);
+      let res: Response;
+      try {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          // qwen3 emits its thinking into the answer unless this is off, and a
+          // streamed answer would have to be reassembled for no gain here.
+          body: JSON.stringify({ model, stream: false, think: false, ...body }),
+        });
+      } catch {
+        // Connection refused is the everyday case: Ollama is not running,
+        // which is a setup step rather than an error to report.
+        throw new ModelUnavailableError(`Ollama is not running at ${url}`);
+      }
+      if (res.status === 404) throw new ModelUnavailableError(`Model ${model} is not pulled: ollama pull ${model}`);
+      if (!res.ok) throw new ModelUnavailableError(`Ollama answered ${res.status} at ${url}`);
+      return (await res.json()) as OllamaResponse;
+    } finally {
+      // Runs whether `post` returned or threw, so a dead Ollama can't wedge
+      // this on and leave the embed clock thinking the model is busy forever.
+      inFlight--;
     }
-    if (res.status === 404) throw new ModelUnavailableError(`Model ${model} is not pulled: ollama pull ${model}`);
-    if (!res.ok) throw new ModelUnavailableError(`Ollama answered ${res.status} at ${url}`);
-    return (await res.json()) as OllamaResponse;
   }
 
   function chatTurns(messages: ModelMessage[]): OllamaMessage[] {
