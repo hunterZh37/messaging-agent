@@ -5081,6 +5081,8 @@
         <path data-edge-from="statsp" data-edge-to="thread" data-edge-key="41" data-edge-id="ui-stats" data-composition-points="895,960;895,924" d="M 895 960 L 895 924" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="usagep" data-edge-to="drafts" data-edge-key="42" data-edge-id="ui-usage" data-composition-points="1055,960;1055,924" d="M 1055 960 L 1055 924" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
         <path data-edge-from="composep" data-edge-to="askp" data-edge-key="43" data-edge-id="ui-compose" data-composition-points="1215,960;1215,924" d="M 1215 960 L 1215 924" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
+        <path data-edge-from="db" data-edge-to="embedclock" data-edge-label="unembedded mail in, vectors out" data-edge-key="44" data-edge-id="embed-read" data-composition-points="715,235;715,220;620,220;620,204" d="M 715 235 L 715 227.5 Q 715 220 707.5 220 L 628 220 Q 620 220 620 212 L 620 204" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="embedclock" data-edge-to="ollama" data-edge-label="embed" data-edge-key="45" data-edge-id="embed-ollama" data-composition-points="620,140;620,125;685,125;685,114" d="M 620 140 L 620 132.5 Q 620 125 627.5 125 L 679.5 125 Q 685 125 685 119.5 L 685 114" class="a-dashed" stroke-width="1.5" marker-end="url(#arrowhead-dashed)"/>
 
         <!-- Components -->
         <g id="node-imap" data-node-id="imap" data-node-label="IMAP / SMTP inboxes" tabindex="0" role="button" aria-label="Focus IMAP / SMTP inboxes, Gmail, Fastmail, any IMAP, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Gmail, Fastmail, any IMAP" data-node-context="Architecture component">
@@ -5471,15 +5473,15 @@
         <text data-detail="context" x="420" y="146" class="t-muted" font-size="9" text-anchor="middle">fetch every 2 min, in the app server</text>
         </g>
 
-        <g id="node-embedclock" data-node-id="embedclock" data-node-label="Embed clock" tabindex="0" role="button" aria-label="Focus Embed clock, fills vectors via Ollama, Operator&#39;s Mac (always-on server on 127.0.0.1:3100)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="fills vectors via Ollama" data-node-context="Operator&#39;s Mac (always-on server on 127.0.0.1:3100)">
-          <title>Embed clock · fills vectors via Ollama · Operator&#39;s Mac (always-on server on 127.0.0.1:3100)</title>
-          <rect x="350" y="480" width="170" height="64" rx="6" class="c-mask"/>
-          <rect x="350" y="480" width="170" height="64" rx="6" class="c-backend" stroke-width="1.5"/>
-          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(356 486) scale(0.6875)">
+        <g id="node-embedclock" data-node-id="embedclock" data-node-label="Embed clock" tabindex="0" role="button" aria-label="Focus Embed clock, embeds via Ollama, Operator&#39;s Mac (always-on server on 127.0.0.1:3100)" aria-pressed="false" data-node-kind="backend" data-node-sublabel="embeds via Ollama" data-node-context="Operator&#39;s Mac (always-on server on 127.0.0.1:3100)">
+          <title>Embed clock · embeds via Ollama · Operator&#39;s Mac (always-on server on 127.0.0.1:3100)</title>
+          <rect x="565" y="140" width="110" height="64" rx="6" class="c-mask"/>
+          <rect x="565" y="140" width="110" height="64" rx="6" class="c-backend" stroke-width="1.5"/>
+          <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(571 146) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
-          <text data-node-label="" data-detail-anchor="" x="435" y="510" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Embed clock</text>
-        <text data-detail="context" x="435" y="526" class="t-muted" font-size="9" text-anchor="middle">fills vectors via Ollama</text>
+          <text data-node-label="" data-detail-anchor="" x="620" y="170" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Embed clock</text>
+        <text data-detail="context" x="620" y="186" class="t-muted" font-size="9" text-anchor="middle">embeds via Ollama</text>
         </g>
 
         <g id="node-push" data-node-id="push" data-node-label="Push service" tabindex="0" role="button" aria-label="Focus Push service, Apple / Google Web Push, Architecture component" aria-pressed="false" data-node-kind="external" data-node-sublabel="Apple / Google Web Push" data-node-context="Architecture component">
@@ -5679,6 +5681,14 @@
 
 
 
+        <g data-detail="context" data-edge-from="db" data-edge-to="embedclock" data-edge-label="unembedded mail in, vectors out" data-edge-key="44" data-edge-id="embed-read">
+          <rect x="610.6" y="212" width="158.79999999999998" height="14" rx="3" class="c-mask"/>
+          <text x="690" y="222" class="t-muted" font-size="8" text-anchor="middle">unembedded mail in, vectors out</text>
+        </g>
+        <g data-detail="context" data-edge-from="embedclock" data-edge-to="ollama" data-edge-label="embed" data-edge-key="45" data-edge-id="embed-ollama">
+          <rect x="633" y="115" width="34" height="14" rx="3" class="c-mask"/>
+          <text x="650" y="125" class="t-messagebus" font-size="8" text-anchor="middle">embed</text>
+        </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->
         <g data-graph-role="structural-frame-label" data-composition-frame-id="0" data-composition-frame-kind="region" data-composition-frame-label="Operator&#39;s Mac (always-on server on 127.0.0.1:3100)">

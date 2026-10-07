@@ -522,13 +522,13 @@
       "id": "embedclock",
       "type": "backend",
       "label": "Embed clock",
-      "sublabel": "fills vectors via Ollama",
+      "sublabel": "embeds via Ollama",
       "pos": [
-        350,
-        480
+        565,
+        140
       ],
       "size": [
-        170,
+        110,
         64
       ]
     },
@@ -1243,6 +1243,33 @@
       "fromSide": "top",
       "toSide": "bottom",
       "variant": "dashed"
+    },
+    {
+      "id": "embed-read",
+      "from": "db",
+      "to": "embedclock",
+      "label": "unembedded mail in, vectors out",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [
+        [715, 220],
+        [620, 220]
+      ],
+      "labelAt": [690, 222]
+    },
+    {
+      "id": "embed-ollama",
+      "from": "embedclock",
+      "to": "ollama",
+      "label": "embed",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "bottom",
+      "via": [
+        [620, 125],
+        [685, 125]
+      ],
+      "labelAt": [650, 125]
     }
   ],
   "cards": [
