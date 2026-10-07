@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb } from "../helpers/db";
-import { backfillSearchIndex, ftsQuery, indexMessageForSearch, rebuildSearchIndexIfStale, searchMessages } from "../../src/chat/search";
+import { backfillSearchIndex, ftsQuery, indexMessageForSearch, mergeHits, rebuildSearchIndexIfStale, searchMessages } from "../../src/chat/search";
+import type { SearchHit } from "../../src/chat/types";
 import { accounts, messages, projectAssignments } from "../../src/db/schema";
 import { createProject } from "../../src/projects/projects";
 import { seedMail } from "./seed";
@@ -244,5 +245,33 @@ describe("rebuildSearchIndexIfStale", () => {
     );
     expect(rebuildSearchIndexIfStale(db)).toBe(true);
     expect(rebuildSearchIndexIfStale(db)).toBe(false);
+  });
+});
+
+describe("mergeHits", () => {
+  const hit = (id: string): SearchHit => ({ messageId: id, threadId: `t-${id}`, subject: id, from: "sam@example.com", sentAt: 0, snippet: "", channel: "mail" });
+
+  it("leads with the best word match, so an identifier is never pushed off", () => {
+    const merged = mergeHits([hit("w1"), hit("w2")], [hit("m1"), hit("m2")], 10);
+    expect(merged.map((h) => h.messageId)).toEqual(["w1", "m1", "w2", "m2"]);
+  });
+
+  it("shows a message found both ways once, at its better place", () => {
+    const merged = mergeHits([hit("a")], [hit("a"), hit("b")], 10);
+    expect(merged.map((h) => h.messageId)).toEqual(["a", "b"]);
+  });
+
+  it("fills from whichever half has more when the other runs out", () => {
+    expect(mergeHits([hit("w1")], [hit("m1"), hit("m2"), hit("m3")], 10).map((h) => h.messageId)).toEqual(["w1", "m1", "m2", "m3"]);
+    expect(mergeHits([hit("w1"), hit("w2")], [], 10).map((h) => h.messageId)).toEqual(["w1", "w2"]);
+  });
+
+  it("never returns more than asked for, and keeps the best of each half within it", () => {
+    const merged = mergeHits([hit("w1"), hit("w2"), hit("w3")], [hit("m1"), hit("m2")], 3);
+    expect(merged.map((h) => h.messageId)).toEqual(["w1", "m1", "w2"]);
+  });
+
+  it("is empty when neither half found anything", () => {
+    expect(mergeHits([], [], 10)).toEqual([]);
   });
 });

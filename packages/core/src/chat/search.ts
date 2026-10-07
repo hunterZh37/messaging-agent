@@ -238,3 +238,27 @@ export function searchMessages(db: Db, query: string, opts: SearchFilters = {}):
     return [];
   }
 }
+
+/**
+ * The two halves of a search, as one list (2026-10-07). They answer different
+ * questions well: the words find `IOE8022910507`, which is in 71 of the
+ * operator's messages and which an embedding model turns to noise, and the
+ * meaning finds the mail about billing when the question said invoicing.
+ *
+ * So they alternate, words first. Whatever the keyword index thought was the
+ * best match stays the first thing the operator sees, and a meaning match
+ * reaches the list without having to beat it. A message both halves found is
+ * one message, at the better of its two places.
+ */
+export function mergeHits(words: SearchHit[], meaning: SearchHit[], limit: number): SearchHit[] {
+  const out: SearchHit[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; out.length < limit && (i < words.length || i < meaning.length); i++) {
+    for (const hit of [words[i], meaning[i]]) {
+      if (!hit || seen.has(hit.messageId) || out.length >= limit) continue;
+      seen.add(hit.messageId);
+      out.push(hit);
+    }
+  }
+  return out;
+}
