@@ -22,12 +22,18 @@ let quiet = false;
 
 /**
  * One pass, with everything it talks to passed in so the test never starts a
- * timer or reaches Ollama. `resting` means the backlog is done: not "this
- * pass embedded less than a full batch" — the recheck slice `embedPending`
- * reserves out of every batch means a backlog-draining pass almost never
- * reports a full batch, full backlog or not (2026-10-07, see `embedPending`'s
- * `more`). `resting` instead mirrors `more` straight from `embedPending`:
- * false until it says there is nothing left waiting.
+ * timer or reaches Ollama. `resting` means the next tick can wait a long
+ * time, for one of two different reasons that must never be confused in a
+ * log or a report: the backlog is genuinely done (`more` says so straight
+ * from `embedPending` — not "this pass embedded less than a full batch",
+ * which the recheck slice `embedPending` reserves out of every batch means a
+ * backlog-draining pass almost never reports either way, 2026-10-07), or the
+ * call failed outright. A failed call rests too: `embedPending`'s `ORDER BY`
+ * for the search scope cannot use an index and costs 0.42s on the
+ * operator's real mailbox even to find nothing to embed, and burning that
+ * every 60 seconds while Ollama is simply not installed buys nothing —
+ * the operator is not waiting on the backfill either way, and recovery
+ * within a resting interval is the right trade (2026-10-07).
  */
 export async function embedBatch(deps: {
   embed: () => Promise<{ embedded: number; reembedded: number; more?: boolean }>;
@@ -43,12 +49,14 @@ export async function embedBatch(deps: {
     quiet = false;
     return { embedded, resting: !more };
   } catch (err) {
-    // Ollama off for a week is one line, not one a minute.
+    // Ollama off for a week is one line, not one a minute. The log line
+    // above, not this return, is where "it failed" is said; `resting: true`
+    // here only buys back the cadence, never the reason.
     if (!quiet) {
       deps.log?.(`embed clock: ${(err as Error).message}`);
       quiet = true;
     }
-    return { embedded: 0, resting: false };
+    return { embedded: 0, resting: true };
   }
 }
 

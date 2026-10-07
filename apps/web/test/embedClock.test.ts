@@ -44,14 +44,21 @@ describe("embedBatch", () => {
     expect(embed).not.toHaveBeenCalled();
   });
 
-  /** Ollama off for a week must not be a line in the log every minute. */
-  it("swallows an error, counts nothing, and says nothing the second time", async () => {
+  /**
+   * Ollama off for a week must not be a line in the log every minute — and
+   * must not be a full `embedPending` scan every minute either: the search
+   * scope's `ORDER BY` costs 0.42s on the operator's real mailbox even to
+   * find nothing, for no reason once Ollama is down (2026-10-07, the
+   * review's back-off addendum). A failed pass rests the same as a drained
+   * backlog, so the next tick waits `EMBED_RESTING_MS`, not `EMBED_EVERY_MS`.
+   */
+  it("swallows an error, counts nothing, says nothing the second time, and rests so the next tick is cheap", async () => {
     const embed = vi.fn(async () => {
       throw new Error("no ollama");
     });
     const said: string[] = [];
     const log = (m: string) => said.push(m);
-    await expect(embedBatch({ embed, sorting: () => false, log })).resolves.toEqual({ embedded: 0, resting: false });
+    await expect(embedBatch({ embed, sorting: () => false, log })).resolves.toEqual({ embedded: 0, resting: true });
     await embedBatch({ embed, sorting: () => false, log });
     await embedBatch({ embed, sorting: () => false, log });
     expect(said).toEqual(["embed clock: no ollama"]);
