@@ -269,15 +269,29 @@ export function searchMessages(db: Db, query: string, opts: SearchFilters = {}):
  * best match stays the first thing the operator sees, and a meaning match
  * reaches the list without having to beat it. A message both halves found is
  * one message, at the better of its two places.
+ *
+ * This is also the only place that marks each hit's `match` (2026-10-07):
+ * the meaning half has no distance floor, so with no cue a question whose
+ * words matched nothing hands Celeste up to a limit's worth of merely
+ * nearest-anything mail, indistinguishable from an exact hit — the same
+ * reasoning `searchByMeaning` already applies to a wordless query, extended
+ * to a query whose words simply miss. Only here are both halves' id sets
+ * in hand at once to tell "words", "meaning" and "both" apart, so every
+ * caller is expected to route every hit through this — a words-only or
+ * meaning-only result included, with the other half passed as `[]`.
  */
 export function mergeHits(words: SearchHit[], meaning: SearchHit[], limit: number): SearchHit[] {
+  const wordIds = new Set(words.map((h) => h.messageId));
+  const meaningIds = new Set(meaning.map((h) => h.messageId));
+  const matchFor = (id: string): SearchHit["match"] => (wordIds.has(id) && meaningIds.has(id) ? "both" : meaningIds.has(id) ? "meaning" : "words");
+
   const out: SearchHit[] = [];
   const seen = new Set<string>();
   for (let i = 0; out.length < limit && (i < words.length || i < meaning.length); i++) {
     for (const hit of [words[i], meaning[i]]) {
       if (!hit || seen.has(hit.messageId) || out.length >= limit) continue;
       seen.add(hit.messageId);
-      out.push(hit);
+      out.push({ ...hit, match: matchFor(hit.messageId) });
     }
   }
   return out;

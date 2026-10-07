@@ -130,7 +130,7 @@ export function actionThreadIds(action: ProposedAction): string[] {
   return action.threadId ? [action.threadId] : [];
 }
 
-/** One hit from the keyword index, as the search tool returns it. */
+/** One hit from search_inbox, keyword, meaning or both. */
 export interface SearchHit {
   messageId: string;
   threadId: string;
@@ -142,6 +142,14 @@ export interface SearchHit {
   channel: "mail" | "imessage" | "whatsapp";
   /** In Deleted items here. */
   deleted?: boolean;
+  /**
+   * How this hit was found: the keyword index, the meaning half, or both
+   * (2026-10-07). "meaning" is mail *about* something similar, not mail
+   * that contains the operator's own words — Celeste is told to tell the
+   * difference. Optional so a `SearchHit` from before this field existed
+   * still satisfies the type.
+   */
+  match?: "words" | "meaning" | "both";
 }
 
 /* ------------------------------------------------------------------ *

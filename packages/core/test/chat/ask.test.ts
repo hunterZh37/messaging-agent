@@ -477,6 +477,37 @@ describe("askCeleste", () => {
     expect(client.requests).toHaveLength(2);
   });
 
+  /**
+   * The other half of finding 3's hazard (2026-10-07): the meaning half has
+   * no distance floor, so a question whose words matched nothing still
+   * comes back with up to a limit's worth of merely nearest-anything mail.
+   * Without being told to tell a "meaning" hit apart from a "words" one,
+   * Celeste could answer from it as confidently as an exact hit, where she
+   * used to say plainly that nothing matched.
+   */
+  it("tells Celeste to say when nothing matched the operator's words, not just what came close", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "due on the 30th" }]);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "search_inbox", input: { query: "invoice" } }]),
+      textResponse("It is due on the 30th. [msg:a1:m1]"),
+    ]);
+    client.inspect = (request) => {
+      const rules = request.system[0]!.text;
+      // The literal field name a hit carries it in, and the instruction to
+      // use it: a hedge that only said "meaning" and "words" somewhere in
+      // the prompt — both words this prompt already used before this fix,
+      // for the words half alone — would pass without Celeste ever being
+      // told to say so plainly when nothing matched.
+      expect(rules).toContain('"match":');
+      expect(rules.toLowerCase()).toContain("nothing matched their words");
+    };
+
+    await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "When is the invoice due?", contextThreadId: null });
+    expect(client.requests).toHaveLength(2);
+  });
+
   it("cites the messages it named, whether by marker or by id from a tool", async () => {
     const db = testDb();
     seedMail(db, [

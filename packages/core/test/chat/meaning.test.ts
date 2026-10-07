@@ -207,7 +207,12 @@ describe("searchHybrid", () => {
   it("is the keyword search alone when there is no embedder", async () => {
     const db = testDbWithVectors();
     seedIndexed(db, "w1", { body: "the invoice is attached" });
-    await expect(searchHybrid(db, undefined, "invoice").then((h) => h.map((x) => x.messageId))).resolves.toEqual(["w1"]);
+    const hits = await searchHybrid(db, undefined, "invoice");
+    expect(hits.map((h) => h.messageId)).toEqual(["w1"]);
+    // Still tagged "words", even with no meaning half to merge it against
+    // (2026-10-07): a hit that skipped `mergeHits` would carry no `match` at
+    // all, indistinguishable from one found both ways.
+    expect(hits[0]?.match).toBe("words");
   });
 
   it("is the keyword search alone when Ollama is not running", async () => {
@@ -227,6 +232,27 @@ describe("searchHybrid", () => {
     seedEmbedded(db, "m1", unit(0));
     const hits = await searchHybrid(db, embedderOf(unit(0)), "invoice");
     expect(hits.map((h) => h.messageId)).toEqual(["w1", "m1"]);
+  });
+
+  /**
+   * The operator's hazard, in one test (2026-10-07): the meaning half has no
+   * distance floor, so with no cue a question whose words matched nothing
+   * would hand Celeste results indistinguishable from an exact hit. `match`
+   * is how she tells a message that merely reads alike from one that
+   * actually has her words, or both.
+   */
+  it("marks each hit with whether it was found by words, by meaning, or by both", async () => {
+    const db = testDbWithVectors();
+    seedIndexed(db, "w1", { body: "the invoice is attached" });
+    seedEmbedded(db, "m1", unit(0));
+    seedIndexed(db, "both1", { body: "the invoice is attached" });
+    db.$client.prepare("INSERT INTO message_embeddings(message_id, embedding) VALUES (?, ?)").run("both1", toBuffer(unit(0)));
+
+    const hits = await searchHybrid(db, embedderOf(unit(0)), "invoice");
+    const byId = new Map(hits.map((h) => [h.messageId, h.match]));
+    expect(byId.get("w1")).toBe("words");
+    expect(byId.get("m1")).toBe("meaning");
+    expect(byId.get("both1")).toBe("both");
   });
 
   /**

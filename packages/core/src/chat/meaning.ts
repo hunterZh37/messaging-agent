@@ -108,6 +108,11 @@ function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number): 
  * from an index that answers in under ten milliseconds, the meaning from one
  * embed call of about forty. Without an embedder, or with one that cannot
  * reach Ollama, this is exactly the search Celeste has always had.
+ *
+ * Always returned through `mergeHits`, even with no meaning half to merge:
+ * that is the one place a hit is marked how it was found, and a hit that
+ * skipped it would reach Celeste with no `match` at all, indistinguishable
+ * from one found both ways (2026-10-07).
  */
 export async function searchHybrid(db: Db, embedder: Embedder | undefined, query: string, opts: SearchFilters = {}): Promise<SearchHit[]> {
   // Clamped once, here, by the same rule both halves already clamp by
@@ -115,11 +120,10 @@ export async function searchHybrid(db: Db, embedder: Embedder | undefined, query
   // caller's raw one.
   const limit = Math.min(opts.limit ?? DEFAULT_LIMIT, MAX_SEARCH_LIMIT);
   const words = searchMessages(db, query, opts);
-  if (!embedder) return words;
+  if (!embedder) return mergeHits(words, [], limit);
   // `searchByMeaning` already never throws for the reasons it says above;
   // this catch is only for an embedder that throws something of its own,
   // so a search is never worse off for having asked the vectors too.
   const meaning = await searchByMeaning(db, embedder, query, opts).catch(() => [] as SearchHit[]);
-  if (meaning.length === 0) return words;
   return mergeHits(words, meaning, limit);
 }

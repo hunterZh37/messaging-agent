@@ -261,6 +261,33 @@ describe("mergeHits", () => {
     expect(merged.map((h) => h.messageId)).toEqual(["a", "b"]);
   });
 
+  /**
+   * Celeste's one cue for telling a message that merely reads alike from
+   * one that actually has the operator's words (2026-10-07): a message
+   * found only by the keyword half is "words", only by the meaning half is
+   * "meaning", and found by both — genuinely stronger evidence than either
+   * alone — is "both", however the two halves happened to overlap.
+   */
+  it("marks each hit with how it was found: words, meaning, or both", () => {
+    const merged = mergeHits([hit("w1"), hit("both1")], [hit("both1"), hit("m1")], 10);
+    const byId = new Map(merged.map((h) => [h.messageId, h.match]));
+    expect(byId.get("w1")).toBe("words");
+    expect(byId.get("m1")).toBe("meaning");
+    expect(byId.get("both1")).toBe("both");
+  });
+
+  /**
+   * `hit()` above is exactly the shape a `SearchHit` had before `match`
+   * existed: no such field at all. A hit from before this branch, were one
+   * ever to reach `mergeHits`, is shaped the same way, and must pass
+   * through tagged rather than this function assuming the field is already
+   * there to read (2026-10-07).
+   */
+  it("tags a hit that arrived with no match field of its own", () => {
+    const merged = mergeHits([hit("w1")], [], 10);
+    expect(merged).toEqual([{ ...hit("w1"), match: "words" }]);
+  });
+
   it("fills from whichever half has more when the other runs out", () => {
     expect(mergeHits([hit("w1")], [hit("m1"), hit("m2"), hit("m3")], 10).map((h) => h.messageId)).toEqual(["w1", "m1", "m2", "m3"]);
     expect(mergeHits([hit("w1"), hit("w2")], [], 10).map((h) => h.messageId)).toEqual(["w1", "w2"]);
