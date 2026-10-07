@@ -449,6 +449,34 @@ describe("askCeleste", () => {
     expect(client.requests).toHaveLength(1);
   });
 
+  /**
+   * search_inbox now matches meaning as well as words (this branch). A
+   * prompt that still called it a keyword search and told Celeste to
+   * translate a question into mailbox words first would make the operator
+   * ask twice for nothing: the whole point of the meaning half is that
+   * asking in their own words already works (2026-10-07).
+   */
+  it("tells Celeste search_inbox matches meaning too, not only the words a message used", async () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "March invoice", bodyText: "due on the 30th" }]);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "search_inbox", input: { query: "invoice" } }]),
+      textResponse("It is due on the 30th. [msg:a1:m1]"),
+    ]);
+    client.inspect = (request) => {
+      const rules = request.system[0]!.text;
+      expect(rules).not.toContain("not a question");
+      expect(rules.toLowerCase()).toContain("meaning");
+      const tool = request.tools.find((t) => t.name === "search_inbox")!;
+      expect(tool.description).not.toContain("Keyword search");
+      expect(tool.description.toLowerCase()).toContain("meant");
+    };
+
+    await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "When is the invoice due?", contextThreadId: null });
+    expect(client.requests).toHaveLength(2);
+  });
+
   it("cites the messages it named, whether by marker or by id from a tool", async () => {
     const db = testDb();
     seedMail(db, [

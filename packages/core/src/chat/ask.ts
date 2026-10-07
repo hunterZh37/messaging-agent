@@ -55,7 +55,7 @@ How to answer:
 
 Which tool to reach for:
 - list_mail reads the mailbox itself. Use it for anything about what is there now: new, recent, today, this week, unopened, needs a reply, still waiting on an answer. Never answer those from search. Folder "messages" lists the chats.
-- search_inbox is for words, a sender or a project you already know, across mail and chats alike. Give "from" alone to gather everything from one person, "channel" to stay inside WhatsApp or Messages, and raise "limit" when the operator asks for all of it. A WhatsApp or Messages hit names its chat; read the chat with get_thread.
+- search_inbox matches both the words in a message and what it meant (spec: semantic search, 2026-10-07), across mail and chats alike. Ask it the way the operator asked you — a question, a description, whatever is natural — rather than stopping to guess the words the message itself would use first; the meaning half is there so that guess no longer has to be right. Give "from" alone to gather everything from one person, "channel" to stay inside WhatsApp or Messages, and raise "limit" when the operator asks for all of it. A WhatsApp or Messages hit names its chat; read the chat with get_thread.
 - get_thread reads one conversation in full.
 - propose_action offers the operator a button. One proposal covers as many threads as it needs: pass every id in "thread_ids" rather than proposing the same thing once per thread. When the operator names a project that does not exist, propose it with "create_project" true and say so in the note.
 
@@ -100,7 +100,7 @@ const TOOLS: ChatToolDef[] = [
   {
     name: "search_inbox",
     description:
-      "Keyword search over the operator's mail and chats (Messages and WhatsApp): subject or chat name, sender name, sender address and body. Use the words that would appear in the message itself, not a question. `from`, `project` and `channel` narrow the words, and stand alone without them — `from` on its own gathers everything one person has sent.",
+      "Searches the operator's mail and chats (Messages and WhatsApp) by the words a message contains and by what it meant, so asking in your own words or as a question works as well as the words the message itself used: subject or chat name, sender name, sender address and body. `from`, `project` and `channel` narrow it, and stand alone without a query — `from` on its own gathers everything one person has sent.",
     input_schema: {
       type: "object",
       properties: {
