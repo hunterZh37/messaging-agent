@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, ne, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, notInArray, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { messages, sorts } from "../db/schema";
 import { DOCUMENT_PREFIX, embedTextFor } from "../projects/classify";
@@ -74,7 +74,22 @@ export async function findExamples(
   const k = opts.k ?? DEFAULT_EXAMPLE_COUNT;
   if (k <= 0) return [];
   const trusted = trustedVerdictCondition(trustedModelNames(db, opts.trickleModel));
-  const ids = (await nearestTrusted(db, embedder, input, k, trusted)) ?? recentTrusted(db, input, k, trusted);
+  const nearest = await nearestTrusted(db, embedder, input, k, trusted);
+  // `null` is "no vector search happened" (no table, no Ollama, no vector
+  // for this message): recency answers the whole request. A vector search
+  // that happened but came up short of `k` is now the common case, not the
+  // rare one — the vector table went from project mail alone to every
+  // message in the inbox, so the oversampled neighbours are mostly chats,
+  // trash and the operator's own sent mail that the trusted-verdict filter
+  // below throws away (2026-10-07). Topping up with recency, rather than
+  // `??`-falling-back only on `null`, is what keeps a short or empty KNN
+  // result from reaching the trickle model as zero examples.
+  const ids =
+    nearest === null
+      ? recentTrusted(db, input, k, trusted)
+      : nearest.length >= k
+        ? nearest
+        : [...nearest, ...recentTrusted(db, input, k - nearest.length, trusted, new Set(nearest))];
   return ids.map((id) => exampleFor(db, id)).filter((e): e is SortExample => e !== null);
 }
 
@@ -137,14 +152,25 @@ async function nearestTrusted(
  * With no vector to search by, the next best thing is the same sender's
  * organisation: mail from a domain tends to be judged the same way twice.
  * The rest of the list is whatever this inbox judged most recently.
+ *
+ * `exclude` is who already has a seat — the KNN top-up's own ids, so the
+ * same message is never offered as both a nearest neighbour and a recency
+ * fill (2026-10-07).
  */
-function recentTrusted(db: Db, input: SortInput & { id: string; accountId: string }, k: number, trusted: SQL): string[] {
+function recentTrusted(
+  db: Db,
+  input: SortInput & { id: string; accountId: string },
+  k: number,
+  trusted: SQL,
+  exclude: Set<string> = new Set(),
+): string[] {
+  const skip = [input.id, ...exclude];
   const pick = (extra: SQL[]): string[] =>
     db
       .select({ id: messages.id })
       .from(messages)
       .innerJoin(sorts, eq(sorts.messageId, messages.id))
-      .where(and(eq(messages.accountId, input.accountId), ne(messages.id, input.id), eq(messages.isFromOperator, false), trusted, ...extra))
+      .where(and(eq(messages.accountId, input.accountId), notInArray(messages.id, skip), eq(messages.isFromOperator, false), trusted, ...extra))
       .orderBy(desc(messages.sentAt))
       .limit(k)
       .all()
