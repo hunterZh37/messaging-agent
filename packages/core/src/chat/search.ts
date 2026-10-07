@@ -81,7 +81,7 @@ export function ftsQuery(query: string, join: "AND" | "OR"): string | null {
   return terms.map((t) => `"${t}"`).join(` ${join} `);
 }
 
-interface SearchRow {
+export interface SearchRow {
   message_id: string;
   thread_id: string;
   subject: string;
@@ -112,8 +112,13 @@ export interface SearchFilters {
   channel?: Channel;
 }
 
-/** The conditions every shape of the query shares, and the join a project filter needs. */
-function narrow(filters: SearchFilters): { join: string; where: string[]; params: (string | number)[] } {
+/**
+ * The conditions every shape of the query shares, and the join a project
+ * filter needs. Exported so `meaning.ts` narrows a vector hit by the same
+ * rules a keyword hit is narrowed by (2026-10-07): one inbox, one sender, one
+ * project means the same thing on both halves of search.
+ */
+export function narrow(filters: SearchFilters): { join: string; where: string[]; params: (string | number)[] } {
   const where: string[] = [];
   const params: (string | number)[] = [];
   let join = "";
@@ -143,11 +148,18 @@ function narrow(filters: SearchFilters): { join: string; where: string[]; params
   return { join, where, params };
 }
 
-const COLUMNS = `m.id AS message_id, m.thread_id AS thread_id, m.subject AS subject, m.from_name AS from_name,
+/** Exported so `meaning.ts` selects the same columns a keyword hit is built from (2026-10-07). */
+export const COLUMNS = `m.id AS message_id, m.thread_id AS thread_id, m.subject AS subject, m.from_name AS from_name,
                  m.from_address AS from_address, m.sent_at AS sent_at, a.provider AS provider, m.folder AS folder`;
-const ACCOUNT = " JOIN accounts a ON a.id = m.account_id";
+/** Exported alongside `COLUMNS` for the same reason (2026-10-07). */
+export const ACCOUNT = " JOIN accounts a ON a.id = m.account_id";
 
-function toHits(rows: SearchRow[]): SearchHit[] {
+/**
+ * Exported so a meaning hit is built by this and only this function
+ * (2026-10-07): two code paths constructing a `SearchHit` would drift the
+ * moment one of them changed.
+ */
+export function toHits(rows: SearchRow[]): SearchHit[] {
   return rows.map((r) => {
     const channel = channelOf(r.provider);
     return {
