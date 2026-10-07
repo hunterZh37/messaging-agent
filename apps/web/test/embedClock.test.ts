@@ -8,22 +8,33 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
  * than once within itself to see the flag do its job (2026-10-07).
  */
 let embedBatch: typeof import("../lib/embedClock").embedBatch;
-let EMBED_BATCH: number;
 
 beforeEach(async () => {
   vi.resetModules();
-  ({ embedBatch, EMBED_BATCH } = await import("../lib/embedClock"));
+  ({ embedBatch } = await import("../lib/embedClock"));
 });
 
 describe("embedBatch", () => {
-  it("embeds a batch and says there is more to do", async () => {
-    const embed = vi.fn(async () => ({ embedded: EMBED_BATCH, reembedded: 0 }));
-    await expect(embedBatch({ embed, sorting: () => false })).resolves.toEqual({ embedded: EMBED_BATCH, resting: false });
+  /**
+   * The recheck slice `embedPending` reserves out of every batch means a
+   * backlog-draining pass can never actually report `EMBED_BATCH` — 190 of
+   * 200 at the clock's real settings — so a test asserting that value was
+   * asserting something production cannot produce (2026-10-07, the whole-
+   * branch review that caught the 190 < 200 bug this guards against).
+   */
+  it("keeps working while embedPending says there is more backlog, even on a short pass", async () => {
+    const embed = vi.fn(async () => ({ embedded: 190, reembedded: 10, more: true }));
+    await expect(embedBatch({ embed, sorting: () => false })).resolves.toEqual({ embedded: 190, resting: false });
   });
 
-  it("rests once a pass embeds less than a full batch", async () => {
-    const embed = vi.fn(async () => ({ embedded: 3, reembedded: 0 }));
-    await expect(embedBatch({ embed, sorting: () => false })).resolves.toEqual({ embedded: 3, resting: true });
+  it("rests once embedPending says the backlog is drained, even on a full-looking pass", async () => {
+    const embed = vi.fn(async () => ({ embedded: 190, reembedded: 10, more: false }));
+    await expect(embedBatch({ embed, sorting: () => false })).resolves.toEqual({ embedded: 190, resting: true });
+  });
+
+  it("rests once a pass finds nothing left to embed", async () => {
+    const embed = vi.fn(async () => ({ embedded: 0, reembedded: 0, more: false }));
+    await expect(embedBatch({ embed, sorting: () => false })).resolves.toEqual({ embedded: 0, resting: true });
   });
 
   /** One local model, and a question they are waiting on beats a backfill they are not. */

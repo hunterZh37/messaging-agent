@@ -22,11 +22,15 @@ let quiet = false;
 
 /**
  * One pass, with everything it talks to passed in so the test never starts a
- * timer or reaches Ollama. `resting` means the backlog is done: the pass
- * embedded less than a full batch, so the next tick can wait a long time.
+ * timer or reaches Ollama. `resting` means the backlog is done: not "this
+ * pass embedded less than a full batch" — the recheck slice `embedPending`
+ * reserves out of every batch means a backlog-draining pass almost never
+ * reports a full batch, full backlog or not (2026-10-07, see `embedPending`'s
+ * `more`). `resting` instead mirrors `more` straight from `embedPending`:
+ * false until it says there is nothing left waiting.
  */
 export async function embedBatch(deps: {
-  embed: () => Promise<{ embedded: number; reembedded: number }>;
+  embed: () => Promise<{ embedded: number; reembedded: number; more?: boolean }>;
   sorting: () => boolean;
   log?: (message: string) => void;
 }): Promise<{ embedded: number; resting: boolean }> {
@@ -35,9 +39,9 @@ export async function embedBatch(deps: {
   // (2026-10-07).
   if (deps.sorting()) return { embedded: 0, resting: false };
   try {
-    const { embedded } = await deps.embed();
+    const { embedded, more } = await deps.embed();
     quiet = false;
-    return { embedded, resting: embedded < EMBED_BATCH };
+    return { embedded, resting: !more };
   } catch (err) {
     // Ollama off for a week is one line, not one a minute.
     if (!quiet) {

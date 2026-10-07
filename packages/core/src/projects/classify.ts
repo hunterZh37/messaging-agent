@@ -194,13 +194,24 @@ function readVectors(db: Db, ids: string[]): Map<string, Float32Array> {
  * window a plain `ORDER BY ... LIMIT` would fix in place — a limit and a
  * hash check applied only after the window was already decided would keep
  * re-reading the same already-current rows at the top of it forever.
+ *
+ * `more`, returned only for the `"search"` scope, is whether the
+ * never-embedded bucket filled every slot it was given this call — i.e.
+ * whether there is almost certainly more unembedded mail waiting. The embed
+ * clock rests on this rather than on comparing `embedded` to its batch size,
+ * which the recheck slice above makes `embedPending` structurally unable to
+ * return in full (2026-10-07: at the clock's batch of 200 the recheck slice
+ * takes up to 10 of it, so `embedded` tops out at 190 even mid-backlog, and
+ * a clock resting on "less than 200" rested after its very first pass). The
+ * projects scope has no clock asking, so it is left undefined rather than
+ * returned as a boolean nobody reads.
  */
 export async function embedPending(
   db: Db,
   embedder: Embedder,
   opts: { accountId?: string; limit?: number; scope?: "projects" | "search" } = {},
   clock: () => number = now,
-): Promise<{ embedded: number; reembedded: number }> {
+): Promise<{ embedded: number; reembedded: number; more?: boolean }> {
   requireVec(db);
   // Two different questions want vectors. Filing a message under a project
   // only ever concerned inbound mail in the folders the operator lives in.
@@ -264,6 +275,7 @@ export async function embedPending(
   // the hash check done in JS meant every repeat call re-read whatever was
   // already embedded, found it current, and reported nothing left to do
   // while unembedded mail further down was never reached).
+  const neverEmbeddedCap = limit - recheck.length;
   const neverEmbedded = db
     .select(select)
     .from(messages)
@@ -271,13 +283,18 @@ export async function embedPending(
     .innerJoin(accounts, eq(accounts.id, messages.accountId))
     .where(and(...conditions, or(isNull(embeddingState.messageId), isNull(embeddingState.textHash))))
     .orderBy(...order)
-    .limit(limit - recheck.length)
+    .limit(neverEmbeddedCap)
     .all();
+
+  // See the doc comment: cap <= 0 means the recheck slice alone claimed the
+  // whole limit, so this call says nothing about the never-embedded bucket
+  // either way — assume there is more rather than risk resting on a guess.
+  const more = forSearch ? neverEmbeddedCap <= 0 || neverEmbedded.length >= neverEmbeddedCap : undefined;
 
   const pending = [...neverEmbedded, ...recheck]
     .map((m) => ({ ...m, text: embedTextFor(m) }))
     .filter((m) => m.embeddedAt === null || m.embeddedHash === null || m.embeddedHash !== embedTextHash(m.text));
-  if (pending.length === 0) return { embedded: 0, reembedded: 0 };
+  if (pending.length === 0) return { embedded: 0, reembedded: 0, more };
 
   const vectors = await embedder.embed(pending.map((m) => `${DOCUMENT_PREFIX}${m.text}`));
   const at = clock();
@@ -299,6 +316,7 @@ export async function embedPending(
   return {
     embedded: pending.length,
     reembedded: pending.filter((m) => m.embeddedAt !== null).length,
+    more,
   };
 }
 

@@ -335,6 +335,40 @@ describe("embedPending with scope: search", () => {
     const embedder = new FakeEmbedder();
     expect((await embedPending(db, embedder)).embedded).toBe(0);
   });
+
+  /**
+   * The embed clock rests on `more`, not on `embedded` reaching the batch
+   * size: the recheck slice reserved out of every batch means a
+   * backlog-draining call can report well under `limit` and still have a
+   * backlog (2026-10-07, the whole-branch review this guards). Four never-
+   * embedded messages against a limit of two must say there is more left,
+   * even though `embedded` (2) looks like "a short pass" by the old,
+   * now-removed `embedded < limit` rule.
+   */
+  it("says there is more when the never-embedded bucket fills its allocation", async () => {
+    const db = testDb();
+    account(db);
+    for (let i = 0; i < 4; i++) addMessage(db, { id: `m${i}`, subject: `m${i}`, body: "x" });
+    const r = await embedPending(db, new FakeEmbedder(), { scope: "search", limit: 2 });
+    expect(r).toEqual({ embedded: 2, reembedded: 0, more: true });
+  });
+
+  it("says there is nothing more once the never-embedded bucket comes up short of its allocation", async () => {
+    const db = testDb();
+    account(db);
+    addMessage(db, { id: "m1", subject: "m1", body: "x" });
+    const r = await embedPending(db, new FakeEmbedder(), { scope: "search", limit: 50 });
+    expect(r).toEqual({ embedded: 1, reembedded: 0, more: false });
+  });
+
+  it("leaves `more` out for the projects scope, which no clock asks", async () => {
+    const db = testDb();
+    account(db);
+    addMessage(db, { id: "m1", subject: "m1", body: "x" });
+    const r = await embedPending(db, new FakeEmbedder(), { accountId: "a1" });
+    expect(r).toEqual({ embedded: 1, reembedded: 0 });
+    expect(r.more).toBeUndefined();
+  });
 });
 
 describe("projectVectors", () => {
