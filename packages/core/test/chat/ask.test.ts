@@ -4,8 +4,17 @@ import { askCeleste, citedMessageIds } from "../../src/chat/ask";
 import { getOrCreateChat, appendChatMessage, listChatMessages } from "../../src/chat/store";
 import { actions, drafts, projectAssignments } from "../../src/db/schema";
 import { listProjects } from "../../src/projects/projects";
+import { EMBEDDING_DIMENSIONS } from "../../src/db/client";
+import type { Embedder } from "../../src/projects/embedder";
 import { FakeChatClient, textResponse, toolResponse } from "./fake";
 import { seedMail } from "./seed";
+
+/** A unit vector with 1 at index `i`, the same shape `meaning.test.ts` uses to make two vectors provably near or far. */
+function unit(i: number): Float32Array {
+  const v = new Float32Array(EMBEDDING_DIMENSIONS);
+  v[i] = 1;
+  return v;
+}
 
 function clockFrom(start: number): () => number {
   let t = start;
@@ -37,6 +46,31 @@ describe("askCeleste", () => {
     expect(result.role).toBe("user");
     expect(JSON.stringify(result.content)).toContain("a1:m1");
     expect(JSON.stringify(result.content)).toContain("tool_result");
+  });
+
+  /** `search_inbox` with `deps.embedder` given: a meaning hit comes back beside the word hit (2026-10-07). */
+  it("finds a meaning hit too, when deps.embedder is given", async () => {
+    const db = testDb();
+    seedMail(db, [
+      { id: "m1", subject: "March invoice", bodyText: "The invoice for March is due on the 30th." },
+      { id: "m2", bodyText: "unrelated filler" },
+    ]);
+    // Worded nothing like "invoice", so only the embedder -- not the keyword
+    // index -- can find it.
+    const vector = unit(0);
+    db.$client.prepare("INSERT INTO message_embeddings(message_id, embedding) VALUES (?, ?)").run("a1:m2", Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength));
+    const chat = getOrCreateChat(db);
+    const embedder: Embedder = { embed: async () => [vector] };
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "search_inbox", input: { query: "invoice" } }]),
+      textResponse("It is due on the 30th. [msg:a1:m1]"),
+    ]);
+
+    await askCeleste(db, { client, clock: clockFrom(1000), embedder }, { chatId: chat.id, question: "When is the invoice due?", contextThreadId: null });
+
+    const content = JSON.stringify(client.requests[1]!.messages.at(-1)!.content);
+    expect(content).toContain("a1:m1");
+    expect(content).toContain("a1:m2");
   });
 
   it("says so when the search finds nothing", async () => {

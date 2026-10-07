@@ -1,7 +1,7 @@
 import type { Db } from "../db/client";
 import { EmbeddingsUnavailableError, type Embedder } from "../projects/embedder";
 import { QUERY_PREFIX } from "../projects/classify";
-import { ACCOUNT, COLUMNS, DEFAULT_LIMIT, MAX_SEARCH_LIMIT, ftsQuery, narrow, toHits, type SearchFilters, type SearchRow } from "./search";
+import { ACCOUNT, COLUMNS, DEFAULT_LIMIT, MAX_SEARCH_LIMIT, ftsQuery, mergeHits, narrow, searchMessages, toHits, type SearchFilters, type SearchRow } from "./search";
 import type { SearchHit } from "./types";
 
 /**
@@ -100,4 +100,26 @@ function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number): 
     if (kept.length === limit) break;
   }
   return toHits(kept);
+}
+
+/**
+ * What `search_inbox` runs (2026-10-07). Both halves at once, because they
+ * take about the same time and neither waits on the other: the words come
+ * from an index that answers in under ten milliseconds, the meaning from one
+ * embed call of about forty. Without an embedder, or with one that cannot
+ * reach Ollama, this is exactly the search Celeste has always had.
+ */
+export async function searchHybrid(db: Db, embedder: Embedder | undefined, query: string, opts: SearchFilters = {}): Promise<SearchHit[]> {
+  // Clamped once, here, by the same rule both halves already clamp by
+  // (search.ts): `mergeHits` is handed the limit it returns at, not the
+  // caller's raw one.
+  const limit = Math.min(opts.limit ?? DEFAULT_LIMIT, MAX_SEARCH_LIMIT);
+  const words = searchMessages(db, query, opts);
+  if (!embedder) return words;
+  // `searchByMeaning` already never throws for the reasons it says above;
+  // this catch is only for an embedder that throws something of its own,
+  // so a search is never worse off for having asked the vectors too.
+  const meaning = await searchByMeaning(db, embedder, query, opts).catch(() => [] as SearchHit[]);
+  if (meaning.length === 0) return words;
+  return mergeHits(words, meaning, limit);
 }

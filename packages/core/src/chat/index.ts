@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./search";
+export * from "./meaning";
 export * from "./list";
 export * from "./execute";
 export * from "./store";

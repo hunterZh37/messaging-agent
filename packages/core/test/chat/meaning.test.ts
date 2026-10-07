@@ -3,8 +3,8 @@ import { testDb } from "../helpers/db";
 import { EmbeddingsUnavailableError, type Embedder } from "../../src/projects/embedder";
 import { EMBEDDING_DIMENSIONS, type Db } from "../../src/db/client";
 import { accounts, messages, threads } from "../../src/db/schema";
-import { MAX_SEARCH_LIMIT } from "../../src/chat/search";
-import { searchByMeaning } from "../../src/chat/meaning";
+import { indexMessageForSearch, MAX_SEARCH_LIMIT } from "../../src/chat/search";
+import { searchByMeaning, searchHybrid } from "../../src/chat/meaning";
 
 /** An embedder that answers with whatever vector the test names, or refuses. */
 function embedderOf(vector: Float32Array | Error): Embedder {
@@ -74,6 +74,42 @@ function seedEmbedded(db: Db, id: string, vector: Float32Array, opts: { accountI
     })
     .run();
   db.$client.prepare("INSERT INTO message_embeddings(message_id, embedding) VALUES (?, ?)").run(id, toBuffer(vector));
+}
+
+/** A message in the keyword index, as `indexMessageForSearch` would have left it: the word half of a hybrid search. */
+function seedIndexed(db: Db, id: string, opts: { body?: string; accountId?: string } = {}): void {
+  const accountId = opts.accountId ?? "a1";
+  db.insert(accounts)
+    .values({ id: accountId, provider: "imap", email: `${accountId}@example.com`, displayName: null, createdAt: 1 })
+    .onConflictDoNothing()
+    .run();
+  const threadId = `${accountId}:t-${id}`;
+  db.insert(threads)
+    .values({ id: threadId, accountId, providerThreadId: threadId, subject: "Subject", lastMessageAt: 1000, lastFromOperator: false })
+    .onConflictDoNothing()
+    .run();
+  const row = {
+    id,
+    accountId,
+    providerMessageId: id,
+    threadId,
+    rfcMessageId: null,
+    fromAddress: "bob@example.com",
+    fromName: "Bob",
+    toAddresses: ["me@example.com"],
+    ccAddresses: [],
+    subject: "Subject",
+    bodyText: opts.body ?? "body",
+    bodyHtml: null,
+    snippet: null,
+    attachmentNames: [],
+    isFromOperator: false,
+    folder: "inbox" as const,
+    sentAt: 1000,
+    receivedAt: 1000,
+  };
+  db.insert(messages).values(row).run();
+  indexMessageForSearch(db, row);
 }
 
 describe("searchByMeaning", () => {
@@ -164,5 +200,32 @@ describe("searchByMeaning", () => {
     db.$client.exec("PRAGMA foreign_keys = OFF");
     db.$client.exec("DROP TABLE accounts");
     await expect(searchByMeaning(db, embedderOf(unit(0)), "invoice")).resolves.toEqual([]);
+  });
+});
+
+describe("searchHybrid", () => {
+  it("is the keyword search alone when there is no embedder", async () => {
+    const db = testDbWithVectors();
+    seedIndexed(db, "w1", { body: "the invoice is attached" });
+    await expect(searchHybrid(db, undefined, "invoice").then((h) => h.map((x) => x.messageId))).resolves.toEqual(["w1"]);
+  });
+
+  it("is the keyword search alone when Ollama is not running", async () => {
+    const db = testDbWithVectors();
+    seedIndexed(db, "w1", { body: "the invoice is attached" });
+    const down = {
+      embed: async () => {
+        throw new EmbeddingsUnavailableError("no ollama");
+      },
+    };
+    await expect(searchHybrid(db, down, "invoice").then((h) => h.map((x) => x.messageId))).resolves.toEqual(["w1"]);
+  });
+
+  it("puts a meaning match beside a word match", async () => {
+    const db = testDbWithVectors();
+    seedIndexed(db, "w1", { body: "the invoice is attached" });
+    seedEmbedded(db, "m1", unit(0));
+    const hits = await searchHybrid(db, embedderOf(unit(0)), "invoice");
+    expect(hits.map((h) => h.messageId)).toEqual(["w1", "m1"]);
   });
 });

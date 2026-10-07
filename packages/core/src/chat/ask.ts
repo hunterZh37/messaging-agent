@@ -3,10 +3,12 @@ import { operatorAddresses } from "../accounts/aliases";
 import { now, type Db } from "../db/client";
 import { drafts, messages, projects, threads, type ChatMessageRow } from "../db/schema";
 import { listProjects } from "../projects/projects";
+import type { Embedder } from "../projects/embedder";
 import { HUMAN_STYLE_RULE, humanizePunctuation } from "../draft/style";
 import { describeThreads, renderChatFiles, renderContextDraft, renderThread } from "./context";
 import { listMailForChat, MAX_LIST_LIMIT, type ChatStatus, type ChatWindow } from "./list";
-import { MAX_SEARCH_LIMIT, searchMessages } from "./search";
+import { searchHybrid } from "./meaning";
+import { MAX_SEARCH_LIMIT } from "./search";
 import { CLAIM_CORRECTION, CLAIM_WARNING, changesTheDraft, claimsDraftChanged } from "./claims";
 import { checkQuotes, QUOTE_WARNING, quoteCorrection } from "./quotes";
 import { appendChatMessage, listChatMessages } from "./store";
@@ -176,6 +178,12 @@ export interface AskDeps {
   clock?: () => number;
   /** What to call the operator; unset, the prompt says "The operator". */
   operatorName?: string | undefined;
+  /**
+   * The local embedder, when one is to hand, so a search finds mail that
+   * means what was asked and not only mail that says it (2026-10-07). Absent,
+   * search is the keyword half alone, which is what it was before.
+   */
+  embedder?: Embedder;
 }
 
 export interface AskInput {
@@ -438,54 +446,67 @@ export async function askCeleste(db: Db, deps: AskDeps, input: AskInput): Promis
       if (toolUses.length === 0 || response.stop_reason !== "tool_use" || round >= MAX_TOOL_ROUNDS) break;
 
       conversation.push({ role: "assistant", content: response.content });
-      const results: ChatToolResultBlock[] = toolUses.map((use) => {
-        const args = (use.input ?? {}) as Record<string, unknown>;
-        const scope = input.accountId ? { accountId: input.accountId } : {};
-        let content: string;
-        if (use.name === "list_mail") {
-          const rows = listMailForChat(db, {
-            ...scope,
-            ...(WINDOWS.includes(args.since as ChatWindow) ? { since: args.since as ChatWindow } : {}),
-            ...(STATUSES.includes(args.status as ChatStatus) ? { status: args.status as ChatStatus } : {}),
-            ...(args.folder === "inbox" || args.folder === "sent" || args.folder === "messages" ? { folder: args.folder } : {}),
-            ...(typeof args.project === "string" && args.project !== "" ? { project: args.project } : {}),
-            ...(args.finance === "income" || args.finance === "expense" ? { finance: args.finance } : {}),
-            ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
-          });
-          if ("unknownProject" in rows) {
-            content = `No project named ${rows.unknownProject} in this inbox.`;
+      // `search_inbox` is the one branch below that awaits anything (the
+      // meaning half of a search), so this is async now (2026-10-07). The
+      // rest stay synchronous inside it: `Promise.all` keeps `results` in
+      // `toolUses` order regardless of which tool answers first, which
+      // matters because the model matches a result to its own tool-use id
+      // positionally as well as by id. The shared state the branches touch
+      // — `toolIds.add`, `proposals.push` — is mutated by plain synchronous
+      // statements with no await inside them, so nothing here can run two
+      // of those statements at once: JS never switches to another branch
+      // mid-statement, only at an `await`, and no branch but `search_inbox`
+      // has one.
+      const results: ChatToolResultBlock[] = await Promise.all(
+        toolUses.map(async (use) => {
+          const args = (use.input ?? {}) as Record<string, unknown>;
+          const scope = input.accountId ? { accountId: input.accountId } : {};
+          let content: string;
+          if (use.name === "list_mail") {
+            const rows = listMailForChat(db, {
+              ...scope,
+              ...(WINDOWS.includes(args.since as ChatWindow) ? { since: args.since as ChatWindow } : {}),
+              ...(STATUSES.includes(args.status as ChatStatus) ? { status: args.status as ChatStatus } : {}),
+              ...(args.folder === "inbox" || args.folder === "sent" || args.folder === "messages" ? { folder: args.folder } : {}),
+              ...(typeof args.project === "string" && args.project !== "" ? { project: args.project } : {}),
+              ...(args.finance === "income" || args.finance === "expense" ? { finance: args.finance } : {}),
+              ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
+            });
+            if ("unknownProject" in rows) {
+              content = `No project named ${rows.unknownProject} in this inbox.`;
+            } else {
+              for (const r of rows) toolIds.add(r.messageId);
+              content = rows.length > 0 ? JSON.stringify(rows) : "Nothing in the mailbox matches that.";
+            }
+          } else if (use.name === "search_inbox") {
+            const hits = await searchHybrid(db, deps.embedder, typeof args.query === "string" ? args.query : "", {
+              ...scope,
+              ...(typeof args.from === "string" && args.from !== "" ? { from: args.from } : {}),
+              ...(args.channel === "mail" || args.channel === "imessage" || args.channel === "whatsapp" ? { channel: args.channel } : {}),
+              ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
+              ...(typeof args.project === "string" && args.project !== "" ? { projectId: projectIdFor(db, args.project, input.accountId) ?? "none" } : {}),
+            });
+            for (const h of hits) toolIds.add(h.messageId);
+            content = hits.length > 0 ? JSON.stringify(hits) : "No message matched that search.";
+          } else if (use.name === "get_thread") {
+            const rendered = typeof args.thread_id === "string" ? renderThread(db, args.thread_id) : null;
+            if (rendered) for (const id of rendered.messageIds) toolIds.add(id);
+            content = rendered ? rendered.text : "No thread with that id.";
+          } else if (use.name === "propose_action") {
+            const proposal = proposalFrom(db, args, draftThreadId);
+            if (typeof proposal === "string") {
+              content = proposal;
+            } else {
+              const key = (p: ProposedAction) => `${p.kind}|${p.threadIds.join(",")}|${p.projectName ?? ""}|${p.text ?? ""}|${p.instruction ?? ""}`;
+              if (!proposals.some((p) => key(p) === key(proposal))) proposals.push(proposal);
+              content = JSON.stringify({ ok: true, threads: proposal.threadIds.length });
+            }
           } else {
-            for (const r of rows) toolIds.add(r.messageId);
-            content = rows.length > 0 ? JSON.stringify(rows) : "Nothing in the mailbox matches that.";
+            content = `Unknown tool: ${use.name}`;
           }
-        } else if (use.name === "search_inbox") {
-          const hits = searchMessages(db, typeof args.query === "string" ? args.query : "", {
-            ...scope,
-            ...(typeof args.from === "string" && args.from !== "" ? { from: args.from } : {}),
-            ...(args.channel === "mail" || args.channel === "imessage" || args.channel === "whatsapp" ? { channel: args.channel } : {}),
-            ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
-            ...(typeof args.project === "string" && args.project !== "" ? { projectId: projectIdFor(db, args.project, input.accountId) ?? "none" } : {}),
-          });
-          for (const h of hits) toolIds.add(h.messageId);
-          content = hits.length > 0 ? JSON.stringify(hits) : "No message matched that search.";
-        } else if (use.name === "get_thread") {
-          const rendered = typeof args.thread_id === "string" ? renderThread(db, args.thread_id) : null;
-          if (rendered) for (const id of rendered.messageIds) toolIds.add(id);
-          content = rendered ? rendered.text : "No thread with that id.";
-        } else if (use.name === "propose_action") {
-          const proposal = proposalFrom(db, args, draftThreadId);
-          if (typeof proposal === "string") {
-            content = proposal;
-          } else {
-            const key = (p: ProposedAction) => `${p.kind}|${p.threadIds.join(",")}|${p.projectName ?? ""}|${p.text ?? ""}|${p.instruction ?? ""}`;
-            if (!proposals.some((p) => key(p) === key(proposal))) proposals.push(proposal);
-            content = JSON.stringify({ ok: true, threads: proposal.threadIds.length });
-          }
-        } else {
-          content = `Unknown tool: ${use.name}`;
-        }
-        return { type: "tool_result", tool_use_id: use.id, content };
-      });
+          return { type: "tool_result", tool_use_id: use.id, content };
+        }),
+      );
       conversation.push({ role: "user", content: results });
     }
 
