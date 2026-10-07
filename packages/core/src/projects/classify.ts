@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import type { Config } from "../config";
 import { now, type Db } from "../db/client";
 import { accounts, embeddingState, messages, projectAssignments, projects, sorts, threads, type ProjectRow } from "../db/schema";
@@ -167,6 +167,14 @@ function readVectors(db: Db, ids: string[]): Map<string, Float32Array> {
  * inbound mail in the folders the operator files (spec 10a). `"search"` is
  * wider, because looking something up by what it meant can mean any message
  * they might ask about, their own sent mail and their texts included.
+ *
+ * A backlog bigger than `limit` is meant to be cleared by calling this
+ * again and again (2026-10-07, for the clock that will do exactly that):
+ * each call must reach mail the last one did not, which is why what is
+ * definitely unembedded is selected directly rather than through the
+ * window a plain `ORDER BY ... LIMIT` would fix in place — a limit and a
+ * hash check applied only after the window was already decided would keep
+ * re-reading the same already-current rows at the top of it forever.
  */
 export async function embedPending(
   db: Db,
@@ -186,29 +194,62 @@ export async function embedPending(
     : [eq(messages.isFromOperator, false), inArray(messages.folder, ["inbox", "sent"])];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
 
-  const candidates = db
-    .select({
-      id: messages.id,
-      subject: messages.subject,
-      bodyText: messages.bodyText,
-      embeddedHash: embeddingState.textHash,
-      embeddedAt: embeddingState.embeddedAt,
-    })
+  const limit = opts.limit ?? DEFAULT_EMBED_LIMIT;
+  const select = {
+    id: messages.id,
+    subject: messages.subject,
+    bodyText: messages.bodyText,
+    embeddedHash: embeddingState.textHash,
+    embeddedAt: embeddingState.embeddedAt,
+  };
+  // Email first, newest first within it (2026-10-07). Their mailbox is
+  // 86,210 texts to 7,939 emails, so newest-first alone would spend its
+  // first hour on texts while the complaint that started this was about
+  // email. Texts follow, and the clock keeps going until there are none. The
+  // projects scope has no texts to sort ahead of, so it keeps the single
+  // newest-first order it always had. `messages.id` breaks the tie between
+  // two messages sent in the same second, so the order is total: without it
+  // the two queries below could hand the same message back twice on one
+  // page and skip another on the next.
+  const order = [...(forSearch ? [sql`${accounts.provider} IN ('imessage', 'whatsapp')`] : []), desc(messages.sentAt), messages.id];
+
+  // A message with no embedding_state row, or one whose hash was blanked by
+  // the "no hash at all" rule above, is stale with no need to check: it is
+  // selected directly rather than through the window below, so a backlog
+  // many pages deep keeps surfacing new mail call after call instead of the
+  // same page's already-current rows (2026-10-07: without this, a limited
+  // window plus the hash check done in JS meant every repeat call re-read
+  // whatever was already embedded, found it current, and reported nothing
+  // left to do while unembedded mail further down was never reached).
+  const neverEmbedded = db
+    .select(select)
     .from(messages)
     .leftJoin(embeddingState, eq(embeddingState.messageId, messages.id))
     .innerJoin(accounts, eq(accounts.id, messages.accountId))
-    .where(and(...conditions))
-    // Email first, newest first within it (2026-10-07). Their mailbox is
-    // 86,210 texts to 7,939 emails, so newest-first alone would spend its
-    // first hour on texts while the complaint that started this was about
-    // email. Texts follow, and the clock keeps going until there are none.
-    // The projects scope has no texts to sort ahead of, so it keeps the
-    // single newest-first order it always had.
-    .orderBy(...(forSearch ? [sql`${accounts.provider} IN ('imessage', 'whatsapp')`] : []), desc(messages.sentAt))
-    .limit(opts.limit ?? DEFAULT_EMBED_LIMIT)
+    .where(and(...conditions, or(isNull(embeddingState.messageId), isNull(embeddingState.textHash))))
+    .orderBy(...order)
+    .limit(limit)
     .all();
 
-  const pending = candidates
+  // Room left in the batch is spent rechecking mail that already has a
+  // vector, oldest-checked first, so the recheck sweep rotates through the
+  // whole backlog instead of sticking to whichever rows sort first in the
+  // scope's own order. Most of these are still current; the hash comparison
+  // below is what decides which of them actually needs a new vector.
+  const recheck =
+    neverEmbedded.length >= limit
+      ? []
+      : db
+          .select(select)
+          .from(messages)
+          .innerJoin(embeddingState, eq(embeddingState.messageId, messages.id))
+          .innerJoin(accounts, eq(accounts.id, messages.accountId))
+          .where(and(...conditions, isNotNull(embeddingState.textHash)))
+          .orderBy(asc(embeddingState.embeddedAt), messages.id)
+          .limit(limit - neverEmbedded.length)
+          .all();
+
+  const pending = [...neverEmbedded, ...recheck]
     .map((m) => ({ ...m, text: embedTextFor(m) }))
     .filter((m) => m.embeddedAt === null || m.embeddedHash === null || m.embeddedHash !== embedTextHash(m.text));
   if (pending.length === 0) return { embedded: 0, reembedded: 0 };

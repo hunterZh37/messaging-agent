@@ -200,6 +200,40 @@ describe("embedPending", () => {
     expect(await embedPending(db, new FakeEmbedder(), {})).toEqual({ embedded: 2, reembedded: 0 });
   });
 
+  it("drains a backlog larger than the limit over repeated calls, rather than re-reading the same page forever", async () => {
+    const db = testDb();
+    account(db);
+    const ids = ["m1", "m2", "m3", "m4", "m5"].map((id) => addMessage(db, { id, subject: id, body: "x" }));
+    const embedder = new FakeEmbedder();
+
+    // Five candidates, a limit of two: three calls to clear them, a fourth
+    // finding nothing left. A window that re-fetched the same top rows every
+    // time would report embedded: 2 forever and never reach the rest.
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 2, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 2, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 1, reembedded: 0 });
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 2 })).toEqual({ embedded: 0, reembedded: 0 });
+    expect(db.select().from(embeddingState).all().map((r) => r.messageId).sort()).toEqual([...ids].sort());
+  });
+
+  it("still re-embeds a changed message once newer mail has pushed it out of the top of the window", async () => {
+    const db = testDb();
+    account(db);
+    const stale = addMessage(db, { id: "m1", subject: "SOW", body: "signed" });
+    await embedPending(db, new FakeEmbedder(), { accountId: "a1" });
+    db.update(embeddingState).set({ textHash: "stale" }).where(eq(embeddingState.messageId, stale)).run();
+
+    // Three newer, never-embedded messages, which fill the window ahead of
+    // it under the scope's own newest-first order.
+    addMessage(db, { id: "m2", subject: "two", body: "b" });
+    addMessage(db, { id: "m3", subject: "three", body: "c" });
+    addMessage(db, { id: "m4", subject: "four", body: "d" });
+
+    const embedder = new FakeEmbedder();
+    expect(await embedPending(db, embedder, { accountId: "a1", limit: 4 })).toEqual({ embedded: 4, reembedded: 1 });
+    expect(db.select().from(embeddingState).all().map((r) => r.messageId).sort()).toEqual(["a1:m1", "a1:m2", "a1:m3", "a1:m4"]);
+  });
+
   it("re-embeds a message whose text no longer hashes to what was embedded", async () => {
     const db = testDb();
     account(db);
