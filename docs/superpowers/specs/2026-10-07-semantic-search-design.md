@@ -39,7 +39,9 @@ index answers those perfectly today and keeps doing so.
 `unicode61` collapses invoice/invoices/invoicing to one entry; measured, that
 turns the 3 above into 354 and the 194 into 2,614. One word of schema, and the
 index rebuilds in about 1.0 second, measured against 94,242 real messages
-after wrapping the refill in one transaction.
+after wrapping the refill in one transaction. (94,242, not the 94,215 in
+§1: the mailbox grew between the two measurements, days apart — each count
+is as of when it was taken.)
 
 This line used to say 1.2 seconds, estimated rather than measured against
 the shipped code. The code that shipped did not wrap the refill in a
