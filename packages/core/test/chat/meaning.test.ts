@@ -228,4 +228,19 @@ describe("searchHybrid", () => {
     const hits = await searchHybrid(db, embedderOf(unit(0)), "invoice");
     expect(hits.map((h) => h.messageId)).toEqual(["w1", "m1"]);
   });
+
+  /**
+   * The third way the meaning half can be absent (2026-10-07): an embedder
+   * was given and Ollama answers, but the extension itself never loaded
+   * (`searchByMeaning` returns `[]` for this one at its very first line).
+   * The other two -- no embedder, and an embedder that throws -- are above;
+   * all three are composition, not asserted by `searchHybrid` itself, and
+   * all three are owed their own test so nothing downstream of
+   * `db.vecAvailable` can silently stop returning the words alone.
+   */
+  it("is the keyword search alone when the vector extension did not load", async () => {
+    const db = testDbWithoutVectors();
+    seedIndexed(db, "w1", { body: "the invoice is attached" });
+    await expect(searchHybrid(db, embedderOf(unit(0)), "invoice").then((h) => h.map((x) => x.messageId))).resolves.toEqual(["w1"]);
+  });
 });

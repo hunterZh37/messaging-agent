@@ -5,7 +5,7 @@ import { getOrCreateChat, appendChatMessage, listChatMessages } from "../../src/
 import { actions, drafts, projectAssignments } from "../../src/db/schema";
 import { listProjects } from "../../src/projects/projects";
 import { EMBEDDING_DIMENSIONS } from "../../src/db/client";
-import type { Embedder } from "../../src/projects/embedder";
+import { EmbeddingsUnavailableError, type Embedder } from "../../src/projects/embedder";
 import { FakeChatClient, textResponse, toolResponse } from "./fake";
 import { seedMail } from "./seed";
 
@@ -71,6 +71,65 @@ describe("askCeleste", () => {
     const content = JSON.stringify(client.requests[1]!.messages.at(-1)!.content);
     expect(content).toContain("a1:m1");
     expect(content).toContain("a1:m2");
+  });
+
+  /**
+   * Two `search_inbox` calls genuinely in flight together: both tool uses
+   * are in the same `toolResponse`, so the tool loop's `Promise.all` runs
+   * them concurrently rather than one after another the way every other
+   * multi-search test in this file does (2026-10-07). One is findable only
+   * by the word it contains, the other only by what the embedder says it
+   * means -- the embedder answers by the question's own wording, not a
+   * constant, so each call's meaning half is independent of the other's.
+   * `Promise.all` is documented to resolve positionally, but the model
+   * matches a result to its tool_use by `tool_use_id` too, and that id is
+   * set from `use.id` inside each callback's own closure -- a mistake that
+   * swapped two callbacks' closures over `use` would still look right by
+   * position and wrong by id. Pinning both catches that.
+   */
+  it("keeps two concurrent search_inbox calls each matched to its own result", async () => {
+    const db = testDb();
+    seedMail(db, [
+      { id: "m1", bodyText: "Invoice IOE8022910507 is attached." },
+      { id: "m2", bodyText: "The courier left it at the front desk." },
+    ]);
+    // Seeded directly, as `meaning.test.ts` seeds a vector: `m2` means
+    // "package", and nothing else in this mailbox does.
+    const packageVector = unit(0);
+    db.$client
+      .prepare("INSERT INTO message_embeddings(message_id, embedding) VALUES (?, ?)")
+      .run("a1:m2", Buffer.from(packageVector.buffer, packageVector.byteOffset, packageVector.byteLength));
+    // `m2` is the only vector in the table, so a KNN query returns it as
+    // "nearest" no matter how far the asked-about vector actually is --
+    // there is nothing nearer to lose to. Isolating `tu1` to the keyword
+    // half, then, is not a distant vector but the embedder refusing that
+    // one call outright, the way it genuinely can per call.
+    const embedder: Embedder = {
+      embed: async (texts) => {
+        if (!(texts[0] ?? "").includes("package")) throw new EmbeddingsUnavailableError("no vector for that one");
+        return [packageVector];
+      },
+    };
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([
+        { id: "tu1", name: "search_inbox", input: { query: "IOE8022910507" } },
+        { id: "tu2", name: "search_inbox", input: { query: "package shipment status" } },
+      ]),
+      textResponse("Answered."),
+    ]);
+
+    await askCeleste(db, { client, clock: clockFrom(1000), embedder }, { chatId: chat.id, question: "two things", contextThreadId: null });
+
+    const blocks = client.requests[1]!.messages.at(-1)!.content as { type: string; tool_use_id: string; content: string }[];
+    // Position and id agree: `Promise.all` did not reorder them, and
+    // neither callback answered under the other's identity.
+    expect(blocks.map((b) => b.tool_use_id)).toEqual(["tu1", "tu2"]);
+    const byId = new Map(blocks.map((b) => [b.tool_use_id, b.content]));
+    expect(byId.get("tu1")).toContain("a1:m1");
+    expect(byId.get("tu1")).not.toContain("a1:m2");
+    expect(byId.get("tu2")).toContain("a1:m2");
+    expect(byId.get("tu2")).not.toContain("a1:m1");
   });
 
   it("says so when the search finds nothing", async () => {
