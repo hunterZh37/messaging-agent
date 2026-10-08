@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { draftContextReducer, openDraft, type DraftContextState } from "../lib/ask";
-import { beganAsking, cardMeta, endedAsking, isAsking, isNewerChat, scoreTone } from "../lib/chat";
+import { beganAsking, cardMeta, endedAsking, hasWhy, isAsking, isNewerChat, scoreTone, whyOpen } from "../lib/chat";
 
 interface Card {
   draftId: string;
@@ -180,5 +180,32 @@ describe("cardMeta", () => {
 
   it("falls back to the address when there is no name", () => {
     expect(cardMeta({ ...base, from: "noreply@example.com" })).toBe("noreply@example.com");
+  });
+});
+
+/**
+ * The popover on the score (spec 2026-10-07). The sentence itself is written
+ * on the server, where the search terms are known — a citation carries no
+ * query — so the panel's job is only to decide when to show it.
+ */
+describe("whyOpen", () => {
+  it("opens for the card the operator is on, and nothing else", () => {
+    expect(whyOpen("m1", "m1")).toBe(true);
+    expect(whyOpen("m1", "m2")).toBe(false);
+    expect(whyOpen("m1", null)).toBe(false);
+  });
+});
+
+describe("hasWhy", () => {
+  const base = { messageId: "m1", threadId: "t1", subject: "Budget", from: "Keith <k@example.com>" };
+
+  it("is there when a search ranked it", () => {
+    expect(hasWhy({ ...base, score: 92, why: "Matched “invoice”; sent today." })).toBe(true);
+  });
+
+  /** Nothing ranked it, so there is no score to hover and nothing to explain. */
+  it("is not there for a citation nothing ranked", () => {
+    expect(hasWhy(base)).toBe(false);
+    expect(hasWhy({ ...base, score: 92 })).toBe(false);
   });
 });

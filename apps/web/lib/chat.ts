@@ -551,3 +551,18 @@ export function cardMeta(c: Citation): string {
   const when = c.sentAt === undefined ? null : new Date(c.sentAt).toLocaleDateString(undefined, { day: "numeric", month: "short" });
   return [sender, when].filter(Boolean).join(" · ");
 }
+
+/**
+ * Whether a card has a reason to show at all (2026-10-07). It needs both the
+ * score, which is what the operator hovers, and the sentence, which is written
+ * on the server where the search terms are known. A citation nothing ranked
+ * has neither, and its card has no control to reach.
+ */
+export function hasWhy(c: Citation): boolean {
+  return c.score !== undefined && Boolean(c.why);
+}
+
+/** Which card's popover is open: one at a time, keyed by the message it belongs to. */
+export function whyOpen(messageId: string, openFor: string | null): boolean {
+  return openFor === messageId;
+}

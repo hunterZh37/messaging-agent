@@ -42,6 +42,8 @@ import {
   threadsOf,
   type Turn,
   scoreTone,
+  hasWhy,
+  whyOpen,
 } from "@/lib/chat";
 import {
   attachedQuestion,
@@ -314,6 +316,21 @@ function closeOnPhone(close: () => void) {
 
 function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; question: string; applied?: boolean; drafted?: string[] | "running" }) {
   const { close } = useAsk();
+  // Which card is showing its reason, if any: one at a time, so the panel is
+  // never two popovers deep (2026-10-07).
+  const [whyFor, setWhyFor] = useState<string | null>(null);
+  // Escape closes it without closing the panel underneath, which is what a
+  // popover over a conversation has to do to be usable.
+  useEffect(() => {
+    if (!whyFor) return;
+    const shut = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setWhyFor(null);
+    };
+    window.addEventListener("keydown", shut, true);
+    return () => window.removeEventListener("keydown", shut, true);
+  }, [whyFor]);
   const cited = new Set(turn.citations.map((c) => c.messageId));
   // A marker points at its own chip when there is one; when there is not, the
   // number stands on its own rather than linking nowhere.
@@ -339,10 +356,41 @@ function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; quest
               </div>
               {c.score === undefined ? null : (
                 <div className={`ask-card-rail ${scoreTone(c.score)}`}>
-                  <div className="ask-score">{c.score}</div>
+                  {hasWhy(c) ? (
+                    // The score is the control, so it is a button: a div is
+                    // skipped by Tab, and the reason has to be reachable from
+                    // the keyboard as well as the pointer (2026-10-07). The
+                    // card around it is a link, so the press must not travel.
+                    <button
+                      type="button"
+                      className="ask-score"
+                      aria-expanded={whyOpen(c.messageId, whyFor)}
+                      aria-label={`Relevance ${c.score} of 100 — why`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setWhyFor(whyOpen(c.messageId, whyFor) ? null : c.messageId);
+                      }}
+                      onMouseEnter={() => setWhyFor(c.messageId)}
+                      onFocus={() => setWhyFor(c.messageId)}
+                    >
+                      {c.score}
+                    </button>
+                  ) : (
+                    <div className="ask-score">{c.score}</div>
+                  )}
                   <div className="ask-bar">
                     <div style={{ width: `${c.score}%` }} />
                   </div>
+                  {whyOpen(c.messageId, whyFor) && c.why ? (
+                    <div className="ask-why" role="tooltip" onMouseLeave={() => setWhyFor(null)}>
+                      <div className="ask-why-title">Relevance {c.score}/100</div>
+                      <div>{c.why}</div>
+                      <div className="ask-why-foot">
+                        <span>From how it was ranked</span>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               )}
             </Link>
