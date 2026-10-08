@@ -122,8 +122,13 @@ export function sendsOnEnter(ev: { key: string; shiftKey: boolean; nativeEvent?:
 /** Where the panel's width is remembered. Per browser, like the folder tree's own choices. */
 export const ASK_WIDTH_KEY = "celeste-ask-width";
 
-/** The width the panel opens at, and the one a double-click on its edge goes back to. */
-export const ASK_WIDTH_DEFAULT = 380;
+/**
+ * The width the panel opens at, and the one a double-click on its edge goes
+ * back to. Widened from 380 (2026-10-07): what she leaned on is a card now,
+ * carrying a subject, who it is from, the line that matched and a score rail,
+ * and at 380 the subject got eleven characters before an ellipsis.
+ */
+export const ASK_WIDTH_DEFAULT = 620;
 
 /** Narrower than this and a citation chip has nowhere to sit. */
 export const ASK_WIDTH_MIN = 320;

@@ -1400,7 +1400,6 @@ textarea.field.ask-input { resize: none; font-size: 14px; min-height: 40px; heig
 .ask-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 21; }
 /* The sidebar row that opens it, above Inboxes. */
 .side-bottom .ask-glyph { fill: currentColor; stroke: none; }
-.ask-kbd { margin-left: auto; }
 .side-bottom .ask-row.on, .drawer .side-bottom .ask-row.on { background: var(--bg); color: var(--fg); font-weight: 500; }
 
 @media (max-width: 1199px) {
@@ -1514,15 +1513,8 @@ textarea.field.ask-input { resize: none; font-size: 14px; min-height: 40px; heig
   .shell[data-ask="open"] main, .shell[data-ask="open"] main.inbox-page { padding-right: 0; }
 }
 /* The spark in the phone top bar. */
-.ask-topbtn { margin-left: auto; width: 44px; height: 44px; flex-shrink: 0; border: none; background: none; padding: 0; border-radius: 10px; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 120ms, color 120ms; }
 /* Lime, the night theme's signal colour, in both themes (operator, 2026-09-15):
    a lime disc with the dark star on it, so it reads on a light top bar too. */
-.ask-topbtn { color: #0d0e0b; }
-.ask-topbtn::before { content: ""; position: absolute; width: 34px; height: 34px; border-radius: 999px; background: #deff9a; transition: filter 120ms; }
-.ask-topbtn { position: relative; }
-.ask-topbtn:hover::before, .ask-topbtn.on::before { filter: brightness(0.92); }
-.ask-topbtn svg { position: relative; width: 18px; height: 18px; fill: currentColor; stroke: none; }
-.ask-topbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Delete by touch: the × is always there and big enough for a thumb, and a
    swipe to the left takes the row with the finger. */
 @media (hover: none) {
@@ -1855,3 +1847,10 @@ button.ask-score:focus-visible { outline: 2px solid var(--accent); outline-offse
 .ask-why-explain { background: none; border: none; padding: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
 .ask-why-explain:disabled { color: var(--muted); cursor: default; }
 .ask-why-failed { margin-top: 8px; font-size: 12px; color: var(--danger); }
+
+/* The way in, floating in the corner the panel opens from (operator,
+   2026-10-07). Below the toasts and the navigation veil: a message about what
+   just happened must never be covered by the button that opens the panel. */
+.ask-launch { position: fixed; right: 28px; bottom: 28px; z-index: 60; width: 56px; height: 56px; border-radius: 999px; border: none; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45); }
+.ask-launch:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+@media (max-width: 760px) { .ask-launch { right: 16px; bottom: 16px; } }

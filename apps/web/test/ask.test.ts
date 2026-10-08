@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { draftContextReducer, openDraft, type DraftContextState } from "../lib/ask";
-import { beganAsking, cardMeta, endedAsking, explainState, hasWhy, isAsking, isNewerChat, scoreTone, whyOpen } from "../lib/chat";
+import { ASK_WIDTH_DEFAULT, beganAsking, cardMeta, clampAskWidth, endedAsking, explainState, hasWhy, isAsking, isNewerChat, scoreTone, whyOpen } from "../lib/chat";
 
 interface Card {
   draftId: string;
@@ -231,5 +231,25 @@ describe("explainState", () => {
 
   it("keeps the free text standing when the ask failed, and says why once", () => {
     expect(explainState({ free, asked: { error: "no network" } })).toEqual({ text: free, source: "ranking", failed: "no network" });
+  });
+});
+
+/**
+ * The panel opens wider than it did (spec 2026-10-07): a card carries a
+ * subject, a meta line, a snippet and a score rail, and at 380 the subject got
+ * eleven characters before an ellipsis.
+ */
+describe("ASK_WIDTH_DEFAULT", () => {
+  it("opens wide enough for a card", () => {
+    expect(ASK_WIDTH_DEFAULT).toBe(620);
+  });
+
+  /** On a phone a 620px panel cannot float; it covers, as the panel does today. */
+  it("still clamps to the window on a phone", () => {
+    expect(clampAskWidth(ASK_WIDTH_DEFAULT, 390)).toBeLessThanOrEqual(390);
+  });
+
+  it("opens at its full width on a desktop", () => {
+    expect(clampAskWidth(ASK_WIDTH_DEFAULT, 1440)).toBe(620);
   });
 });
