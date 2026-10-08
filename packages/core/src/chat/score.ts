@@ -13,7 +13,14 @@
  * move once the operator has looked at a week of them.
  */
 export interface ScoreParts {
-  /** `bm25()` from the keyword index: negative, and more negative is better. Absent when the words half did not find it. */
+  /**
+   * `bm25()` from the keyword index, **per term**: negative, and more negative
+   * is better. Per term because bm25 is a sum over the query's words, so the
+   * raw figure grows with how many the operator used — measured against their
+   * own index, one term tops out near -8.5 and four near -14.8, and a fixed
+   * threshold then clamped every result of a four-word question to 100
+   * (whole-branch review, 2026-10-07). Absent when the words half did not find it.
+   */
   words?: number;
   /** Cosine distance from the vector table: 0 is identical. Absent when the meaning half did not find it. */
   meaning?: number;
@@ -21,6 +28,12 @@ export interface ScoreParts {
   ageMs: number;
   /** Whether any of the operator's words are in the subject, which is worth saying out loud. */
   inSubject: boolean;
+  /**
+   * Which of the operator's terms were actually found in it. Under the OR
+   * fallback a hit needs only one of them, so the sentence must name what it
+   * saw rather than reciting the whole query as though it were a phrase.
+   */
+  matched?: string[];
 }
 
 /**
@@ -35,6 +48,14 @@ const MEANING_FAR = 1;
 
 /** What two independent kinds of evidence agreeing is worth. */
 const BOTH_BONUS = 0.15;
+
+/**
+ * The most either half can be worth on its own. The bonus above and the nudge
+ * below have to fit above it, or a strong word match clamps at 1 and the thing
+ * the spec promises — that a message both halves found scores above one either
+ * found alone — stops being true exactly where it matters most.
+ */
+const HALF_CAP = 0.8;
 
 /** The most recency can add. A nudge: it must never carry a weak match past a strong one. */
 const RECENCY_NUDGE = 0.05;
@@ -62,13 +83,13 @@ function clamp01(n: number): number {
 function wordsPart(bm25: number | undefined): number | undefined {
   if (bm25 === undefined) return undefined;
   // bm25 is negative and better the lower it goes; flip it so bigger is better.
-  return MATCH_FLOOR + (1 - MATCH_FLOOR) * clamp01(-bm25 / WORDS_FULL);
+  return MATCH_FLOOR + (HALF_CAP - MATCH_FLOOR) * clamp01(-bm25 / WORDS_FULL);
 }
 
 /** The meaning half's contribution, 0 to 1. */
 function meaningPart(distance: number | undefined): number | undefined {
   if (distance === undefined) return undefined;
-  return MATCH_FLOOR + (1 - MATCH_FLOOR) * clamp01(1 - distance / MEANING_FAR);
+  return MATCH_FLOOR + (HALF_CAP - MATCH_FLOOR) * clamp01(1 - distance / MEANING_FAR);
 }
 
 export function relevanceScore(parts: ScoreParts): number {
@@ -99,8 +120,13 @@ function age(ageMs: number): string {
  * vector yet, and a sentence claiming a meaning match where there was none
  * would be worse than no sentence at all.
  */
-export function explainScore(parts: ScoreParts, terms: string[]): string {
-  const quoted = terms.length > 0 ? `“${terms.join(" ")}”` : "your words";
+export function explainScore(parts: ScoreParts, _terms: string[] = []): string {
+  // Only what was actually seen in the message. The whole query read back as a
+  // phrase was a lie under the OR fallback, where a hit needs one of its terms
+  // (whole-branch review, 2026-10-07); with nothing to go on it says "your
+  // words", which claims nothing in particular.
+  const found = parts.matched ?? [];
+  const quoted = found.length > 0 ? `“${found.join(" ")}”` : "your words";
   const where = parts.inSubject ? " in the subject" : "";
   let lead: string;
   if (parts.words !== undefined && parts.meaning !== undefined) {
@@ -108,7 +134,10 @@ export function explainScore(parts: ScoreParts, terms: string[]): string {
   } else if (parts.words !== undefined) {
     lead = `Matched ${quoted}${where}`;
   } else if (parts.meaning !== undefined) {
-    lead = `Close in meaning to what you asked, though ${quoted} are not in it`;
+    // Not "the words are not in it": `words === undefined` only means the
+    // keyword half did not return it, and a question of more than three terms
+    // does no OR fallback at all, so a meaning hit can plainly contain them.
+    lead = "Close in meaning to what you asked, rather than by the words in it";
   } else {
     // Celeste cites what she read as well as what she searched for; a message
     // nobody ranked gets no score, and this says why rather than implying one.

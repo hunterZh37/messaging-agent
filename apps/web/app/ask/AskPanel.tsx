@@ -46,6 +46,8 @@ import {
   whyOpen,
   explainState,
   type Explained,
+  rememberExplained,
+  type Explanations,
 } from "@/lib/chat";
 import {
   attachedQuestion,
@@ -325,10 +327,21 @@ function closeOnPhone(close: () => void) {
  * free text standing — they pressed a button for more, and getting less than
  * they already had would be the worst answer.
  */
-function WhyPopover({ citation, question, onLeave }: { citation: Citation; question: string; onLeave: () => void }) {
-  const [asked, setAsked] = useState<Explained | null>(null);
+function WhyPopover({
+  citation,
+  question,
+  held,
+  onAnswer,
+  onLeave,
+}: {
+  citation: Citation;
+  question: string;
+  held: Explained | null;
+  onAnswer: (answer: Explained) => void;
+  onLeave: () => void;
+}) {
   const [asking, setAsking] = useState(false);
-  const shown = explainState({ free: citation.why ?? "", asked });
+  const shown = explainState({ free: citation.why ?? "", asked: held });
   return (
     <div className="ask-why" role="tooltip" onMouseLeave={onLeave}>
       <div className="ask-why-title">Relevance {citation.score}/100</div>
@@ -346,9 +359,12 @@ function WhyPopover({ citation, question, onLeave }: { citation: Citation; quest
               e.stopPropagation();
               if (asking) return;
               setAsking(true);
+              // The answer goes up to the turn, which outlives this popover:
+              // held here it was thrown away the moment the pointer left, and
+              // the next press paid for it again (review, 2026-10-07).
               void explainAction(citation.messageId, question)
-                .then((r) => setAsked("error" in r ? { error: r.error } : { sentence: r.sentence }))
-                .catch((err: Error) => setAsked({ error: err.message }))
+                .then((r) => onAnswer("error" in r ? { error: r.error } : { sentence: r.sentence }))
+                .catch((err: Error) => onAnswer({ error: err.message }))
                 .finally(() => setAsking(false));
             }}
           >
@@ -365,6 +381,9 @@ function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; quest
   // Which card is showing its reason, if any: one at a time, so the panel is
   // never two popovers deep (2026-10-07).
   const [whyFor, setWhyFor] = useState<string | null>(null);
+  // What Celeste has already said about each message in this turn. Kept here
+  // rather than in the popover, which unmounts whenever the pointer leaves it.
+  const [explained, setExplained] = useState<Explanations>({});
   // Escape closes it without closing the panel underneath, which is what a
   // popover over a conversation has to do to be usable.
   useEffect(() => {
@@ -429,7 +448,13 @@ function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; quest
                     <div style={{ width: `${c.score}%` }} />
                   </div>
                   {whyOpen(c.messageId, whyFor) && c.why ? (
-                    <WhyPopover citation={c} question={question} onLeave={() => setWhyFor(null)} />
+                    <WhyPopover
+                      citation={c}
+                      question={question}
+                      held={explained[c.messageId] ?? null}
+                      onAnswer={(answer) => setExplained((held) => rememberExplained(held, c.messageId, answer))}
+                      onLeave={() => setWhyFor(null)}
+                    />
                   ) : null}
                 </div>
               )}

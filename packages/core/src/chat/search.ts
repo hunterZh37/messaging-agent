@@ -201,10 +201,25 @@ export function toHits(rows: SearchRow[], terms: string[] = [], now: number = Da
     // ranked against anything, so there is nothing to say about how well it
     // matched — the card simply shows no score.
     const subject = r.subject?.toLowerCase() ?? "";
+    // What the operator can be told was found: the terms this row actually
+    // shows. The snippet is the matched line, so between it and the subject
+    // this is what a reader would see for themselves (whole-branch review,
+    // 2026-10-07 — reciting the whole query was a lie under the OR fallback,
+    // where a hit needs only one of its terms).
+    const seen = `${subject} ${r.snippet?.toLowerCase() ?? ""}`;
+    const matched = terms.filter((t) => seen.includes(t.toLowerCase()));
     const parts =
       r.bm25 === undefined
         ? undefined
-        : { words: r.bm25, ageMs: Math.max(0, now - r.sent_at), inSubject: terms.some((t) => subject.includes(t.toLowerCase())) };
+        : {
+            // Per term: bm25 is a sum over the query's words, so the raw figure
+            // grows with how many were asked and a four-word question clamped
+            // every result to 100.
+            words: r.bm25 / Math.max(1, terms.length),
+            ageMs: Math.max(0, now - r.sent_at),
+            inSubject: terms.some((t) => subject.includes(t.toLowerCase())),
+            ...(matched.length > 0 ? { matched } : {}),
+          };
     return {
       messageId: r.message_id,
       threadId: r.thread_id,
@@ -357,11 +372,16 @@ function scored(hit: SearchHit, match: SearchHit["match"], fromWords: SearchHit 
   const w = fromWords?.parts;
   const m = fromMeaning?.parts;
   if (!w && !m) return { ...hit, match };
+  // Whichever half saw the operator's terms is the one that can name them, so
+  // they are carried rather than rebuilt — dropping them here left the reason
+  // saying "your words" for a hit that knew exactly which ones (2026-10-07).
+  const matched = w?.matched ?? m?.matched;
   const parts: ScoreParts = {
     ...(w?.words !== undefined ? { words: w.words } : {}),
     ...(m?.meaning !== undefined ? { meaning: m.meaning } : {}),
     ageMs: w?.ageMs ?? m?.ageMs ?? 0,
     inSubject: Boolean(w?.inSubject || m?.inSubject),
+    ...(matched && matched.length > 0 ? { matched } : {}),
   };
   return { ...hit, match, parts, score: relevanceScore(parts) };
 }

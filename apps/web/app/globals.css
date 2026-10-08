@@ -1849,8 +1849,13 @@ button.ask-score:focus-visible { outline: 2px solid var(--accent); outline-offse
 .ask-why-failed { margin-top: 8px; font-size: 12px; color: var(--danger); }
 
 /* The way in, floating in the corner the panel opens from (operator,
-   2026-10-07). Below the toasts and the navigation veil: a message about what
-   just happened must never be covered by the button that opens the panel. */
-.ask-launch { position: fixed; right: 28px; bottom: 28px; z-index: 60; width: 56px; height: 56px; border-radius: 999px; border: none; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45); }
+   2026-10-07). Under every scrim: at z 60 it painted over an open dialog and
+   still took clicks, and pressing it opened the panel *beneath* the scrim, so
+   the button appeared to vanish and nothing happened (review, 2026-10-07). The
+   sidebar row it replaced was at z 10 and safely covered; this has to be too.
+   Also under the toasts, so a message about what just happened is never hidden
+   behind the button that opens a panel. `test/stacking.test.ts` pins the
+   order, because a z-index nobody is watching drifts. */
+.ask-launch { position: fixed; right: 28px; bottom: 28px; z-index: 25; width: 56px; height: 56px; border-radius: 999px; border: none; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45); }
 .ask-launch:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
 @media (max-width: 760px) { .ask-launch { right: 16px; bottom: 16px; } }

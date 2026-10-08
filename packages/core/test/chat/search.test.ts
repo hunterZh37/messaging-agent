@@ -361,6 +361,29 @@ describe("what a real search knows about its hits", () => {
     expect(searchMessages(db, "invoice")[0]!.parts!.inSubject).toBe(false);
   });
 
+  /**
+   * bm25 sums over the query's terms, so a four-word question produces a far
+   * bigger number than a one-word one for the same quality of match. Captured
+   * raw, every result of a sentence-shaped question clamped to 100 (measured
+   * against the real index, whole-branch review 2026-10-07).
+   */
+  it("keeps a per-term bm25, so a long question does not score everything alike", () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "September", bodyText: "your statement is available to download" }]);
+    const one = searchMessages(db, "statement")[0]!.parts!.words!;
+    const four = searchMessages(db, "your statement is available")[0]!.parts!.words!;
+    // Per term, a four-word match of ordinary words is not four times better
+    // than a one-word match; raw, it would be.
+    expect(Math.abs(four)).toBeLessThan(Math.abs(one) * 2);
+  });
+
+  it("says which of the operator's terms it actually found", () => {
+    const db = testDb();
+    seedMail(db, [{ id: "m1", subject: "September", bodyText: "the invoice is attached" }]);
+    const [hit] = searchMessages(db, "invoice");
+    expect(hit!.parts!.matched).toEqual(["invoice"]);
+  });
+
   /** A search with filters and no words ranked nothing, so there is nothing to score. */
   it("leaves a filters-only result unranked", () => {
     const db = testDb();

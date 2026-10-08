@@ -591,3 +591,26 @@ export function explainState(input: { free: string; asked: Explained | null }): 
   if (input.asked) return { text: input.free, source: "ranking", failed: input.asked.error };
   return { text: input.free, source: "ranking" };
 }
+
+/** What Celeste has said about each message, kept by the turn and not by a popover. */
+export type Explanations = Record<string, Explained>;
+
+/**
+ * Remember what came back for one message (whole-branch review, 2026-10-07).
+ * The popover unmounts the moment the pointer leaves it, so an answer held
+ * inside it was thrown away the instant they looked elsewhere — and the next
+ * press spent again. The turn outlives the pointer; this is where it goes.
+ */
+export function rememberExplained(held: Explanations, messageId: string, answer: Explained): Explanations {
+  return { ...held, [messageId]: answer };
+}
+
+/**
+ * Whether this message's sentence is already paid for. A failure is not an
+ * answer: pressing again is how the operator retries one, so only a sentence
+ * closes the question.
+ */
+export function alreadyExplained(held: Explanations, messageId: string): boolean {
+  const had = held[messageId];
+  return Boolean(had && "sentence" in had);
+}
