@@ -1363,15 +1363,19 @@ html[data-switching] .inbox-grid, html[data-switching] main > .empty-wrap { opac
 /* The number in the sentence, and the chip it belongs to. */
 .ask-ref { font-size: 10px; line-height: 0; vertical-align: super; margin-left: 2px; }
 .ask-ref a { color: var(--accent); text-decoration: none; }
-.ask-cite:target { border-color: var(--accent); color: var(--fg); }
+/* A superscript in the answer jumps to the card it cites; without this the
+   scroll lands and says nothing about which one it meant (2026-10-07). */
+.ask-card:target { border-color: var(--accent); }
 .ask-thinking { color: var(--muted); }
 /* A question the app asked for the operator after they dropped a file: still
    their bubble, said more quietly, because they did not type it. */
 .ask-auto { color: var(--muted); font-style: italic; background: color-mix(in srgb, var(--fg) 4%, transparent); border-color: var(--line); }
 /* The messages an answer stands on, one chip each, straight to the thread. */
-.ask-cites { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; }
-.ask-cite { font-size: 11.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.ask-cite:hover { color: var(--fg); border-color: var(--line-strong); }
+/* One card per row. This was the chips' container and wrapped them two to a
+   line; a card is a block, and two short ones — a citation from get_thread,
+   or any turn stored before cards existed — sat side by side at unequal
+   heights (review, 2026-10-07). */
+.ask-cites { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
 /* A proposal is a button. Until it is clicked, nothing has happened. */
 .ask-actions { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .ask-action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1399,8 +1403,6 @@ textarea.field.ask-input { resize: none; font-size: 14px; min-height: 40px; heig
 .text-composer .error { margin-top: 8px; }
 .ask-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 21; }
 /* The sidebar row that opens it, above Inboxes. */
-.side-bottom .ask-glyph { fill: currentColor; stroke: none; }
-.side-bottom .ask-row.on, .drawer .side-bottom .ask-row.on { background: var(--bg); color: var(--fg); font-weight: 500; }
 
 @media (max-width: 1199px) {
   .ask-grip { display: none; }

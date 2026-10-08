@@ -33,3 +33,27 @@ describe("what covers the Ask launcher", () => {
     expect(zIndexOf(".ask-launch")).toBeLessThan(zIndexOf(".toasts"));
   });
 });
+
+/**
+ * How the cards stack up (whole-branch review, 2026-10-07). `.ask-cites` was
+ * the chips' container and wrapped them two to a row; a card is a block, and
+ * two short ones — the `get_thread` case, and every turn stored before today —
+ * sat side by side at unequal heights.
+ */
+describe("the card list", () => {
+  it("puts one card per row", () => {
+    const rule = /^\.ask-cites\s*\{([^}]*)\}/m.exec(css)![1]!;
+    expect(rule).toMatch(/flex-direction:\s*column/);
+  });
+
+  /** A superscript in the answer jumps to its card; the card has to say which it is. */
+  it("highlights the card a citation marker points at", () => {
+    expect(css).toMatch(/\.ask-card:target/);
+  });
+
+  it("has no rules left for the chip the card replaced", () => {
+    for (const dead of [".ask-cite:target", ".ask-cite:hover", ".side-bottom .ask-glyph", ".ask-row"]) {
+      expect(css.includes(`\n${dead} `), `${dead} should be gone`).toBe(false);
+    }
+  });
+});
