@@ -8,7 +8,6 @@ import type { Person } from "@messaging-agent/core";
 import type { SidebarPeople } from "./people";
 import { PEOPLE_CHOICES, SIDEBAR_PEOPLE } from "@messaging-agent/core/people";
 import { activeTreeKey, rowsForSide, sideHref, sideOfPath, treeRows, type TreeIcon, type TreeSide, type ViewParams } from "@/lib/folders";
-import { useAsk } from "../ask/AskProvider";
 import { useSendGate } from "./SendProvider";
 import { bumpPersonAction, unbumpPersonAction } from "../inbox/actions";
 import { ArchitectureDialog } from "./ArchitectureDialog";
@@ -81,15 +80,6 @@ function InboxesIcon() {
     <svg viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="3" />
       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
-}
-
-/** The Celeste mark, as a sidebar glyph: filled, unlike every stroked icon here. */
-function AskIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="ask-glyph">
-      <path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4z" />
     </svg>
   );
 }
@@ -471,7 +461,6 @@ export function Nav(props: { counts: TreeCounts; people: SidebarPeople; params?:
   const pathname = usePathname() ?? "/";
   const params = useSearchParams();
   const [open, setOpen] = useState(false);
-  const ask = useAsk();
 
   const activeKey = activeTreeKey(pathname, {
     folder: params?.get("folder") ?? undefined,
@@ -580,11 +569,6 @@ export function Nav(props: { counts: TreeCounts; people: SidebarPeople; params?:
       <People people={props.people} pathname={pathname} side={hasTexts ? side : "mail"} inDrawer={inDrawer} />
       <div className="tree-spacer" />
       <div className="side-bottom">
-        <button type="button" className={`ask-row${ask.open ? " on" : ""}`} onClick={ask.toggle} aria-pressed={ask.open}>
-          <AskIcon />
-          <span className="tree-label">Ask Celeste</span>
-          <kbd className="ask-kbd">⌘/</kbd>
-        </button>
         <Link href="/inboxes" className={inboxesOn ? "on" : undefined} aria-current={inboxesOn ? "page" : undefined}>
           <InboxesIcon />
           <span className="tree-label">Inboxes</span>
@@ -624,11 +608,6 @@ export function Nav(props: { counts: TreeCounts; people: SidebarPeople; params?:
         {/* On a phone the top bar carries Mail or Messages, a tap from
             anywhere (2026-09-14); the inbox switcher lives in the menu. */}
         {hasTexts ? <SideToggle side={side} counts={props.counts} params={props.params ?? {}} onPick={pickSide} /> : null}
-        {/* The phone top bar's way to Celeste: the sidebar's row is behind
-            the menu, and a phone has no ⌘/ (the phone pass, 2026-09-11). */}
-        <button type="button" className={`ask-topbtn${ask.open ? " on" : ""}`} onClick={ask.toggle} aria-pressed={ask.open} aria-label="Ask Celeste">
-          <AskIcon />
-        </button>
       </div>
       {open ? <div className="drawer-overlay" onClick={() => setOpen(false)} /> : null}
       {open ? (

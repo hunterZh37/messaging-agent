@@ -530,7 +530,10 @@ describe("askCeleste", () => {
 
     const turn = await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "invoice?", contextThreadId: null });
 
-    expect(turn.citations).toEqual([
+    // Which messages, and in what order — a citation also carries what the
+    // search knew about it now (2026-10-07), which the card test covers and
+    // this one is not about.
+    expect(turn.citations).toMatchObject([
       { messageId: "a1:m1", threadId: "a1:t-m1", subject: "March invoice", from: "Acme <billing@acme.test>" },
       { messageId: "a1:m2", threadId: "a1:t-m2", subject: "Lunch", from: "bob@example.com" },
     ]);
@@ -1037,5 +1040,37 @@ describe("askCeleste: quotes checked against their citations", () => {
     const client = new FakeChatClient([textResponse('> "Username: me@grants.example.com" [msg:a1:grant]')]);
     await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "?", contextThreadId: null });
     expect(client.requests).toHaveLength(1);
+  });
+});
+
+/**
+ * A card needs more than a citation used to carry, and only some citations can
+ * have it (spec 2026-10-07). Celeste cites what she read as well as what she
+ * searched for, and a message nobody ranked has no score to show.
+ */
+describe("citations carry the card", () => {
+  it("gives a cited search hit its score, and a cited thread message none", async () => {
+    const db = testDb();
+    seedMail(db, [
+      { id: "m1", subject: "March invoice", bodyText: "The invoice for March is due on the 30th." },
+      { id: "m2", threadId: "a1:t2", subject: "Lunch", bodyText: "See you Thursday." },
+    ]);
+    const chat = getOrCreateChat(db);
+    const client = new FakeChatClient([
+      toolResponse([{ id: "tu1", name: "search_inbox", input: { query: "invoice" } }]),
+      toolResponse([{ id: "tu2", name: "get_thread", input: { thread_id: "a1:t2" } }]),
+      textResponse("The invoice is due on the 30th [msg:a1:m1], and lunch is Thursday [msg:a1:m2]."),
+    ]);
+
+    const turn = await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "When is the invoice due?", contextThreadId: null });
+
+    const searched = turn.assistant.citations!.find((c) => c.messageId === "a1:m1")!;
+    const read = turn.assistant.citations!.find((c) => c.messageId === "a1:m2")!;
+    expect(searched.score).toBeGreaterThan(0);
+    expect(searched.why).toMatch(/invoice/);
+    expect(searched.sentAt).toBeTypeOf("number");
+    // Nothing ranked the one she read from the thread, so it carries no number.
+    expect(read.score).toBeUndefined();
+    expect(read.why).toBeUndefined();
   });
 });

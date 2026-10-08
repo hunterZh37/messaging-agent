@@ -1,3 +1,5 @@
+import type { ScoreParts } from "./score";
+
 /**
  * Ask Celeste (spec 10c): the operator asks, Celeste answers over the mail she
  * can see, and proposes actions the operator clicks. Nothing here executes
@@ -14,6 +16,21 @@ export interface Citation {
   subject: string;
   /** `Name <address>` when the sender has a name, the address otherwise. */
   from: string;
+  /**
+   * What the card shows beyond the name of the thing (spec 2026-10-07). All
+   * optional, for two reasons that will not go away: Celeste cites messages no
+   * search ranked — ones she read with `get_thread`, ones `list_mail` returned,
+   * the mail already on screen — and turns stored before this existed have none
+   * of it. A citation with no score draws no score rail, and a stored turn
+   * draws the plain row it always did.
+   */
+  sentAt?: number;
+  snippet?: string;
+  match?: "words" | "meaning" | "both";
+  score?: number;
+  parts?: ScoreParts;
+  /** Why it scored that, written where the search terms were known. */
+  why?: string;
 }
 
 /**
@@ -150,6 +167,17 @@ export interface SearchHit {
    * still satisfies the type.
    */
   match?: "words" | "meaning" | "both";
+  /**
+   * How relevant this hit is, 0 to 100 (spec 2026-10-07). Set by `mergeHits`,
+   * the one place that knows what both halves said about a message. Absent on
+   * a hit nothing ranked, because a score invented for the occasion is worse
+   * than no score at all.
+   */
+  score?: number;
+  /** What the score was made of, so the reason can be said without recomputing it. */
+  parts?: ScoreParts;
+  /** Why it scored that, in a sentence. Written where the search terms are known. */
+  why?: string;
 }
 
 /* ------------------------------------------------------------------ *

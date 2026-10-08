@@ -122,8 +122,13 @@ export function sendsOnEnter(ev: { key: string; shiftKey: boolean; nativeEvent?:
 /** Where the panel's width is remembered. Per browser, like the folder tree's own choices. */
 export const ASK_WIDTH_KEY = "celeste-ask-width";
 
-/** The width the panel opens at, and the one a double-click on its edge goes back to. */
-export const ASK_WIDTH_DEFAULT = 380;
+/**
+ * The width the panel opens at, and the one a double-click on its edge goes
+ * back to. Widened from 380 (2026-10-07): what she leaned on is a card now,
+ * carrying a subject, who it is from, the line that matched and a score rail,
+ * and at 380 the subject got eleven characters before an ellipsis.
+ */
+export const ASK_WIDTH_DEFAULT = 620;
 
 /** Narrower than this and a citation chip has nowhere to sit. */
 export const ASK_WIDTH_MIN = 320;
@@ -527,4 +532,85 @@ export function endedAsking(counts: Map<string, number>, key: string): void {
 
 export function isAsking(counts: Map<string, number>, key: string): boolean {
   return (counts.get(key) ?? 0) > 0;
+}
+
+/**
+ * Below this a score greys out (2026-10-07). Not the operator's instruction;
+ * a judgment that in a list where everything looks confident, nothing does.
+ * Reversible: it is one number and nothing else reads it.
+ */
+const STRONG_FROM = 70;
+
+export function scoreTone(score: number): "strong" | "weak" {
+  return score >= STRONG_FROM ? "strong" : "weak";
+}
+
+/**
+ * The line under a card's subject: who it is from and when it arrived —
+ * whichever of those the citation actually carries. A turn stored before cards
+ * existed carries a sender and nothing else, and says only that rather than
+ * leaving a dangling separator.
+ */
+export function cardMeta(c: Citation): string {
+  const sender = c.from.replace(/\s*<[^>]*>\s*$/, "").trim() || c.from;
+  const when = c.sentAt === undefined ? null : new Date(c.sentAt).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return [sender, when].filter(Boolean).join(" · ");
+}
+
+/**
+ * Whether a card has a reason to show at all (2026-10-07). It needs both the
+ * score, which is what the operator hovers, and the sentence, which is written
+ * on the server where the search terms are known. A citation nothing ranked
+ * has neither, and its card has no control to reach.
+ */
+export function hasWhy(c: Citation): boolean {
+  return c.score !== undefined && Boolean(c.why);
+}
+
+/** Which card's popover is open: one at a time, keyed by the message it belongs to. */
+export function whyOpen(messageId: string, openFor: string | null): boolean {
+  return openFor === messageId;
+}
+
+/** What Celeste said about one message, or why she could not be asked. */
+export type Explained = { sentence: string } | { error: string };
+
+/**
+ * What the popover says (spec 2026-10-07). The free text from the ranking is
+ * always there and costs nothing; what Celeste said replaces it only once it
+ * is actually back. A failure leaves the free text standing rather than
+ * blanking the panel — the operator pressed a button for more, and getting
+ * less than they had would be the worst answer.
+ */
+export function explainState(input: { free: string; asked: Explained | null }): {
+  text: string;
+  source: "ranking" | "celeste";
+  failed?: string;
+} {
+  if (input.asked && "sentence" in input.asked) return { text: input.asked.sentence, source: "celeste" };
+  if (input.asked) return { text: input.free, source: "ranking", failed: input.asked.error };
+  return { text: input.free, source: "ranking" };
+}
+
+/** What Celeste has said about each message, kept by the turn and not by a popover. */
+export type Explanations = Record<string, Explained>;
+
+/**
+ * Remember what came back for one message (whole-branch review, 2026-10-07).
+ * The popover unmounts the moment the pointer leaves it, so an answer held
+ * inside it was thrown away the instant they looked elsewhere — and the next
+ * press spent again. The turn outlives the pointer; this is where it goes.
+ */
+export function rememberExplained(held: Explanations, messageId: string, answer: Explained): Explanations {
+  return { ...held, [messageId]: answer };
+}
+
+/**
+ * Whether this message's sentence is already paid for. A failure is not an
+ * answer: pressing again is how the operator retries one, so only a sentence
+ * closes the question.
+ */
+export function alreadyExplained(held: Explanations, messageId: string): boolean {
+  const had = held[messageId];
+  return Boolean(had && "sentence" in had);
 }

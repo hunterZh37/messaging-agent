@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { draftContextReducer, openDraft, type DraftContextState } from "../lib/ask";
-import { beganAsking, endedAsking, isAsking, isNewerChat } from "../lib/chat";
+import { alreadyExplained, ASK_WIDTH_DEFAULT, beganAsking, cardMeta, clampAskWidth, endedAsking, explainState, hasWhy, isAsking, isNewerChat, rememberExplained, scoreTone, whyOpen } from "../lib/chat";
 
 interface Card {
   draftId: string;
@@ -148,5 +148,140 @@ describe("beganAsking / endedAsking / isAsking", () => {
     endedAsking(counts, "general");
     expect(isAsking(counts, "general")).toBe(false);
     expect(counts.size).toBe(0);
+  });
+});
+
+/**
+ * The card that replaces the grey one-line chip (spec 2026-10-07). Its two
+ * jobs are to say how strongly a message matched and to be honest when
+ * nothing ranked it.
+ */
+describe("scoreTone", () => {
+  it("greys a score below 70, so a weak match cannot dress up as a strong one", () => {
+    expect(scoreTone(92)).toBe("strong");
+    expect(scoreTone(70)).toBe("strong");
+    expect(scoreTone(69)).toBe("weak");
+    expect(scoreTone(0)).toBe("weak");
+  });
+});
+
+describe("cardMeta", () => {
+  const base = { messageId: "m1", threadId: "t1", subject: "Budget", from: "Keith Calix <keith@example.com>" };
+
+  it("reads as who it is from and when, with the address left off", () => {
+    expect(cardMeta({ ...base, sentAt: Date.parse("2026-09-12T10:00:00Z") })).toMatch(/^Keith Calix · /);
+    expect(cardMeta({ ...base, sentAt: Date.parse("2026-09-12T10:00:00Z") })).not.toMatch(/@/);
+  });
+
+  /** A turn stored before cards existed carries a sender and nothing else. */
+  it("says only what the citation actually carries", () => {
+    expect(cardMeta(base)).toBe("Keith Calix");
+  });
+
+  it("falls back to the address when there is no name", () => {
+    expect(cardMeta({ ...base, from: "noreply@example.com" })).toBe("noreply@example.com");
+  });
+});
+
+/**
+ * The popover on the score (spec 2026-10-07). The sentence itself is written
+ * on the server, where the search terms are known — a citation carries no
+ * query — so the panel's job is only to decide when to show it.
+ */
+describe("whyOpen", () => {
+  it("opens for the card the operator is on, and nothing else", () => {
+    expect(whyOpen("m1", "m1")).toBe(true);
+    expect(whyOpen("m1", "m2")).toBe(false);
+    expect(whyOpen("m1", null)).toBe(false);
+  });
+});
+
+describe("hasWhy", () => {
+  const base = { messageId: "m1", threadId: "t1", subject: "Budget", from: "Keith <k@example.com>" };
+
+  it("is there when a search ranked it", () => {
+    expect(hasWhy({ ...base, score: 92, why: "Matched “invoice”; sent today." })).toBe(true);
+  });
+
+  /** Nothing ranked it, so there is no score to hover and nothing to explain. */
+  it("is not there for a citation nothing ranked", () => {
+    expect(hasWhy(base)).toBe(false);
+    expect(hasWhy({ ...base, score: 92 })).toBe(false);
+  });
+});
+
+/**
+ * Explain (spec 2026-10-07). The free text from the ranking is always there;
+ * Celeste is asked only on a click, and a failure must leave what was already
+ * on screen standing rather than blanking it.
+ */
+describe("explainState", () => {
+  const free = "Matched “invoice”; sent today.";
+
+  it("shows the free text until Explain is pressed", () => {
+    expect(explainState({ free, asked: null })).toEqual({ text: free, source: "ranking" });
+  });
+
+  it("shows Celeste's sentence once it is back", () => {
+    expect(explainState({ free, asked: { sentence: "Keith is chasing the Q3 invoice." } })).toEqual({
+      text: "Keith is chasing the Q3 invoice.",
+      source: "celeste",
+    });
+  });
+
+  it("keeps the free text standing when the ask failed, and says why once", () => {
+    expect(explainState({ free, asked: { error: "no network" } })).toEqual({ text: free, source: "ranking", failed: "no network" });
+  });
+});
+
+/**
+ * The panel opens wider than it did (spec 2026-10-07): a card carries a
+ * subject, a meta line, a snippet and a score rail, and at 380 the subject got
+ * eleven characters before an ellipsis.
+ */
+describe("ASK_WIDTH_DEFAULT", () => {
+  it("opens wide enough for a card", () => {
+    expect(ASK_WIDTH_DEFAULT).toBe(620);
+  });
+
+  /** On a phone a 620px panel cannot float; it covers, as the panel does today. */
+  it("still clamps to the window on a phone", () => {
+    expect(clampAskWidth(ASK_WIDTH_DEFAULT, 390)).toBeLessThanOrEqual(390);
+  });
+
+  it("opens at its full width on a desktop", () => {
+    expect(clampAskWidth(ASK_WIDTH_DEFAULT, 1440)).toBe(620);
+  });
+});
+
+/**
+ * What Celeste said about a message, kept by the turn rather than by the
+ * popover (whole-branch review, 2026-10-07). The popover unmounts the moment
+ * the pointer leaves it, so holding the answer there meant a sentence the
+ * operator paid for was thrown away, and the next press paid again.
+ */
+describe("rememberExplained", () => {
+  it("keeps each message's answer under its own id", () => {
+    const first = rememberExplained({}, "m1", { sentence: "Keith is chasing the invoice." });
+    const both = rememberExplained(first, "m2", { sentence: "Sam is confirming Friday." });
+    expect(both.m1).toEqual({ sentence: "Keith is chasing the invoice." });
+    expect(both.m2).toEqual({ sentence: "Sam is confirming Friday." });
+  });
+
+  it("replaces a failure when the ask is tried again and works", () => {
+    const failed = rememberExplained({}, "m1", { error: "no network" });
+    expect(rememberExplained(failed, "m1", { sentence: "Keith is chasing it." }).m1).toEqual({ sentence: "Keith is chasing it." });
+  });
+});
+
+describe("alreadyExplained", () => {
+  it("is true once an answer is held, so a second press cannot spend again", () => {
+    expect(alreadyExplained({ m1: { sentence: "…" } }, "m1")).toBe(true);
+  });
+
+  it("is false for a message never asked about, and after a failure", () => {
+    expect(alreadyExplained({}, "m1")).toBe(false);
+    // A failed ask is not an answer: pressing again is how they retry.
+    expect(alreadyExplained({ m1: { error: "no network" } }, "m1")).toBe(false);
   });
 });

@@ -1363,15 +1363,19 @@ html[data-switching] .inbox-grid, html[data-switching] main > .empty-wrap { opac
 /* The number in the sentence, and the chip it belongs to. */
 .ask-ref { font-size: 10px; line-height: 0; vertical-align: super; margin-left: 2px; }
 .ask-ref a { color: var(--accent); text-decoration: none; }
-.ask-cite:target { border-color: var(--accent); color: var(--fg); }
+/* A superscript in the answer jumps to the card it cites; without this the
+   scroll lands and says nothing about which one it meant (2026-10-07). */
+.ask-card:target { border-color: var(--accent); }
 .ask-thinking { color: var(--muted); }
 /* A question the app asked for the operator after they dropped a file: still
    their bubble, said more quietly, because they did not type it. */
 .ask-auto { color: var(--muted); font-style: italic; background: color-mix(in srgb, var(--fg) 4%, transparent); border-color: var(--line); }
 /* The messages an answer stands on, one chip each, straight to the thread. */
-.ask-cites { display: flex; flex-wrap: wrap; gap: 6px; max-width: 100%; }
-.ask-cite { font-size: 11.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-.ask-cite:hover { color: var(--fg); border-color: var(--line-strong); }
+/* One card per row. This was the chips' container and wrapped them two to a
+   line; a card is a block, and two short ones — a citation from get_thread,
+   or any turn stored before cards existed — sat side by side at unequal
+   heights (review, 2026-10-07). */
+.ask-cites { display: flex; flex-direction: column; gap: 8px; max-width: 100%; }
 /* A proposal is a button. Until it is clicked, nothing has happened. */
 .ask-actions { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .ask-action-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -1399,9 +1403,6 @@ textarea.field.ask-input { resize: none; font-size: 14px; min-height: 40px; heig
 .text-composer .error { margin-top: 8px; }
 .ask-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 21; }
 /* The sidebar row that opens it, above Inboxes. */
-.side-bottom .ask-glyph { fill: currentColor; stroke: none; }
-.ask-kbd { margin-left: auto; }
-.side-bottom .ask-row.on, .drawer .side-bottom .ask-row.on { background: var(--bg); color: var(--fg); font-weight: 500; }
 
 @media (max-width: 1199px) {
   .ask-grip { display: none; }
@@ -1514,15 +1515,8 @@ textarea.field.ask-input { resize: none; font-size: 14px; min-height: 40px; heig
   .shell[data-ask="open"] main, .shell[data-ask="open"] main.inbox-page { padding-right: 0; }
 }
 /* The spark in the phone top bar. */
-.ask-topbtn { margin-left: auto; width: 44px; height: 44px; flex-shrink: 0; border: none; background: none; padding: 0; border-radius: 10px; color: var(--muted); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background-color 120ms, color 120ms; }
 /* Lime, the night theme's signal colour, in both themes (operator, 2026-09-15):
    a lime disc with the dark star on it, so it reads on a light top bar too. */
-.ask-topbtn { color: #0d0e0b; }
-.ask-topbtn::before { content: ""; position: absolute; width: 34px; height: 34px; border-radius: 999px; background: #deff9a; transition: filter 120ms; }
-.ask-topbtn { position: relative; }
-.ask-topbtn:hover::before, .ask-topbtn.on::before { filter: brightness(0.92); }
-.ask-topbtn svg { position: relative; width: 18px; height: 18px; fill: currentColor; stroke: none; }
-.ask-topbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Delete by touch: the × is always there and big enough for a thumb, and a
    swipe to the left takes the row with the finger. */
 @media (hover: none) {
@@ -1824,3 +1818,46 @@ main.architecture-page { display: flex; flex-direction: column; height: 100vh; m
    this stays on a phone: a refusal nobody can read is a button that looks
    broken (2026-09-25). */
 .draft-marks-note { font-size: 11.5px; color: var(--muted); flex: 1 1 auto; min-width: 0; }
+
+/* What Celeste leaned on, as cards (operator, 2026-10-07: "the ranking should
+   display like the ones I have shown you in the picture"). The score rail is
+   absent, not blank, on a citation no search ranked. */
+.ask-card { display: flex; gap: 14px; padding: 14px 16px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; text-decoration: none; color: inherit; }
+.ask-card:hover { border-color: var(--line-strong); }
+.ask-card-body { flex-grow: 1; min-width: 0; }
+.ask-card-subject { font-size: 14.5px; font-weight: 600; line-height: 1.3; }
+.ask-card-meta { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.ask-card-snippet { font-size: 13.5px; color: var(--ink-soft); line-height: 1.5; margin-top: 8px; }
+.ask-card-rail { width: 54px; flex-shrink: 0; text-align: right; }
+.ask-score { font-size: 26px; font-weight: 700; line-height: 1; color: var(--accent); }
+.ask-bar { height: 3px; background: var(--line); border-radius: 999px; margin-top: 6px; overflow: hidden; }
+.ask-bar > div { height: 100%; background: var(--accent); }
+/* Under 70 the number greys: in a list where everything looks confident, nothing does. */
+.ask-card-rail.weak .ask-score { color: var(--muted); }
+.ask-card-rail.weak .ask-bar > div { background: var(--ink-faint); }
+
+/* Why a message scored what it did, on the score itself (operator, 2026-10-07:
+   "when I hover over the relevance score, it shows why the search results are
+   what I'm asking for"). A popover rather than a tooltip, because Task 6 puts
+   a link inside it and the pointer has to be able to travel there. */
+.ask-card-rail { position: relative; }
+button.ask-score { background: none; border: none; padding: 0; font: inherit; font-size: 26px; font-weight: 700; line-height: 1; color: inherit; cursor: help; }
+button.ask-score:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+.ask-why { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: 300px; padding: 14px 16px; text-align: left; background: var(--bg-elev); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5); font-size: 13px; line-height: 1.55; color: var(--ink-soft); font-weight: 400; }
+.ask-why-title { font-size: 13.5px; font-weight: 600; color: var(--fg); margin-bottom: 8px; }
+.ask-why-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
+.ask-why-explain { background: none; border: none; padding: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.ask-why-explain:disabled { color: var(--muted); cursor: default; }
+.ask-why-failed { margin-top: 8px; font-size: 12px; color: var(--danger); }
+
+/* The way in, floating in the corner the panel opens from (operator,
+   2026-10-07). Under every scrim: at z 60 it painted over an open dialog and
+   still took clicks, and pressing it opened the panel *beneath* the scrim, so
+   the button appeared to vanish and nothing happened (review, 2026-10-07). The
+   sidebar row it replaced was at z 10 and safely covered; this has to be too.
+   Also under the toasts, so a message about what just happened is never hidden
+   behind the button that opens a panel. `test/stacking.test.ts` pins the
+   order, because a z-index nobody is watching drifts. */
+.ask-launch { position: fixed; right: 28px; bottom: 28px; z-index: 25; width: 56px; height: 56px; border-radius: 999px; border: none; background: var(--accent); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45); }
+.ask-launch:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+@media (max-width: 760px) { .ask-launch { right: 16px; bottom: 16px; } }

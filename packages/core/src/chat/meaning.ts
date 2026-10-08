@@ -1,6 +1,7 @@
 import type { Db } from "../db/client";
 import { EmbeddingsUnavailableError, type Embedder } from "../projects/embedder";
 import { QUERY_PREFIX } from "../projects/classify";
+import { explainScore } from "./score";
 import { ACCOUNT, COLUMNS, DEFAULT_LIMIT, MAX_SEARCH_LIMIT, ftsQuery, mergeHits, narrow, searchMessages, toHits, type SearchFilters, type SearchRow } from "./search";
 import type { SearchHit } from "./types";
 
@@ -53,11 +54,11 @@ export async function searchByMeaning(db: Db, embedder: Embedder, query: string,
   // bound parameters in `hitsFor`'s query below — enough of them, unguarded,
   // to throw "too many SQL variables" (2026-10-07).
   const limit = Math.min(opts.limit ?? DEFAULT_LIMIT, MAX_SEARCH_LIMIT);
-  let near: { message_id: string }[];
+  let near: { message_id: string; distance: number }[];
   try {
     near = db.$client
-      .prepare("SELECT message_id FROM message_embeddings WHERE embedding MATCH ? AND k = ?")
-      .all(Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength), limit * OVERSAMPLE) as { message_id: string }[];
+      .prepare("SELECT message_id, distance FROM message_embeddings WHERE embedding MATCH ? AND k = ?")
+      .all(Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength), limit * OVERSAMPLE) as { message_id: string; distance: number }[];
   } catch {
     return null;
   }
@@ -68,7 +69,7 @@ export async function searchByMeaning(db: Db, embedder: Embedder, query: string,
   // was embedded simply does not come back, and the filters narrow the rest.
   // Genuinely zero of them surviving the filters below is answered, not
   // unanswerable — that is `[]`, same as `hitsFor` returns it.
-  return hitsFor(db, near.map((r) => r.message_id), opts, limit);
+  return hitsFor(db, near.map((r) => r.message_id), opts, limit, new Map(near.map((r) => [r.message_id, r.distance])));
 }
 
 /**
@@ -81,7 +82,7 @@ export async function searchByMeaning(db: Db, embedder: Embedder, query: string,
  * the database refuses outright — an id every one of these filters excludes
  * is answered, and answered with `[]`.
  */
-function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number): SearchHit[] | null {
+function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number, distances: Map<string, number>, now: number = Date.now()): SearchHit[] | null {
   const { join, where, params } = narrow(filters);
   const holes = ids.map(() => "?").join(", ");
   const bound: (string | number)[] = [...(filters.projectId ? [filters.projectId] : []), ...ids, ...params];
@@ -109,7 +110,14 @@ function hitsFor(db: Db, ids: string[], filters: SearchFilters, limit: number): 
     if (row) kept.push(row);
     if (kept.length === limit) break;
   }
-  return toHits(kept);
+  // The distance the vector table reported is what the meaning half of a score
+  // is built from (spec 2026-10-07); `toHits` cannot see it, since it is not a
+  // column of `messages`, so it is attached here.
+  return toHits(kept).map((hit) => {
+    const meaning = distances.get(hit.messageId);
+    if (meaning === undefined) return hit;
+    return { ...hit, parts: { meaning, ageMs: Math.max(0, now - hit.sentAt), inSubject: false } };
+  });
 }
 
 /**
@@ -142,5 +150,11 @@ export async function searchHybrid(db: Db, embedder: Embedder | undefined, query
   // AND hits and 26,506 OR hits on "what", "did" and "the" alone — the
   // fallback this guards is not hypothetical).
   const words = searchMessages(db, query, opts, meaning === null ? "always" : "short-only");
-  return mergeHits(words, meaning ?? [], limit);
+  // The sentence under the score is written here, not in the browser: this is
+  // the last place that knows the operator's search terms (spec 2026-10-07).
+  // A citation carries no query, and the panel knows the question they asked
+  // Celeste rather than the one she passed to the tool — so a panel trying to
+  // explain a score would be explaining it from the wrong words.
+  const terms = query.match(/[\p{L}\p{N}_]+/gu) ?? [];
+  return mergeHits(words, meaning ?? [], limit).map((hit) => (hit.parts ? { ...hit, why: explainScore(hit.parts, terms) } : hit));
 }

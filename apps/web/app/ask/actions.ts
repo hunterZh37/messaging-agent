@@ -11,6 +11,7 @@ import {
   composeDraft,
   composeText,
   createOllamaEmbedder,
+  explainMessage,
   QUERY_EMBED_TIMEOUT_MS,
   operatorNameFor,
   createDrafter,
@@ -123,6 +124,43 @@ export interface ChatFile {
   filename: string;
   mimeType: string;
   size: number;
+}
+
+/**
+ * One sentence about one message, written by Celeste (spec 2026-10-07). The
+ * only part of a result card that spends money, and it spends it only when the
+ * operator presses Explain: the text under the score comes free from the
+ * ranking and is already in front of them.
+ *
+ * It writes nothing to the conversation. This is an aside about one message,
+ * not a turn — a question they did not ask should not appear in their history.
+ */
+export async function explainAction(messageId: string, query: string): Promise<{ sentence: string } | StepError> {
+  try {
+    const { cfg, db } = core();
+    const row = db
+      .select({ subject: schema.messages.subject, fromName: schema.messages.fromName, fromAddress: schema.messages.fromAddress, sentAt: schema.messages.sentAt, bodyText: schema.messages.bodyText })
+      .from(schema.messages)
+      .where(eq(schema.messages.id, messageId))
+      .get();
+    if (!row) return { error: "That message is gone." };
+    const accountId = await selectedInbox();
+    const sentence = await explainMessage(
+      providerForRole("drafter", cfg, db, accountId ? { accountId } : {}),
+      {
+        subject: row.subject || "(no subject)",
+        from: row.fromName ? `${row.fromName} <${row.fromAddress}>` : row.fromAddress,
+        sentAt: row.sentAt,
+        bodyText: row.bodyText ?? "",
+      },
+      query,
+    );
+    return { sentence };
+  } catch (err) {
+    // The free text stays on their screen either way; this only says why the
+    // richer sentence did not arrive.
+    return { error: (err as Error).message };
+  }
 }
 
 /**

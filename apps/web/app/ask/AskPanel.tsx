@@ -11,7 +11,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ProposedAction } from "@messaging-agent/core";
+import type { Citation, ProposedAction } from "@messaging-agent/core";
 import {
   actionDoneLabel,
   actionLabel,
@@ -29,6 +29,7 @@ import {
   conversationAboutLabel,
   conversationCostLabel,
   conversationUsageLabel,
+  cardMeta,
   citationChipLabel,
   citeAnchorId,
   renderAnswer,
@@ -40,6 +41,13 @@ import {
   threadChipLabel,
   threadsOf,
   type Turn,
+  scoreTone,
+  hasWhy,
+  whyOpen,
+  explainState,
+  type Explained,
+  rememberExplained,
+  type Explanations,
 } from "@/lib/chat";
 import {
   attachedQuestion,
@@ -68,6 +76,7 @@ import {
   type ChatFile,
   type ChatHistoryRow,
   deleteChatAction,
+  explainAction,
 } from "./actions";
 import { useAsk, type LookingAtDraft } from "./AskProvider";
 
@@ -310,8 +319,83 @@ function closeOnPhone(close: () => void) {
   if (window.matchMedia?.("(max-width: 899px)").matches) close();
 }
 
+/**
+ * Why a message scored what it did. The sentence from the ranking is there the
+ * instant the operator points at the number and costs nothing; Explain asks
+ * Celeste about that one message, which costs a fraction of a cent, and only
+ * for the result they asked about (spec 2026-10-07). A failed ask leaves the
+ * free text standing — they pressed a button for more, and getting less than
+ * they already had would be the worst answer.
+ */
+function WhyPopover({
+  citation,
+  question,
+  held,
+  onAnswer,
+  onLeave,
+}: {
+  citation: Citation;
+  question: string;
+  held: Explained | null;
+  onAnswer: (answer: Explained) => void;
+  onLeave: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  const shown = explainState({ free: citation.why ?? "", asked: held });
+  return (
+    <div className="ask-why" role="tooltip" onMouseLeave={onLeave}>
+      <div className="ask-why-title">Relevance {citation.score}/100</div>
+      <div>{shown.text}</div>
+      {shown.failed ? <div className="ask-why-failed">Celeste could not say more: {shown.failed}</div> : null}
+      <div className="ask-why-foot">
+        <span>{shown.source === "celeste" ? "Written by Celeste" : "From how it was ranked"}</span>
+        {shown.source === "celeste" ? null : (
+          <button
+            type="button"
+            className="ask-why-explain"
+            disabled={asking}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (asking) return;
+              setAsking(true);
+              // The answer goes up to the turn, which outlives this popover:
+              // held here it was thrown away the moment the pointer left, and
+              // the next press paid for it again (review, 2026-10-07).
+              void explainAction(citation.messageId, question)
+                .then((r) => onAnswer("error" in r ? { error: r.error } : { sentence: r.sentence }))
+                .catch((err: Error) => onAnswer({ error: err.message }))
+                .finally(() => setAsking(false));
+            }}
+          >
+            {asking ? "Asking…" : "Explain ▸"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; question: string; applied?: boolean; drafted?: string[] | "running" }) {
   const { close } = useAsk();
+  // Which card is showing its reason, if any: one at a time, so the panel is
+  // never two popovers deep (2026-10-07).
+  const [whyFor, setWhyFor] = useState<string | null>(null);
+  // What Celeste has already said about each message in this turn. Kept here
+  // rather than in the popover, which unmounts whenever the pointer leaves it.
+  const [explained, setExplained] = useState<Explanations>({});
+  // Escape closes it without closing the panel underneath, which is what a
+  // popover over a conversation has to do to be usable.
+  useEffect(() => {
+    if (!whyFor) return;
+    const shut = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setWhyFor(null);
+    };
+    window.addEventListener("keydown", shut, true);
+    return () => window.removeEventListener("keydown", shut, true);
+  }, [whyFor]);
   const cited = new Set(turn.citations.map((c) => c.messageId));
   // A marker points at its own chip when there is one; when there is not, the
   // number stands on its own rather than linking nowhere.
@@ -323,8 +407,57 @@ function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; quest
       {turn.citations.length > 0 ? (
         <div className="ask-cites">
           {turn.citations.map((c) => (
-            <Link key={c.messageId} id={citeAnchorId(turn.id, c.messageId)} href={threadHref(c.threadId)} className="chip ask-cite" onClick={() => closeOnPhone(close)}>
-              {citationChipLabel(c)}
+            // What she leaned on, as a card rather than a one-line chip
+            // (operator, 2026-10-07: "the ranking should display like the ones
+            // I have shown you in the picture"). The score rail is drawn only
+            // when a search actually ranked it: Celeste cites what she read as
+            // well as what she searched for, and a message nobody ranked gets
+            // no number rather than an invented one.
+            <Link key={c.messageId} id={citeAnchorId(turn.id, c.messageId)} href={threadHref(c.threadId)} className="ask-card" onClick={() => closeOnPhone(close)}>
+              <div className="ask-card-body">
+                <div className="ask-card-subject">{c.subject}</div>
+                <div className="ask-card-meta">{cardMeta(c)}</div>
+                {c.snippet ? <div className="ask-card-snippet">{c.snippet}</div> : null}
+              </div>
+              {c.score === undefined ? null : (
+                <div className={`ask-card-rail ${scoreTone(c.score)}`}>
+                  {hasWhy(c) ? (
+                    // The score is the control, so it is a button: a div is
+                    // skipped by Tab, and the reason has to be reachable from
+                    // the keyboard as well as the pointer (2026-10-07). The
+                    // card around it is a link, so the press must not travel.
+                    <button
+                      type="button"
+                      className="ask-score"
+                      aria-expanded={whyOpen(c.messageId, whyFor)}
+                      aria-label={`Relevance ${c.score} of 100 — why`}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setWhyFor(whyOpen(c.messageId, whyFor) ? null : c.messageId);
+                      }}
+                      onMouseEnter={() => setWhyFor(c.messageId)}
+                      onFocus={() => setWhyFor(c.messageId)}
+                    >
+                      {c.score}
+                    </button>
+                  ) : (
+                    <div className="ask-score">{c.score}</div>
+                  )}
+                  <div className="ask-bar">
+                    <div style={{ width: `${c.score}%` }} />
+                  </div>
+                  {whyOpen(c.messageId, whyFor) && c.why ? (
+                    <WhyPopover
+                      citation={c}
+                      question={question}
+                      held={explained[c.messageId] ?? null}
+                      onAnswer={(answer) => setExplained((held) => rememberExplained(held, c.messageId, answer))}
+                      onLeave={() => setWhyFor(null)}
+                    />
+                  ) : null}
+                </div>
+              )}
             </Link>
           ))}
         </div>

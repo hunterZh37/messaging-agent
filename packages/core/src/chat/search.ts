@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { messages, type MessageRow } from "../db/schema";
 import { stripQuoted } from "../text/quoted";
+import { relevanceScore, type ScoreParts } from "./score";
 import type { SearchHit } from "./types";
 
 /** How much of a body goes into the index. Past this a mail is a document, not a message. */
@@ -122,6 +123,8 @@ export interface SearchRow {
   snippet: string;
   provider: string;
   folder: string;
+  /** Only on a row that came from the index: `bm25()`, negative and better the lower it goes. */
+  bm25?: number;
 }
 
 /** Where a message came from, as Celeste says it (2026-09-11: texts and WhatsApp are searchable too). */
@@ -190,9 +193,33 @@ export const ACCOUNT = " JOIN accounts a ON a.id = m.account_id";
  * (2026-10-07): two code paths constructing a `SearchHit` would drift the
  * moment one of them changed.
  */
-export function toHits(rows: SearchRow[]): SearchHit[] {
+export function toHits(rows: SearchRow[], terms: string[] = [], now: number = Date.now()): SearchHit[] {
   return rows.map((r) => {
     const channel = channelOf(r.provider);
+    // Only a row the index ranked carries a bm25, and only those get the parts
+    // a score is built from (spec 2026-10-07). A filters-only result was never
+    // ranked against anything, so there is nothing to say about how well it
+    // matched — the card simply shows no score.
+    const subject = r.subject?.toLowerCase() ?? "";
+    // What the operator can be told was found: the terms this row actually
+    // shows. The snippet is the matched line, so between it and the subject
+    // this is what a reader would see for themselves (whole-branch review,
+    // 2026-10-07 — reciting the whole query was a lie under the OR fallback,
+    // where a hit needs only one of its terms).
+    const seen = `${subject} ${r.snippet?.toLowerCase() ?? ""}`;
+    const matched = terms.filter((t) => seen.includes(t.toLowerCase()));
+    const parts =
+      r.bm25 === undefined
+        ? undefined
+        : {
+            // Per term: bm25 is a sum over the query's words, so the raw figure
+            // grows with how many were asked and a four-word question clamped
+            // every result to 100.
+            words: r.bm25 / Math.max(1, terms.length),
+            ageMs: Math.max(0, now - r.sent_at),
+            inSubject: terms.some((t) => subject.includes(t.toLowerCase())),
+            ...(matched.length > 0 ? { matched } : {}),
+          };
     return {
       messageId: r.message_id,
       threadId: r.thread_id,
@@ -203,24 +230,25 @@ export function toHits(rows: SearchRow[]): SearchHit[] {
       snippet: r.snippet,
       channel,
       ...(r.folder === "trash" ? { deleted: true } : {}),
+      ...(parts ? { parts } : {}),
     };
   });
 }
 
 /** Words plus filters: the index decides the order, best match first. */
-function runMatch(db: Db, match: string, filters: SearchFilters, limit: number): SearchHit[] {
+function runMatch(db: Db, match: string, filters: SearchFilters, limit: number, terms: string[]): SearchHit[] {
   const { join, where, params } = narrow(filters);
   // The project id binds in the join, ahead of every other parameter.
   const bound: (string | number)[] = [...(filters.projectId ? [filters.projectId] : []), match, ...params, limit];
   const rows = db.$client
     .prepare(
-      `SELECT ${COLUMNS}, snippet(messages_fts, 4, '', '', '…', 14) AS snippet
+      `SELECT ${COLUMNS}, snippet(messages_fts, 4, '', '', '…', 14) AS snippet, bm25(messages_fts) AS bm25
        FROM messages_fts f JOIN messages m ON m.id = f.message_id${ACCOUNT}${join}
        WHERE messages_fts MATCH ?${where.length > 0 ? ` AND ${where.join(" AND ")}` : ""}
        ORDER BY rank LIMIT ?`,
     )
     .all(...bound) as SearchRow[];
-  return toHits(rows);
+  return toHits(rows, terms);
 }
 
 /** Filters with no words: there is no rank to sort by, so the newest come first. */
@@ -273,13 +301,17 @@ const OR_FALLBACK_MAX_TERMS = 3;
 export function searchMessages(db: Db, query: string, opts: SearchFilters = {}, fallback: "always" | "short-only" = "always"): SearchHit[] {
   const limit = Math.min(opts.limit ?? DEFAULT_LIMIT, MAX_SEARCH_LIMIT);
   try {
+    // The operator's own words, which `toHits` needs to say whether they were
+    // in the subject — the one part of the score's reason that cannot be read
+    // off the index (2026-10-07).
+    const terms = query.match(/[\p{L}\p{N}_]+/gu) ?? [];
     const all = ftsQuery(query, "AND");
     if (!all) return runFilters(db, opts, limit);
-    const hits = runMatch(db, all, opts, limit);
+    const hits = runMatch(db, all, opts, limit, terms);
     if (hits.length > 0) return hits;
     if (fallback === "short-only" && wordCount(query) > OR_FALLBACK_MAX_TERMS) return [];
     const any = ftsQuery(query, "OR");
-    return any ? runMatch(db, any, opts, limit) : [];
+    return any ? runMatch(db, any, opts, limit, terms) : [];
   } catch {
     // A query the index refuses is a miss, not a crash: the model asked
     // something, and "nothing found" is an answer it can work with.
@@ -312,6 +344,11 @@ export function mergeHits(words: SearchHit[], meaning: SearchHit[], limit: numbe
   const wordIds = new Set(words.map((h) => h.messageId));
   const meaningIds = new Set(meaning.map((h) => h.messageId));
   const matchFor = (id: string): SearchHit["match"] => (wordIds.has(id) && meaningIds.has(id) ? "both" : meaningIds.has(id) ? "meaning" : "words");
+  // What each half said about a message, so a message both of them found can
+  // be scored on the evidence of both (spec 2026-10-07). Built from the full
+  // lists, before the limit truncates either of them.
+  const byWords = new Map(words.map((h) => [h.messageId, h]));
+  const byMeaning = new Map(meaning.map((h) => [h.messageId, h]));
 
   const out: SearchHit[] = [];
   const seen = new Set<string>();
@@ -319,8 +356,37 @@ export function mergeHits(words: SearchHit[], meaning: SearchHit[], limit: numbe
     for (const hit of [words[i], meaning[i]]) {
       if (!hit || seen.has(hit.messageId) || out.length >= limit) continue;
       seen.add(hit.messageId);
-      out.push({ ...hit, match: matchFor(hit.messageId) });
+      out.push(scored(hit, matchFor(hit.messageId), byWords.get(hit.messageId), byMeaning.get(hit.messageId)));
     }
   }
   return out;
+}
+
+/**
+ * One hit with its score, from whatever the two halves each knew about it. A
+ * hit neither half ranked — which cannot come from a search, but keeps this
+ * total — gets its match and no score: the panel then draws the card without
+ * a score rail rather than showing a number nothing stands behind.
+ */
+function scored(hit: SearchHit, match: SearchHit["match"], fromWords: SearchHit | undefined, fromMeaning: SearchHit | undefined): SearchHit {
+  const w = fromWords?.parts;
+  const m = fromMeaning?.parts;
+  if (!w && !m) return { ...hit, match };
+  // Whichever half saw the operator's terms is the one that can name them, so
+  // they are carried rather than rebuilt — dropping them here left the reason
+  // saying "your words" for a hit that knew exactly which ones (2026-10-07).
+  const matched = w?.matched ?? m?.matched;
+  const parts: ScoreParts = {
+    ...(w?.words !== undefined ? { words: w.words } : {}),
+    ...(m?.meaning !== undefined ? { meaning: m.meaning } : {}),
+    ageMs: w?.ageMs ?? m?.ageMs ?? 0,
+    inSubject: Boolean(w?.inSubject || m?.inSubject),
+    ...(matched && matched.length > 0 ? { matched } : {}),
+  };
+  // The keyword half's snippet is the line the operator's words are on; the
+  // meaning half's is whatever the body opens with. A message both halves
+  // found can enter from either list, and the reason beside it says the words
+  // appear in it — so the card shows the line where they do (2026-10-07).
+  const snippet = fromWords?.snippet || hit.snippet;
+  return { ...hit, snippet, match, parts, score: relevanceScore(parts) };
 }

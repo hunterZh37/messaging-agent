@@ -7,6 +7,7 @@ import { core } from "@/lib/core";
 import { ASK_COOKIE } from "@/lib/selection";
 import { requestIsUnlocked } from "@/lib/session";
 import { OPEN_SCRIPT } from "@/lib/landing";
+import { AskLauncher } from "./ask/AskLauncher";
 import { AskProvider } from "./ask/AskProvider";
 import { SendProvider } from "./queue/SendProvider";
 import { SyncProvider } from "./queue/sync";
@@ -97,6 +98,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 the Undo go on counting while the operator reads something
                 else (spec 8, 2026-09-10). */}
             <SendProvider>{children}</SendProvider>
+            {/* The way in, in the corner it opens from (2026-10-07). */}
+            <AskLauncher />
           </AskProvider>
         </SyncProvider>
       </body>
