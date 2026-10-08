@@ -22,7 +22,12 @@ export interface ScoreParts {
    * (whole-branch review, 2026-10-07). Absent when the words half did not find it.
    */
   words?: number;
-  /** Cosine distance from the vector table: 0 is identical. Absent when the meaning half did not find it. */
+  /**
+   * The distance `message_embeddings` reported: **L2**, not cosine — the vec0
+   * table is created without a `distance_metric` (`db/client.ts`), so that is
+   * what it returns, over vectors nomic has already normalised. Smaller is
+   * nearer. Absent when the meaning half did not find it.
+   */
   meaning?: number;
   /** How long ago it was sent. */
   ageMs: number;
@@ -43,7 +48,19 @@ export interface ScoreParts {
  */
 const WORDS_FULL = 12;
 
-/** A cosine distance at or beyond this counts as no meaning match at all. */
+/**
+ * The band real questions actually produce, measured rather than assumed
+ * (2026-10-07). Five real questions through Ollama against the operator's own
+ * 94,000-message index, top eight neighbours each: every distance fell between
+ * 0.69 and 0.93. The old scale treated 0 as the near end, which put every
+ * meaning hit between 38 and 49 — so semantic search, the thing this score
+ * exists to surface, was permanently greyed out as weak.
+ *
+ * Query-to-document distances are what matters here, not document-to-document:
+ * nomic is asymmetric, and a question embedded as a question sits further from
+ * its answers than two documents about the same thing sit from each other.
+ */
+const MEANING_NEAR = 0.65;
 const MEANING_FAR = 1;
 
 /** What two independent kinds of evidence agreeing is worth. */
@@ -89,7 +106,7 @@ function wordsPart(bm25: number | undefined): number | undefined {
 /** The meaning half's contribution, 0 to 1. */
 function meaningPart(distance: number | undefined): number | undefined {
   if (distance === undefined) return undefined;
-  return MATCH_FLOOR + (HALF_CAP - MATCH_FLOOR) * clamp01(1 - distance / MEANING_FAR);
+  return MATCH_FLOOR + (HALF_CAP - MATCH_FLOOR) * clamp01((MEANING_FAR - distance) / (MEANING_FAR - MEANING_NEAR));
 }
 
 export function relevanceScore(parts: ScoreParts): number {

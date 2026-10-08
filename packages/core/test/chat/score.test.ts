@@ -74,6 +74,28 @@ describe("relevanceScore", () => {
     expect(both).toBeGreaterThan(relevanceScore({ ...base, meaning: 0.0 }));
   });
 
+  /**
+   * The distances are L2 over unit-normalised vectors, not cosine, and a real
+   * question's nearest neighbours sit far further out than the constant
+   * assumed. Measured through Ollama against the operator's own 94k-message
+   * index, five real questions, top eight each: every distance fell between
+   * 0.69 and 0.93 — which under the old scale put every meaning hit at 38 to
+   * 49, so semantic search was permanently marked weak (review, 2026-10-07).
+   */
+  it("lets the best meaning match clear the strong threshold", () => {
+    expect(relevanceScore({ ...base, meaning: 0.69 })).toBeGreaterThanOrEqual(70);
+  });
+
+  it("still calls a distant neighbour weak", () => {
+    expect(relevanceScore({ ...base, meaning: 0.93 })).toBeLessThan(70);
+  });
+
+  it("spreads the band real questions actually produce", () => {
+    const near = relevanceScore({ ...base, meaning: 0.69 });
+    const far = relevanceScore({ ...base, meaning: 0.93 });
+    expect(near - far).toBeGreaterThan(20);
+  });
+
   it("is a whole number between 0 and 100 whatever it is given", () => {
     const wild: ScoreParts[] = [
       { ...base, words: -999 },

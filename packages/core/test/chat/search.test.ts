@@ -337,6 +337,22 @@ describe("scores on hits", () => {
     expect(merged[0]!.score!).toBeGreaterThan(mergeHits([w], [], 10)[0]!.score!);
   });
 
+  /**
+   * A message both halves found can enter the merge from the meaning list,
+   * which carries the opening of the body rather than the line that matched.
+   * The reason beside it says the operator's words appear in it, so the card
+   * must show the line where they do (review, 2026-10-07).
+   */
+  it("shows the matched line on a hit both halves found, whichever list it entered from", () => {
+    const w = { ...hit("a"), snippet: "…the invoice is attached…", parts: { words: -9, ageMs: 0, inSubject: false } };
+    const m = { ...hit("a"), snippet: "Hello, hope you are well", parts: { meaning: 0.7, ageMs: 0, inSubject: false } };
+    // The meaning half ranked it first, so it enters from that list.
+    const merged = mergeHits([hit("z"), hit("y"), hit("x"), w], [m], 10);
+    const both = merged.find((h) => h.messageId === "a")!;
+    expect(both.match).toBe("both");
+    expect(both.snippet).toBe("…the invoice is attached…");
+  });
+
   /** A hit that was never ranked keeps its match but gets no score to invent. */
   it("leaves a hit with no parts unscored", () => {
     const merged = mergeHits([hit("a")], [], 10);

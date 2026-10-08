@@ -383,5 +383,10 @@ function scored(hit: SearchHit, match: SearchHit["match"], fromWords: SearchHit 
     inSubject: Boolean(w?.inSubject || m?.inSubject),
     ...(matched && matched.length > 0 ? { matched } : {}),
   };
-  return { ...hit, match, parts, score: relevanceScore(parts) };
+  // The keyword half's snippet is the line the operator's words are on; the
+  // meaning half's is whatever the body opens with. A message both halves
+  // found can enter from either list, and the reason beside it says the words
+  // appear in it — so the card shows the line where they do (2026-10-07).
+  const snippet = fromWords?.snippet || hit.snippet;
+  return { ...hit, snippet, match, parts, score: relevanceScore(parts) };
 }
