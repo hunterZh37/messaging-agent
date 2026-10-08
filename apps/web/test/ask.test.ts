@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { draftContextReducer, openDraft, type DraftContextState } from "../lib/ask";
-import { beganAsking, cardMeta, endedAsking, hasWhy, isAsking, isNewerChat, scoreTone, whyOpen } from "../lib/chat";
+import { beganAsking, cardMeta, endedAsking, explainState, hasWhy, isAsking, isNewerChat, scoreTone, whyOpen } from "../lib/chat";
 
 interface Card {
   draftId: string;
@@ -207,5 +207,29 @@ describe("hasWhy", () => {
   it("is not there for a citation nothing ranked", () => {
     expect(hasWhy(base)).toBe(false);
     expect(hasWhy({ ...base, score: 92 })).toBe(false);
+  });
+});
+
+/**
+ * Explain (spec 2026-10-07). The free text from the ranking is always there;
+ * Celeste is asked only on a click, and a failure must leave what was already
+ * on screen standing rather than blanking it.
+ */
+describe("explainState", () => {
+  const free = "Matched “invoice”; sent today.";
+
+  it("shows the free text until Explain is pressed", () => {
+    expect(explainState({ free, asked: null })).toEqual({ text: free, source: "ranking" });
+  });
+
+  it("shows Celeste's sentence once it is back", () => {
+    expect(explainState({ free, asked: { sentence: "Keith is chasing the Q3 invoice." } })).toEqual({
+      text: "Keith is chasing the Q3 invoice.",
+      source: "celeste",
+    });
+  });
+
+  it("keeps the free text standing when the ask failed, and says why once", () => {
+    expect(explainState({ free, asked: { error: "no network" } })).toEqual({ text: free, source: "ranking", failed: "no network" });
   });
 });

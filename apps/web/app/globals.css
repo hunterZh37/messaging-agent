@@ -1852,3 +1852,6 @@ button.ask-score:focus-visible { outline: 2px solid var(--accent); outline-offse
 .ask-why { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: 300px; padding: 14px 16px; text-align: left; background: var(--bg-elev); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5); font-size: 13px; line-height: 1.55; color: var(--ink-soft); font-weight: 400; }
 .ask-why-title { font-size: 13.5px; font-weight: 600; color: var(--fg); margin-bottom: 8px; }
 .ask-why-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 11.5px; color: var(--muted); }
+.ask-why-explain { background: none; border: none; padding: 0; font: inherit; font-size: 12px; font-weight: 600; color: var(--accent); cursor: pointer; }
+.ask-why-explain:disabled { color: var(--muted); cursor: default; }
+.ask-why-failed { margin-top: 8px; font-size: 12px; color: var(--danger); }

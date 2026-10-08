@@ -566,3 +566,23 @@ export function hasWhy(c: Citation): boolean {
 export function whyOpen(messageId: string, openFor: string | null): boolean {
   return openFor === messageId;
 }
+
+/** What Celeste said about one message, or why she could not be asked. */
+export type Explained = { sentence: string } | { error: string };
+
+/**
+ * What the popover says (spec 2026-10-07). The free text from the ranking is
+ * always there and costs nothing; what Celeste said replaces it only once it
+ * is actually back. A failure leaves the free text standing rather than
+ * blanking the panel — the operator pressed a button for more, and getting
+ * less than they had would be the worst answer.
+ */
+export function explainState(input: { free: string; asked: Explained | null }): {
+  text: string;
+  source: "ranking" | "celeste";
+  failed?: string;
+} {
+  if (input.asked && "sentence" in input.asked) return { text: input.asked.sentence, source: "celeste" };
+  if (input.asked) return { text: input.free, source: "ranking", failed: input.asked.error };
+  return { text: input.free, source: "ranking" };
+}

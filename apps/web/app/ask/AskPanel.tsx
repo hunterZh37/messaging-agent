@@ -11,7 +11,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ProposedAction } from "@messaging-agent/core";
+import type { Citation, ProposedAction } from "@messaging-agent/core";
 import {
   actionDoneLabel,
   actionLabel,
@@ -44,6 +44,8 @@ import {
   scoreTone,
   hasWhy,
   whyOpen,
+  explainState,
+  type Explained,
 } from "@/lib/chat";
 import {
   attachedQuestion,
@@ -72,6 +74,7 @@ import {
   type ChatFile,
   type ChatHistoryRow,
   deleteChatAction,
+  explainAction,
 } from "./actions";
 import { useAsk, type LookingAtDraft } from "./AskProvider";
 
@@ -314,6 +317,49 @@ function closeOnPhone(close: () => void) {
   if (window.matchMedia?.("(max-width: 899px)").matches) close();
 }
 
+/**
+ * Why a message scored what it did. The sentence from the ranking is there the
+ * instant the operator points at the number and costs nothing; Explain asks
+ * Celeste about that one message, which costs a fraction of a cent, and only
+ * for the result they asked about (spec 2026-10-07). A failed ask leaves the
+ * free text standing — they pressed a button for more, and getting less than
+ * they already had would be the worst answer.
+ */
+function WhyPopover({ citation, question, onLeave }: { citation: Citation; question: string; onLeave: () => void }) {
+  const [asked, setAsked] = useState<Explained | null>(null);
+  const [asking, setAsking] = useState(false);
+  const shown = explainState({ free: citation.why ?? "", asked });
+  return (
+    <div className="ask-why" role="tooltip" onMouseLeave={onLeave}>
+      <div className="ask-why-title">Relevance {citation.score}/100</div>
+      <div>{shown.text}</div>
+      {shown.failed ? <div className="ask-why-failed">Celeste could not say more: {shown.failed}</div> : null}
+      <div className="ask-why-foot">
+        <span>{shown.source === "celeste" ? "Written by Celeste" : "From how it was ranked"}</span>
+        {shown.source === "celeste" ? null : (
+          <button
+            type="button"
+            className="ask-why-explain"
+            disabled={asking}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (asking) return;
+              setAsking(true);
+              void explainAction(citation.messageId, question)
+                .then((r) => setAsked("error" in r ? { error: r.error } : { sentence: r.sentence }))
+                .catch((err: Error) => setAsked({ error: err.message }))
+                .finally(() => setAsking(false));
+            }}
+          >
+            {asking ? "Asking…" : "Explain ▸"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; question: string; applied?: boolean; drafted?: string[] | "running" }) {
   const { close } = useAsk();
   // Which card is showing its reason, if any: one at a time, so the panel is
@@ -383,13 +429,7 @@ function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; quest
                     <div style={{ width: `${c.score}%` }} />
                   </div>
                   {whyOpen(c.messageId, whyFor) && c.why ? (
-                    <div className="ask-why" role="tooltip" onMouseLeave={() => setWhyFor(null)}>
-                      <div className="ask-why-title">Relevance {c.score}/100</div>
-                      <div>{c.why}</div>
-                      <div className="ask-why-foot">
-                        <span>From how it was ranked</span>
-                      </div>
-                    </div>
+                    <WhyPopover citation={c} question={question} onLeave={() => setWhyFor(null)} />
                   ) : null}
                 </div>
               )}
