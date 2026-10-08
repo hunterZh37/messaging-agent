@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { draftContextReducer, openDraft, type DraftContextState } from "../lib/ask";
-import { beganAsking, endedAsking, isAsking, isNewerChat } from "../lib/chat";
+import { beganAsking, cardMeta, endedAsking, isAsking, isNewerChat, scoreTone } from "../lib/chat";
 
 interface Card {
   draftId: string;
@@ -148,5 +148,37 @@ describe("beganAsking / endedAsking / isAsking", () => {
     endedAsking(counts, "general");
     expect(isAsking(counts, "general")).toBe(false);
     expect(counts.size).toBe(0);
+  });
+});
+
+/**
+ * The card that replaces the grey one-line chip (spec 2026-10-07). Its two
+ * jobs are to say how strongly a message matched and to be honest when
+ * nothing ranked it.
+ */
+describe("scoreTone", () => {
+  it("greys a score below 70, so a weak match cannot dress up as a strong one", () => {
+    expect(scoreTone(92)).toBe("strong");
+    expect(scoreTone(70)).toBe("strong");
+    expect(scoreTone(69)).toBe("weak");
+    expect(scoreTone(0)).toBe("weak");
+  });
+});
+
+describe("cardMeta", () => {
+  const base = { messageId: "m1", threadId: "t1", subject: "Budget", from: "Keith Calix <keith@example.com>" };
+
+  it("reads as who it is from and when, with the address left off", () => {
+    expect(cardMeta({ ...base, sentAt: Date.parse("2026-09-12T10:00:00Z") })).toMatch(/^Keith Calix · /);
+    expect(cardMeta({ ...base, sentAt: Date.parse("2026-09-12T10:00:00Z") })).not.toMatch(/@/);
+  });
+
+  /** A turn stored before cards existed carries a sender and nothing else. */
+  it("says only what the citation actually carries", () => {
+    expect(cardMeta(base)).toBe("Keith Calix");
+  });
+
+  it("falls back to the address when there is no name", () => {
+    expect(cardMeta({ ...base, from: "noreply@example.com" })).toBe("noreply@example.com");
   });
 });

@@ -528,3 +528,26 @@ export function endedAsking(counts: Map<string, number>, key: string): void {
 export function isAsking(counts: Map<string, number>, key: string): boolean {
   return (counts.get(key) ?? 0) > 0;
 }
+
+/**
+ * Below this a score greys out (2026-10-07). Not the operator's instruction;
+ * a judgment that in a list where everything looks confident, nothing does.
+ * Reversible: it is one number and nothing else reads it.
+ */
+const STRONG_FROM = 70;
+
+export function scoreTone(score: number): "strong" | "weak" {
+  return score >= STRONG_FROM ? "strong" : "weak";
+}
+
+/**
+ * The line under a card's subject: who it is from and when it arrived —
+ * whichever of those the citation actually carries. A turn stored before cards
+ * existed carries a sender and nothing else, and says only that rather than
+ * leaving a dangling separator.
+ */
+export function cardMeta(c: Citation): string {
+  const sender = c.from.replace(/\s*<[^>]*>\s*$/, "").trim() || c.from;
+  const when = c.sentAt === undefined ? null : new Date(c.sentAt).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+  return [sender, when].filter(Boolean).join(" · ");
+}

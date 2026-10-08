@@ -29,6 +29,7 @@ import {
   conversationAboutLabel,
   conversationCostLabel,
   conversationUsageLabel,
+  cardMeta,
   citationChipLabel,
   citeAnchorId,
   renderAnswer,
@@ -40,6 +41,7 @@ import {
   threadChipLabel,
   threadsOf,
   type Turn,
+  scoreTone,
 } from "@/lib/chat";
 import {
   attachedQuestion,
@@ -323,8 +325,26 @@ function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; quest
       {turn.citations.length > 0 ? (
         <div className="ask-cites">
           {turn.citations.map((c) => (
-            <Link key={c.messageId} id={citeAnchorId(turn.id, c.messageId)} href={threadHref(c.threadId)} className="chip ask-cite" onClick={() => closeOnPhone(close)}>
-              {citationChipLabel(c)}
+            // What she leaned on, as a card rather than a one-line chip
+            // (operator, 2026-10-07: "the ranking should display like the ones
+            // I have shown you in the picture"). The score rail is drawn only
+            // when a search actually ranked it: Celeste cites what she read as
+            // well as what she searched for, and a message nobody ranked gets
+            // no number rather than an invented one.
+            <Link key={c.messageId} id={citeAnchorId(turn.id, c.messageId)} href={threadHref(c.threadId)} className="ask-card" onClick={() => closeOnPhone(close)}>
+              <div className="ask-card-body">
+                <div className="ask-card-subject">{c.subject}</div>
+                <div className="ask-card-meta">{cardMeta(c)}</div>
+                {c.snippet ? <div className="ask-card-snippet">{c.snippet}</div> : null}
+              </div>
+              {c.score === undefined ? null : (
+                <div className={`ask-card-rail ${scoreTone(c.score)}`}>
+                  <div className="ask-score">{c.score}</div>
+                  <div className="ask-bar">
+                    <div style={{ width: `${c.score}%` }} />
+                  </div>
+                </div>
+              )}
             </Link>
           ))}
         </div>
