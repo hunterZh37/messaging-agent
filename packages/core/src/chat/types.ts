@@ -1,3 +1,5 @@
+import type { ScoreParts } from "./score";
+
 /**
  * Ask Celeste (spec 10c): the operator asks, Celeste answers over the mail she
  * can see, and proposes actions the operator clicks. Nothing here executes
@@ -150,6 +152,17 @@ export interface SearchHit {
    * still satisfies the type.
    */
   match?: "words" | "meaning" | "both";
+  /**
+   * How relevant this hit is, 0 to 100 (spec 2026-10-07). Set by `mergeHits`,
+   * the one place that knows what both halves said about a message. Absent on
+   * a hit nothing ranked, because a score invented for the occasion is worse
+   * than no score at all.
+   */
+  score?: number;
+  /** What the score was made of, so the reason can be said without recomputing it. */
+  parts?: ScoreParts;
+  /** Why it scored that, in a sentence. Written where the search terms are known. */
+  why?: string;
 }
 
 /* ------------------------------------------------------------------ *

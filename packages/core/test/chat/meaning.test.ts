@@ -330,3 +330,48 @@ describe("searchHybrid", () => {
     expect(hits[0]?.match).toBe("words");
   });
 });
+
+describe("what the vector table knows", () => {
+  it("keeps the distance it already reported, so the score can use it", async () => {
+    const db = testDbWithVectors();
+    seedEmbedded(db, "near", unit(0));
+    const hits = await searchByMeaning(db, embedderOf(unit(0)), "anything");
+    expect(hits![0]!.parts!.meaning).toBeTypeOf("number");
+    expect(hits![0]!.parts!.meaning).toBeGreaterThanOrEqual(0);
+  });
+
+  it("says a nearer message is nearer, which is what the score leans on", async () => {
+    const db = testDbWithVectors();
+    seedEmbedded(db, "near", unit(0));
+    seedEmbedded(db, "far", unit(1));
+    const hits = await searchByMeaning(db, embedderOf(unit(0)), "anything");
+    expect(hits![0]!.parts!.meaning!).toBeLessThan(hits![1]!.parts!.meaning!);
+  });
+});
+
+/**
+ * The sentence under the score is written here, on the server, because only
+ * here are the operator's search terms known — a citation carries no query,
+ * and the panel knows the question they asked Celeste, not the one she passed
+ * to the tool (ledger ruling, 2026-10-07).
+ */
+describe("the reason travels with the hit", () => {
+  it("writes the sentence where the terms are known", async () => {
+    const db = testDbWithVectors();
+    seedIndexed(db, "w1", { body: "the invoice is attached" });
+    const [hit] = await searchHybrid(db, undefined, "invoice");
+    expect(hit!.why).toMatch(/invoice/);
+    expect(hit!.why!.endsWith(".")).toBe(true);
+  });
+
+  it("leaves a hit nothing ranked without one", async () => {
+    const db = testDbWithVectors();
+    seedIndexed(db, "w1", { body: "anything at all" });
+    // A sender filter with no words: nothing was ranked, so there is no score
+    // and nothing to explain.
+    const [hit] = await searchHybrid(db, undefined, "", { from: "bob" });
+    expect(hit).toBeDefined();
+    expect(hit!.why).toBeUndefined();
+    expect(hit!.score).toBeUndefined();
+  });
+});
