@@ -11,6 +11,8 @@ import { relevanceScore, explainScore, type ScoreParts } from "../../src/chat/sc
 
 const DAY = 86_400_000;
 const base = { ageMs: 30 * DAY, inSubject: false };
+/** A distance at which the meaning half contributes nothing beyond having matched. */
+const MEANING_FAR_ENOUGH = 1;
 
 describe("relevanceScore", () => {
   it("scores a message both halves found above either alone", () => {
@@ -32,6 +34,21 @@ describe("relevanceScore", () => {
     const old = relevanceScore({ ...base, words: -12, ageMs: 900 * DAY });
     const fresh = relevanceScore({ ...base, words: -2, ageMs: 0 });
     expect(old).toBeGreaterThan(fresh);
+  });
+
+  /**
+   * bm25 is relative to the corpus: a term in every message carries no
+   * information and scores near zero, which would show the operator a 0 beside
+   * a message that contains exactly what they asked for. A match is worth
+   * something for being a match.
+   */
+  it("never scores a real match at nothing, however common the word", () => {
+    expect(relevanceScore({ ...base, words: 0 })).toBeGreaterThan(20);
+    expect(relevanceScore({ ...base, meaning: MEANING_FAR_ENOUGH })).toBeGreaterThan(20);
+  });
+
+  it("still ranks a distinctive match far above a common one", () => {
+    expect(relevanceScore({ ...base, words: -12 })).toBeGreaterThan(relevanceScore({ ...base, words: 0 }) + 20);
   });
 
   it("is a whole number between 0 and 100 whatever it is given", () => {

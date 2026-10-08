@@ -16,6 +16,21 @@ export interface Citation {
   subject: string;
   /** `Name <address>` when the sender has a name, the address otherwise. */
   from: string;
+  /**
+   * What the card shows beyond the name of the thing (spec 2026-10-07). All
+   * optional, for two reasons that will not go away: Celeste cites messages no
+   * search ranked — ones she read with `get_thread`, ones `list_mail` returned,
+   * the mail already on screen — and turns stored before this existed have none
+   * of it. A citation with no score draws no score rail, and a stored turn
+   * draws the plain row it always did.
+   */
+  sentAt?: number;
+  snippet?: string;
+  match?: "words" | "meaning" | "both";
+  score?: number;
+  parts?: ScoreParts;
+  /** Why it scored that, written where the search terms were known. */
+  why?: string;
 }
 
 /**

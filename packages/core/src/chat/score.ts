@@ -42,6 +42,17 @@ const RECENCY_NUDGE = 0.05;
 /** Recency has faded to nothing by here. */
 const RECENCY_SPAN_MS = 90 * 86_400_000;
 
+/**
+ * What a match is worth for being a match at all, before either half's own
+ * measure adds to it. Both measures are relative and both bottom out: bm25 is
+ * relative to the corpus, so a word in every message carries no information
+ * and scores near zero, and a neighbour the vector table returned can still
+ * sit at the far end of the distance it reports. Without a floor, a message
+ * containing exactly what the operator asked for shows them a 0, which reads
+ * as broken rather than as common (measured while building, 2026-10-07).
+ */
+const MATCH_FLOOR = 0.35;
+
 function clamp01(n: number): number {
   if (!Number.isFinite(n)) return 0;
   return Math.min(1, Math.max(0, n));
@@ -51,13 +62,13 @@ function clamp01(n: number): number {
 function wordsPart(bm25: number | undefined): number | undefined {
   if (bm25 === undefined) return undefined;
   // bm25 is negative and better the lower it goes; flip it so bigger is better.
-  return clamp01(-bm25 / WORDS_FULL);
+  return MATCH_FLOOR + (1 - MATCH_FLOOR) * clamp01(-bm25 / WORDS_FULL);
 }
 
 /** The meaning half's contribution, 0 to 1. */
 function meaningPart(distance: number | undefined): number | undefined {
   if (distance === undefined) return undefined;
-  return clamp01(1 - distance / MEANING_FAR);
+  return MATCH_FLOOR + (1 - MATCH_FLOOR) * clamp01(1 - distance / MEANING_FAR);
 }
 
 export function relevanceScore(parts: ScoreParts): number {

@@ -25,6 +25,7 @@ import {
   type ContextDraft,
   type ProposedAction,
   type ProposedActionKind,
+  type SearchHit,
 } from "./types";
 
 /** The most threads one proposal can carry. A bigger ask is a mailbox-wide sweep, not a button. */
@@ -329,7 +330,14 @@ export function citedMessageIds(answer: string, toolIds: Iterable<string>): stri
   return ids;
 }
 
-function citationsFor(db: Db, ids: string[]): Citation[] {
+/**
+ * The messages Celeste cited, as the panel draws them. A citation she got from
+ * a search carries what that search knew about it — when it arrived, the line
+ * that matched, how it was found and how well (spec 2026-10-07). One she read
+ * from a thread carries none of that, because nothing ranked it, and the card
+ * shows no score rather than inventing one.
+ */
+function citationsFor(db: Db, ids: string[], ranked: Map<string, SearchHit>): Citation[] {
   if (ids.length === 0) return [];
   const rows = db
     .select({ id: messages.id, threadId: messages.threadId, subject: messages.subject, fromName: messages.fromName, fromAddress: messages.fromAddress })
@@ -346,9 +354,23 @@ function citationsFor(db: Db, ids: string[]): Citation[] {
         threadId: r.threadId,
         subject: r.subject || "(no subject)",
         from: r.fromName ? `${r.fromName} <${r.fromAddress}>` : r.fromAddress,
+        ...cardOf(ranked.get(r.id)),
       },
     ];
   });
+}
+
+/** What a search knew about a message, for the card. Nothing, when no search found it. */
+function cardOf(hit: SearchHit | undefined): Partial<Citation> {
+  if (!hit) return {};
+  return {
+    sentAt: hit.sentAt,
+    snippet: hit.snippet,
+    ...(hit.match ? { match: hit.match } : {}),
+    ...(hit.score !== undefined ? { score: hit.score } : {}),
+    ...(hit.parts ? { parts: hit.parts } : {}),
+    ...(hit.why ? { why: hit.why } : {}),
+  };
 }
 
 /**
@@ -421,6 +443,11 @@ export async function askCeleste(db: Db, deps: AskDeps, input: AskInput): Promis
 
   const proposals: ProposedAction[] = [];
   const toolIds = new Set<string>(contextIds);
+  // What a search said about each message it returned, kept for the citations
+  // below (spec 2026-10-07). Celeste cites what she read as well as what she
+  // searched for, and only the searched ones have a score — this is how the
+  // two are told apart at the end of the turn.
+  const ranked = new Map<string, SearchHit>();
   let inputTokens = 0;
   let outputTokens = 0;
   // Every round's words, not just the last one's. A model that says something
@@ -486,7 +513,13 @@ export async function askCeleste(db: Db, deps: AskDeps, input: AskInput): Promis
               ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
               ...(typeof args.project === "string" && args.project !== "" ? { projectId: projectIdFor(db, args.project, input.accountId) ?? "none" } : {}),
             });
-            for (const h of hits) toolIds.add(h.messageId);
+            for (const h of hits) {
+            toolIds.add(h.messageId);
+            // Two searches in one turn can both return a message; the better
+            // score is the one that belongs on its card.
+            const had = ranked.get(h.messageId);
+            if (!had || (h.score ?? -1) > (had.score ?? -1)) ranked.set(h.messageId, h);
+          }
             content = hits.length > 0 ? JSON.stringify(hits) : "No message matched that search.";
           } else if (use.name === "get_thread") {
             const rendered = typeof args.thread_id === "string" ? renderThread(db, args.thread_id) : null;
@@ -535,7 +568,7 @@ export async function askCeleste(db: Db, deps: AskDeps, input: AskInput): Promis
   // Named here, where there is a database: the panel shows what each thread
   // is, and a stored turn still says it a week later.
   const actions = proposals.map((p) => ({ ...p, threads: describeThreads(db, p.threadIds) }));
-  const citations = citationsFor(db, citedMessageIds(answer, toolIds));
+  const citations = citationsFor(db, citedMessageIds(answer, toolIds), ranked);
 
   const assistant = appendChatMessage(
     db,
