@@ -5,41 +5,66 @@ import type { Notice } from "@messaging-agent/core";
  * 2026-10-09: "set up Celeste so that everything will be automated and
  * authenticated").
  *
- * Two of their inboxes once sat locked out for two and a half days, and the
- * only sign of it was a panel they had to open Celeste to see — so nothing
- * arrived from those mailboxes and nothing said so. A mailbox that has quietly
- * stopped is the one failure here that hides as silence, and the phone is
- * where they would notice it.
+ * Two of their inboxes once sat locked out for two and a half days. Nothing
+ * arrived from either and nothing said so, because the only sign was a panel
+ * they had to open Celeste to see. A mailbox that has quietly stopped is the
+ * one failure here that hides as silence, and the phone is where they would
+ * notice it.
  *
- * The mail clock runs every two minutes, so the whole problem is saying it
- * once rather than seven hundred times a day. These two functions are the
- * saying-it-once; `push.ts` does the sending.
+ * Two things have to be true at once. The mail clock ticks every two minutes,
+ * so an inbox that stays broken must buzz once rather than seven hundred times
+ * a day. And a notice that was never delivered must not count as said — the
+ * first version of this marked an inbox announced before the send was even
+ * awaited, so a push service answering 500 swallowed the notice for the whole
+ * outage (review, 2026-10-09). A thing built to end silent failure failing
+ * silently is the worst of the shapes this could take.
  */
 
+/** How the notice reaches a phone. Injected so the retry above can be tested without one. */
+export type SendNotice = (notice: Notice) => Promise<{ sent: number; gone: number }>;
+
 /**
- * Which of the inboxes now locked out have not been announced yet, and — as a
- * side effect, because the caller's set *is* the memory — forgetting the ones
- * that have come back. Forgetting matters twice over: the set cannot grow
- * without bound, and an inbox that is fixed and then breaks again next month
- * is news again rather than something already said.
+ * What has changed since the last tick: which locked-out inboxes have not been
+ * announced, and which have come back. Decides only — it changes nothing it is
+ * given, so the caller can hold the announcement back until a phone has
+ * actually been told.
  */
-export function newlyDown(alreadySaid: Set<string>, downNow: string[]): string[] {
+export function signinChanges(alreadySaid: Set<string>, downNow: string[]): { fresh: string[]; recovered: string[] } {
   const down = new Set(downNow);
-  for (const email of [...alreadySaid]) {
-    if (!down.has(email)) alreadySaid.delete(email);
-  }
-  const fresh = downNow.filter((email) => !alreadySaid.has(email));
-  for (const email of fresh) alreadySaid.add(email);
-  return fresh;
+  return {
+    fresh: downNow.filter((email) => !alreadySaid.has(email)),
+    recovered: [...alreadySaid].filter((email) => !down.has(email)),
+  };
+}
+
+/**
+ * One tick's worth of telling them. Forgetting a recovered inbox happens
+ * whatever else does — it costs nothing and it is what makes the same inbox
+ * breaking again next month news again. Announcing is only remembered when the
+ * send reports that something received it; until then every tick tries again,
+ * which is also what gets a notice to a phone that subscribes *after* the
+ * inbox went down.
+ */
+export async function announceSignin(
+  alreadySaid: Set<string>,
+  downNow: string[],
+  send: SendNotice,
+): Promise<{ announced: string[]; delivered: boolean }> {
+  const { fresh, recovered } = signinChanges(alreadySaid, downNow);
+  for (const email of recovered) alreadySaid.delete(email);
+  if (fresh.length === 0) return { announced: [], delivered: false };
+
+  // Every inbox that is down, not only the newly broken one: what they want to
+  // know is the state of their mail, not which failure happened most recently.
+  const { sent } = await send(signinNotice(downNow));
+  if (sent > 0) for (const email of fresh) alreadySaid.add(email);
+  return { announced: fresh, delivered: sent > 0 };
 }
 
 /**
  * What the phone shows. One tag for all of them, so a second inbox going down
- * replaces the notification rather than stacking beside it: the operator wants
- * to know the state of their mail, not to collect one card per failure.
- *
- * It names the inboxes rather than saying "some inboxes", because which one
- * decides whether they deal with it now or tonight.
+ * replaces the notification rather than stacking beside it, and it names the
+ * inboxes because which one decides whether they deal with it now or tonight.
  */
 export function signinNotice(emails: string[]): Notice {
   const many = emails.length > 1;

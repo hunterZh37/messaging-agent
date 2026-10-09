@@ -2,7 +2,7 @@ import webpush from "web-push";
 import { eq } from "drizzle-orm";
 import { deleteSubscription, listSubscriptions, needsReplySince, noticesFor, schema, type Notice } from "@messaging-agent/core";
 import { core } from "@/lib/core";
-import { newlyDown, signinNotice } from "@/lib/signinPush";
+import { announceSignin } from "@/lib/signinPush";
 
 /**
  * Push notifications to the phone (2026-09-14, the mobile plan's option 1).
@@ -79,23 +79,22 @@ export async function notifyNeedsReply(): Promise<void> {
 export function startNotifying(): void {
   const g = globalThis as unknown as Record<symbol, number | undefined>;
   g[KEY] ??= Date.now();
-  // And the same for inboxes already locked out: a restart says nothing it
-  // has already said (2026-10-09).
-  said();
 }
 
 /**
- * The inboxes the phone has already been told about. Seeded at server start
- * with whatever is locked out right now, for the same reason the clock above
- * starts at `Date.now()`: a restart must not replay what was already said. The
- * panel over the page is what covers an inbox that was already down before the
- * server came up.
+ * The inboxes the phone has already been *told* about — not the ones that are
+ * down, which is a different thing and conflating them is what the review
+ * caught (2026-10-09). An entry here means a push service accepted a notice
+ * naming that inbox. Starts empty: an inbox already down when the server comes
+ * up has, by this definition, not been told about, so it is told. A restart is
+ * rare and a notification they did not need is a smaller failure than silence
+ * about one they did.
  */
 const DOWN = Symbol.for("celeste.pushSaidDown");
 
 function said(): Set<string> {
   const g = globalThis as unknown as Record<symbol, Set<string> | undefined>;
-  g[DOWN] ??= new Set(lockedOut());
+  g[DOWN] ??= new Set();
   return g[DOWN]!;
 }
 
@@ -122,10 +121,6 @@ function lockedOut(): string[] {
  */
 export async function notifySignin(): Promise<void> {
   if (!configured()) return;
-  const fresh = newlyDown(said(), lockedOut());
-  if (fresh.length === 0) return;
-  // Named together rather than one card each: what they want to know is the
-  // state of their mail, not to collect a notification per failure.
-  const r = await sendNotices([signinNotice([...said()])]);
-  if (r.sent > 0) console.log(`push: signin notice sent for ${fresh.join(", ")}`);
+  const { announced, delivered } = await announceSignin(said(), lockedOut(), (notice) => sendNotices([notice]));
+  if (delivered) console.log(`push: signin notice sent for ${announced.join(", ")}`);
 }
