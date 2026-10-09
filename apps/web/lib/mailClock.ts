@@ -1,6 +1,6 @@
 import { Ticker, ollamaChatBusy } from "@messaging-agent/core";
 import { fetchMail, processMail, syncAllChats, syncModelBusy } from "@/lib/syncAll";
-import { notifyNeedsReply } from "@/lib/push";
+import { notifyNeedsReply, notifySignin } from "@/lib/push";
 
 /** How often the server brings mail in (operator, 2026-09-14: option 1, "about 2 minutes, tab open or not"). */
 export const MAIL_EVERY_MS = 120_000;
@@ -37,6 +37,10 @@ export function startMailClock(): void {
         void notifyNeedsReply().catch((err) => console.error(`push: ${(err as Error).message}`));
       }
       const { fetched, stored } = await fetchMail();
+      // The fetch is where a revoked token first fails, so it is where the
+      // phone can first be told (2026-10-09). After the fetch, not before:
+      // an account only flips to needs_signin once something has tried it.
+      void notifySignin().catch((err) => console.error(`push: ${(err as Error).message}`));
       if (stored > 0) {
         console.log(`mail clock: ${stored} new`);
         // Mail reaches Need to reply once it is sorted; the phone hears then (2026-09-14).

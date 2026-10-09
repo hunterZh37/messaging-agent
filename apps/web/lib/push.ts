@@ -1,6 +1,8 @@
 import webpush from "web-push";
-import { deleteSubscription, listSubscriptions, needsReplySince, noticesFor, type Notice } from "@messaging-agent/core";
+import { eq } from "drizzle-orm";
+import { deleteSubscription, listSubscriptions, needsReplySince, noticesFor, schema, type Notice } from "@messaging-agent/core";
 import { core } from "@/lib/core";
+import { newlyDown, signinNotice } from "@/lib/signinPush";
 
 /**
  * Push notifications to the phone (2026-09-14, the mobile plan's option 1).
@@ -77,4 +79,53 @@ export async function notifyNeedsReply(): Promise<void> {
 export function startNotifying(): void {
   const g = globalThis as unknown as Record<symbol, number | undefined>;
   g[KEY] ??= Date.now();
+  // And the same for inboxes already locked out: a restart says nothing it
+  // has already said (2026-10-09).
+  said();
+}
+
+/**
+ * The inboxes the phone has already been told about. Seeded at server start
+ * with whatever is locked out right now, for the same reason the clock above
+ * starts at `Date.now()`: a restart must not replay what was already said. The
+ * panel over the page is what covers an inbox that was already down before the
+ * server came up.
+ */
+const DOWN = Symbol.for("celeste.pushSaidDown");
+
+function said(): Set<string> {
+  const g = globalThis as unknown as Record<symbol, Set<string> | undefined>;
+  g[DOWN] ??= new Set(lockedOut());
+  return g[DOWN]!;
+}
+
+/** The inboxes Celeste can no longer get into, by address. */
+function lockedOut(): string[] {
+  const { db } = core();
+  return db
+    .select({ email: schema.accounts.email })
+    .from(schema.accounts)
+    .where(eq(schema.accounts.status, "needs_signin"))
+    .all()
+    .map((a) => a.email);
+}
+
+/**
+ * Tells the phone when an inbox stops letting Celeste in (operator,
+ * 2026-10-09). Called from the mail clock, which is where the pipeline finds
+ * out: a token that has been revoked only fails when something tries to use
+ * it, and that is the fetch.
+ *
+ * Two of their inboxes once sat locked out for two and a half days with
+ * nothing arriving and nothing saying so. This is the difference between
+ * learning that in seconds and learning it when they next happen to look.
+ */
+export async function notifySignin(): Promise<void> {
+  if (!configured()) return;
+  const fresh = newlyDown(said(), lockedOut());
+  if (fresh.length === 0) return;
+  // Named together rather than one card each: what they want to know is the
+  // state of their mail, not to collect a notification per failure.
+  const r = await sendNotices([signinNotice([...said()])]);
+  if (r.sent > 0) console.log(`push: signin notice sent for ${fresh.join(", ")}`);
 }
