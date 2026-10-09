@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Celeste — Privacy Policy</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { max-width: 42rem; margin: 0 auto; padding: 3rem 1.25rem 6rem; font: 16px/1.65 ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  h1 { font-size: 1.6rem; margin-bottom: .25rem; }
+  h2 { font-size: 1.05rem; margin-top: 2.25rem; }
+  .date { opacity: .65; font-size: .9rem; margin-top: 0; }
+  ul { padding-left: 1.2rem; }
+  li { margin: .35rem 0; }
+  code { font-size: .9em; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+
+<h1>Celeste — Privacy Policy</h1>
+<p class="date">Last updated 9 October 2026</p>
+
+<p>Celeste is a personal mail client. It is built and run by one person, Hunter Zhang, for
+their own mailboxes, and it runs on their own computer. It is not a service, it has no
+other users, and it has no accounts to sign up for.</p>
+
+<p>This policy describes what Celeste does with data from Google accounts, because Celeste
+signs in to Gmail using Google OAuth.</p>
+
+<h2>What Celeste accesses</h2>
+<p>With the operator's permission, Celeste uses the Gmail API to read their mail, mark it
+read, move it between folders including Trash, and send mail they have written. It also
+reads their email address so it can tell their own mailboxes apart.</p>
+<p>Celeste accesses only the mailboxes the operator has explicitly connected, and only
+their own.</p>
+
+<h2>Where that data goes</h2>
+<ul>
+  <li><strong>It is stored on the operator's own computer</strong>, in a SQLite database
+      file in their home folder. It is not uploaded to any server belonging to Celeste,
+      because there is no such server.</li>
+  <li><strong>Some of it is processed on that same computer</strong> by local models
+      running under Ollama, which sort mail and build the search index. Nothing sent to
+      those models leaves the machine.</li>
+  <li><strong>Some of it is sent to Anthropic's API</strong> — but only when the operator
+      asks Celeste a question about their mail, or asks it to draft a reply. In those
+      cases the text of the relevant messages is sent to Anthropic so the model can answer
+      or write. This does not happen in the background, and it does not happen to mail the
+      operator has not asked about.</li>
+</ul>
+
+<h2>What Celeste does not do</h2>
+<ul>
+  <li>It does not sell, rent, or share data with anyone.</li>
+  <li>It does not use mail for advertising, profiling, or market research.</li>
+  <li>It has no analytics, no telemetry, and no crash reporting.</li>
+  <li>It does not use Google user data to train any machine learning model.</li>
+  <li>It does not transfer Google user data to anyone except as described above.</li>
+</ul>
+
+<h2>Google API Services User Data Policy</h2>
+<p>Celeste's use and transfer of information received from Google APIs to any other app
+adheres to the
+<a href="https://developers.google.com/terms/api-services-user-data-policy">Google API
+Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+<h2>Keeping and deleting data</h2>
+<p>Mail Celeste has synced stays in the local database until the operator deletes it.
+Because that database is a file on their own computer, deleting it deletes everything
+Celeste holds.</p>
+<p>Access can be withdrawn at any time from
+<a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>,
+which immediately stops Celeste from reading anything further.</p>
+
+<h2>Contact</h2>
+<p>Questions about this policy: <a href="mailto:hunterisouch@gmail.com">hunterisouch@gmail.com</a>.</p>
+
+<p style="margin-top:2.5rem"><a href="./">Celeste</a> · <a href="./terms.html">Terms of Service</a></p>
+
+</body>
+</html>
