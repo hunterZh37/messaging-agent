@@ -1207,7 +1207,14 @@ html[data-switching] .inbox-grid, html[data-switching] main > .empty-wrap { opac
 .filter-chip:hover { border-color: var(--fg); }
 .filter-chip[aria-expanded="true"] { border-color: var(--accent); }
 .filter-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.filter-chip-label { flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+/* The small caps on a filter chip (operator, 2026-10-09: "make the header
+   labels easier to spot"). Uppercase at 11px needs more air between letters
+   than lowercase does — at 0.04em the word read as a grey smudge — and a step
+   up from --muted to --ink-soft takes it from 7:1 to 11.6:1 against the page.
+   Still clearly below the value beside it, which is 17.9:1: the label says
+   which filter, the value says what it is set to, and that order should
+   survive being legible. */
+.filter-chip-label { flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-soft); }
 .filter-chip-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 .filter-chip svg { flex: none; width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; color: var(--muted); }
 /* On a desktop the header has room to spare, so a chip is as wide as what it
