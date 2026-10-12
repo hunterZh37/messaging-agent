@@ -21,13 +21,21 @@ import { hideThreads } from "./trash";
  */
 
 /**
- * How long a thread must have been silent to count as stale. A fortnight,
- * chosen against their own mailbox rather than guessed: of 311 Worth Knowing
- * threads, 262 had been quiet this long and 155 were past ninety days, so the
- * pile is dead whatever the number — this only decides how much recent mail
- * still gets their eyes.
+ * How long a thread must have been silent before the button will take it.
+ * Nothing: "I'm saying there should be a button where I can just one-click and
+ * archive everything" (operator, 2026-10-12, having asked for that twice).
+ *
+ * A fortnight sat here first, which was caution of mine rather than anything
+ * they asked for, and it was the wrong caution. The protection they wanted was
+ * never about age — it is that they have seen it, which `sweepable` enforces
+ * absolutely and which no window can switch off. Age only decided how long
+ * read mail that wants nothing from them sat in the way of mail that does.
+ *
+ * Callers can still ask for a window, and the tests still cover one, because
+ * "everything older than N" is a reasonable thing to want later. The button
+ * does not ask.
  */
-export const SWEEP_QUIET_DAYS = 14;
+export const SWEEP_QUIET_DAYS = 0;
 
 const DAY_MS = 86_400_000;
 
@@ -40,7 +48,8 @@ const DAY_MS = 86_400_000;
  *   is a thread with unseen mail, and the sidebar's Unopened row already
  *   says so
  * - nothing new has arrived for `days`, read from the thread's own clock
- *   rather than any message's: an old thread with a reply yesterday is live
+ *   rather than any message's: an old thread with a reply yesterday is live.
+ *   Zero by default, so the button takes everything they have read
  * - its newest inbox message is the sorter's `knowing` — a thread whose latest
  *   word needs a reply stays, however much quiet mail sits behind it
  * - it is in the inbox and not already archived

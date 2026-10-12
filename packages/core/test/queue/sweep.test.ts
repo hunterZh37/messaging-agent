@@ -124,18 +124,24 @@ describe("sweepable", () => {
     expect(sweepable(db, { now: () => NOW })).toEqual(["a1:old"]);
   });
 
-  it("leaves a thread still live, even when it is Worth Knowing", () => {
+  it("takes a thread from this morning, if they have read it", () => {
     const db = seeded();
     thread(db, "fresh", { wants: "knowing", quietDays: 1 });
-    expect(sweepable(db, { now: () => NOW })).toEqual([]);
+    expect(sweepable(db, { now: () => NOW })).toEqual(["a1:fresh"]);
   });
 
-  it("counts the days from the thread, so an old thread with a new reply stays", () => {
+  it("holds a thread back when a window is asked for and it is too recent", () => {
+    const db = seeded();
+    thread(db, "fresh", { wants: "knowing", quietDays: 1 });
+    expect(sweepable(db, { days: 14, now: () => NOW })).toEqual([]);
+  });
+
+  it("counts the days from the thread, not any message, when a window is asked for", () => {
     const db = seeded();
     thread(db, "revived", { wants: "knowing", quietDays: 0 });
     // Its message is ancient; the thread is not.
     db.update(messages).set({ sentAt: NOW - 400 * DAY }).where(eq(messages.id, "a1:revivedm")).run();
-    expect(sweepable(db, { now: () => NOW })).toEqual([]);
+    expect(sweepable(db, { days: 14, now: () => NOW })).toEqual([]);
   });
 
   it("never returns a thread whose newest message wants a reply", () => {
@@ -168,15 +174,36 @@ describe("sweepable", () => {
     expect(sweepable(db, { now: () => NOW })).toEqual([]);
   });
 
+  /**
+   * What they actually asked for, twice: "a button where I can just one-click
+   * and archive everything" (2026-10-12). Age stops being a condition; being
+   * seen does not.
+   */
+  it("takes everything they have read when no window is given", () => {
+    const db = seeded();
+    thread(db, "today", { wants: "knowing", quietDays: 0 });
+    thread(db, "lastweek", { wants: "knowing", quietDays: 6 });
+    thread(db, "ancient", { wants: "knowing", quietDays: 300 });
+    expect(sweepable(db, { now: () => NOW }).sort()).toEqual(["a1:ancient", "a1:lastweek", "a1:today"]);
+  });
+
+  it("still never takes one they have not opened, however the window is set", () => {
+    const db = seeded();
+    thread(db, "unseen", { wants: "knowing", quietDays: 0, opened: false });
+    expect(sweepable(db, { now: () => NOW })).toEqual([]);
+    expect(sweepable(db, { days: 0, now: () => NOW })).toEqual([]);
+    expect(sweepable(db, { days: 365, now: () => NOW })).toEqual([]);
+  });
+
   it("takes the quiet window from the caller", () => {
     const db = seeded();
     thread(db, "tenday", { wants: "knowing", quietDays: 10 });
-    expect(sweepable(db, { now: () => NOW })).toEqual([]);
+    expect(sweepable(db, { days: 14, now: () => NOW })).toEqual([]);
     expect(sweepable(db, { days: 7, now: () => NOW })).toEqual(["a1:tenday"]);
   });
 
-  it("defaults to a fortnight", () => {
-    expect(SWEEP_QUIET_DAYS).toBe(14);
+  it("waits for nothing by default: the button clears the row", () => {
+    expect(SWEEP_QUIET_DAYS).toBe(0);
   });
 });
 

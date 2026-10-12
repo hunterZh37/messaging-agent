@@ -46,14 +46,19 @@ thread sweeps only when its **newest inbox message** is Worth Knowing — one
 whose latest message needs a reply must never go, however much older Worth
 Knowing mail it contains.
 
-**Stale means the thread has gone quiet: no new message for 14 days.**
-Measured on `threads.last_message_at`, not on the age of any one message,
-because a six-month-old thread that got a reply yesterday is live.
+**The button takes everything they have read.** No waiting period: "I'm saying
+there should be a button where I can just one-click and archive everything"
+(2026-10-12, asked for twice — a fortnight's delay was written here first, and
+it was caution of mine rather than anything they wanted).
 
-Their own mailbox, on the day this was written: 311 Worth Knowing threads, of
-which 262 are quiet for 14 days or more. At 90 days it would still be 155, so
-the pile is dead either way; 14 is where mail from the last fortnight still
-gets their eyes. The number is a named constant and expected to move.
+The protection they asked for was never about age. It is that they have seen
+it, and that holds absolutely whatever window a caller asks for. Age only ever
+decided how long read mail that wants nothing from them sat in front of mail
+that does, which is the thing the button exists to end.
+
+`sweepable` still takes a `days`, and the tests still cover one, because
+"everything older than N" is a reasonable thing to want later. The button does
+not ask for one.
 
 **Nothing they have not opened is ever swept** (operator, 2026-10-12: "I want
 to have the confidence that I have personally seen every single email out
@@ -124,7 +129,9 @@ has failed and people will stop doing it.
 - Unopened mail accumulates until they open it, and the sweep will never help.
   That is the design working: it is the part of the inbox that is genuinely
   theirs to clear, and 28 threads are sitting in it today.
-- Fourteen days is a guess, informed by their distribution and nothing else.
+- A thread read this morning and meant to be returned to is archived by this
+  button along with everything else. It is one search away and the toast undoes
+  it, but the button is blunt by request and that is the edge it has.
 
 ## 5. Testing
 

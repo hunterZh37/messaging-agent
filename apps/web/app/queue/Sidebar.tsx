@@ -323,7 +323,7 @@ function SweepButton({ accountId, asked }: { accountId?: string; asked: boolean 
     <button
       type="button"
       className="tree-sweep"
-      title={`Archive ${ready} read ${ready === 1 ? "thread" : "threads"} nothing has happened to in a fortnight`}
+      title={`Archive ${ready} ${ready === 1 ? "thread" : "threads"} you have read. Anything you have not opened stays.`}
       onClick={(e) => {
         // The row is a link; the button is not a way into it.
         e.preventDefault();
