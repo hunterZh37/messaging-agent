@@ -802,6 +802,31 @@ export function disposableThreadIds(db: Db, opts: CountScope & { folder?: "inbox
 }
 
 /**
+ * Every thread the Worth Knowing list would show for this view: what "Archive
+ * all" acts on (operator, 2026-10-12, asking for the button to sit where
+ * "Delete all" sits). The same shape as the two below it, so the three bulk
+ * buttons narrow identically — the window, the project and the inbox all
+ * apply, because what the button acts on is what they are looking at.
+ *
+ * This says what is in view, not what may leave it. `sweepableAmong` in
+ * `queue/sweep.ts` applies the guarantee.
+ */
+export function knowingThreadIds(db: Db, opts: CountScope & { folder?: "inbox" | "messages" } = {}): string[] {
+  const ids = db
+    .select({ threadId: messages.threadId })
+    .from(messages)
+    .innerJoin(threads, eq(threads.id, messages.threadId))
+    .leftJoin(sorts, eq(sorts.messageId, messages.id))
+    .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
+    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
+    .where(and(...scopeConditions({ ...opts, folder: opts.folder ?? "inbox", status: "knowing" })))
+    .orderBy(desc(messages.sentAt))
+    .all()
+    .map((r) => r.threadId);
+  return [...new Set(ids)];
+}
+
+/**
  * Every thread the Hidden list would show for this view, without the page
  * limit: what "Delete all" acts on there (operator, 2026-09-18).
  *

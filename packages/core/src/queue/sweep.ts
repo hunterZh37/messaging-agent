@@ -108,3 +108,40 @@ export function sweepWorthKnowing(
   const { moved } = hideThreads(db, threadIds, () => at);
   return { moved, threadIds, at };
 }
+
+/**
+ * The same question asked of a list someone is already looking at: of these
+ * threads, which may leave? The button lives in the list header beside
+ * "Delete all" (operator, 2026-10-12: "the archive button should be at the
+ * same spot as Delete All"), so the view decides the set — its window, its
+ * project, its inbox — and this decides only what the guarantee permits out
+ * of it.
+ *
+ * Splitting it this way is what keeps the promise in one place. The view's
+ * query lives with the other bulk lists in `inbox.ts` and knows nothing about
+ * sweeping; every rule about what may be archived is here, and a new caller
+ * cannot route around it by assembling its own list.
+ */
+export function sweepableAmong(db: Db, threadIds: string[], opts: { days?: number; now?: () => number } = {}): string[] {
+  if (threadIds.length === 0) return [];
+  const allowed = new Set(sweepable(db, opts));
+  return threadIds.filter((id) => allowed.has(id));
+}
+
+/**
+ * Archives the ones it may, out of the list it was given, and says which went.
+ * One `hidden_at` for the batch, as above, so the undo is this press and
+ * nothing else.
+ */
+export function sweepAmong(
+  db: Db,
+  threadIds: string[],
+  opts: { days?: number; now?: () => number } = {},
+): { moved: number; threadIds: string[]; at: number } {
+  const clock = opts.now ?? nowMs;
+  const take = sweepableAmong(db, threadIds, opts);
+  if (take.length === 0) return { moved: 0, threadIds: [], at: 0 };
+  const at = clock();
+  const { moved } = hideThreads(db, take, () => at);
+  return { moved, threadIds: take, at };
+}

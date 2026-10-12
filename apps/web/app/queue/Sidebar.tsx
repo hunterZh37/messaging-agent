@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { sweepWorthKnowingAction, sweepableCountAction, unhideThreadsAction } from "@/app/inbox/actions";
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import type { Person } from "@messaging-agent/core";
 import type { SidebarPeople } from "./people";
@@ -297,64 +296,9 @@ let keepMenuOpenUntil = 0;
  * Nothing the operator has not opened is ever included, which is the point of
  * the whole thing: an inbox that empties on its own is not one they have read.
  */
-function SweepButton({ accountId, asked }: { accountId?: string; asked: boolean }) {
-  const [ready, setReady] = useState<number | null>(null);
-  const [sweeping, setSweeping] = useState(false);
-  const router = useRouter();
-  const { say } = useSendGate();
-
-  // Counted when the row is first pointed at, not on every mount. The sidebar
-  // is rebuilt on every navigation and this question costs a scan of every
-  // thread — 60 to 70ms against their real mailbox — which is a price to pay
-  // for a button nobody is looking at (review, 2026-10-12).
-  useEffect(() => {
-    if (!asked) return;
-    let dropped = false;
-    void sweepableCountAction(accountId).then((n) => {
-      if (!dropped) setReady(n);
-    });
-    return () => {
-      dropped = true;
-    };
-  }, [asked, accountId]);
-
-  if (!ready || sweeping) return null;
-  return (
-    <button
-      type="button"
-      className="tree-sweep"
-      title={`Archive ${ready} ${ready === 1 ? "thread" : "threads"} you have read. Anything you have not opened stays.`}
-      onClick={(e) => {
-        // The row is a link; the button is not a way into it.
-        e.preventDefault();
-        e.stopPropagation();
-        setSweeping(true);
-        void sweepWorthKnowingAction(accountId)
-          .then((r) => {
-            if ("error" in r) return say(r.error);
-            setReady(0);
-            router.refresh();
-            say(`Archived ${r.moved} ${r.moved === 1 ? "thread" : "threads"}`, {
-              key: "swept",
-              undo: async () => {
-                await unhideThreadsAction(r.threadIds);
-                router.refresh();
-              },
-            });
-          })
-          .finally(() => setSweeping(false));
-      }}
-    >
-      Archive {ready}
-    </button>
-  );
-}
 
 function Tree(props: { counts: TreeCounts; activeKey: string; params: ViewParams; side: TreeSide }) {
   useListAdjustVersion();
-  // Whether the sweep's count has been asked for yet: only once they point at
-  // the row it belongs to (2026-10-12).
-  const [asked, setAsked] = useState(false);
   return (
     <div className="tree">
       {rowsForSide(treeRows(props.counts, props.params), props.side).map((row) => {
@@ -366,13 +310,9 @@ function Tree(props: { counts: TreeCounts; activeKey: string; params: ViewParams
             href={row.href}
             className={[row.child ? "child" : "", on ? "on" : ""].filter(Boolean).join(" ") || undefined}
             aria-current={on ? "page" : undefined}
-            {...(row.key === "inbox:knowing"
-              ? { onMouseEnter: () => setAsked(true), onFocus: () => setAsked(true) }
-              : {})}
           >
             {Glyph ? <Glyph /> : null}
             <span className="tree-label">{row.label}</span>
-            {row.key === "inbox:knowing" ? <SweepButton accountId={props.params.inbox} asked={asked} /> : null}
             {row.counted ? <span className="tree-count">{lessGone(row.count, listAdjust.get(row.key)?.rows)}</span> : null}
             <LinkPending />
           </Link>

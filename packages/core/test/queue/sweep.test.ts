@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { eq } from "drizzle-orm";
 import { testDb } from "../helpers/db";
 import { accounts, messages, sorts, threadOpens, threads } from "../../src/db/schema";
-import { sweepable, sweepWorthKnowing, SWEEP_QUIET_DAYS } from "../../src/queue/sweep";
+import { sweepable, sweepableAmong, sweepWorthKnowing, SWEEP_QUIET_DAYS } from "../../src/queue/sweep";
 import { unhideThreads } from "../../src/queue/trash";
 
 /**
@@ -237,5 +237,38 @@ describe("sweepWorthKnowing", () => {
   it("does nothing, loudly enough to notice, when there is nothing to sweep", () => {
     const db = seeded();
     expect(sweepWorthKnowing(db, { now: () => NOW })).toEqual({ moved: 0, threadIds: [], at: 0 });
+  });
+});
+
+/**
+ * What the button in the list header acts on: the threads that view is
+ * showing, less any the guarantee holds back. The view decides the set; the
+ * guarantee decides what may leave it (operator, 2026-10-12).
+ */
+describe("sweepableAmong", () => {
+  it("keeps only the ones they have read", () => {
+    const db = seeded();
+    thread(db, "read", { wants: "knowing", quietDays: 3 });
+    thread(db, "unread", { wants: "knowing", quietDays: 3, opened: false });
+    expect(sweepableAmong(db, ["a1:read", "a1:unread"])).toEqual(["a1:read"]);
+  });
+
+  it("never reaches outside the list it was given", () => {
+    const db = seeded();
+    thread(db, "shown", { wants: "knowing", quietDays: 3 });
+    thread(db, "elsewhere", { wants: "knowing", quietDays: 3 });
+    expect(sweepableAmong(db, ["a1:shown"])).toEqual(["a1:shown"]);
+  });
+
+  it("is empty for an empty list, without asking the database", () => {
+    const db = seeded();
+    thread(db, "shown", { wants: "knowing", quietDays: 3 });
+    expect(sweepableAmong(db, [])).toEqual([]);
+  });
+
+  it("drops one whose newest message needs a reply, even if the list showed it", () => {
+    const db = seeded();
+    thread(db, "replyish", { wants: "reply", quietDays: 3 });
+    expect(sweepableAmong(db, ["a1:replyish"])).toEqual([]);
   });
 });

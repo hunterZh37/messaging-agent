@@ -46,7 +46,7 @@ import {
   type AlexItem,
   type AlexItemRow,
   type AlexSlot,
-  setThreadWaiting, hideThreads, sweepWorthKnowing, sweepable, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, clearSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
+  setThreadWaiting, hideThreads, knowingThreadIds, sweepAmong, sweepableAmong, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, clearSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 
 type StepError = { error: string };
@@ -383,10 +383,21 @@ export async function hideThreadsAction(threadIds: string[]): Promise<{ moved: n
  * ids so the toast can put exactly this sweep back, and nothing they archived
  * by hand earlier.
  */
-export async function sweepWorthKnowingAction(accountId?: string): Promise<{ moved: number; threadIds: string[] } | StepError> {
+/**
+ * What "Archive all" acts on: the Worth Knowing list exactly as it is
+ * narrowed, resolved at the moment the button is pressed rather than baked
+ * into the page — the same contract as "Delete all" beside it, and for the
+ * same reason. A thread that has had a reply since the page was drawn is off
+ * the list now and must not go with the rest.
+ *
+ * The view names the candidates; `sweepableAmong` decides which may leave.
+ * Nothing they have not read ever does.
+ */
+export async function archiveAllAction(scope: DisposableScope): Promise<{ moved: number; threadIds: string[] } | StepError> {
   try {
     const { db } = core();
-    const { moved, threadIds } = sweepWorthKnowing(db, accountId ? { accountId } : {});
+    const inView = knowingThreadIds(db, { ...scope, folder: scope.folder ?? "inbox" });
+    const { moved, threadIds } = sweepAmong(db, inView);
     revalidatePath("/inbox");
     revalidatePath("/messages");
     return { moved, threadIds };
@@ -395,10 +406,11 @@ export async function sweepWorthKnowingAction(accountId?: string): Promise<{ mov
   }
 }
 
-/** How many a sweep would take right now, for the button's own label. */
-export async function sweepableCountAction(accountId?: string): Promise<number> {
+/** How many that would take right now, for the button's own label. */
+export async function archivableCountAction(scope: DisposableScope): Promise<number> {
   const { db } = core();
-  return sweepable(db, accountId ? { accountId } : {}).length;
+  const inView = knowingThreadIds(db, { ...scope, folder: scope.folder ?? "inbox" });
+  return sweepableAmong(db, inView).length;
 }
 
 /** Unhide (2026-09-15): the threads are back on the four sorting lists. */

@@ -6,6 +6,7 @@ import { recordAction } from "../../src/queue/actions";
 import {
   countByFinance,
   disposableThreadIds,
+  knowingThreadIds,
   folderCounts,
   hiddenThreadIds,
   listsOfMessages,
@@ -752,6 +753,35 @@ describe("Safe to delete", () => {
     expect(folderCounts(db, {}).disposable).toBe(2);
     expect(folderCounts(db, { accountId: "a1" }).disposable).toBe(1);
     expect(listed(db).sort()).toEqual(["a1:m2", "a2:m9"]);
+  });
+});
+
+describe("Archive all", () => {
+  /**
+   * The sweep button sits where Delete all sits, so it has to narrow the way
+   * Delete all narrows: the window, the project and the inbox all apply
+   * (operator, 2026-10-12: "the archive button should be at the same spot as
+   * Delete All").
+   */
+  it("names every thread the Worth Knowing list would show, once each", () => {
+    const db = testDb();
+    seed(db);
+    db.update(sorts).set({ wants: "knowing" }).where(eq(sorts.messageId, "a1:m1")).run();
+    expect(knowingThreadIds(db, { accountId: "a1" })).toEqual(["a1:t1"]);
+    expect(knowingThreadIds(db, { accountId: "a2" })).toEqual([]);
+    // The window narrows it the way it narrows the list.
+    expect(knowingThreadIds(db, { accountId: "a1", since: 400 })).toEqual([]);
+  });
+
+  /**
+   * The list's own rule, which the button inherits by sharing its query: a
+   * thread whose last word is theirs is not waiting to be known about.
+   */
+  it("leaves out a thread whose newest message is the operator's own reply", () => {
+    const db = testDb();
+    seed(db);
+    db.update(sorts).set({ wants: "knowing" }).where(eq(sorts.messageId, "a1:m2")).run();
+    expect(knowingThreadIds(db, { accountId: "a1" })).toEqual([]);
   });
 });
 

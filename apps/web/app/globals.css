@@ -1869,15 +1869,3 @@ button.ask-score:focus-visible { outline: 2px solid var(--accent); outline-offse
 .ask-launch:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
 @media (max-width: 760px) { .ask-launch { right: 16px; bottom: 16px; } }
 
-/* The sweep, on the Worth Knowing row (operator, 2026-10-12: "a button that
-   allows me to migrate all the worth-knowing messages to the archive with one
-   click"). Quiet until pointed at, because it sits on a row they click for
-   other reasons and a button shouting on every glance is a button in the way. */
-/* Out of the layout until it is wanted, not merely invisible: holding the
-   space truncated the label to "Worth Kn…" (seen in the browser, 2026-10-12). */
-.tree-sweep { display: none; margin-left: auto; padding: 2px 8px; border: 1px solid var(--line); border-radius: 999px; background: none; font: inherit; font-size: 11px; color: var(--muted); cursor: pointer; white-space: nowrap; }
-.tree a:hover .tree-sweep, .tree a:focus-within .tree-sweep { display: inline-block; }
-.tree-sweep:hover { border-color: var(--accent); color: var(--accent); }
-.tree-sweep:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* It takes the place the count would sit in, so the row does not grow. */
-.tree a:hover .tree-sweep ~ .tree-count { display: none; }

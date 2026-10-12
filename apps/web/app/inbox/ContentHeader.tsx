@@ -19,6 +19,7 @@ import { ProjectEditor } from "./ProjectEditor";
 import { EditorDialog } from "./EditorDialog";
 import { HeaderChips, type HeaderChip } from "./HeaderChips";
 import { PencilIcon } from "./icons";
+import { ArchiveAll } from "./ArchiveAll";
 import { DeleteAll } from "./DeleteAll";
 import { MarkAllOpened } from "./MarkAllOpened";
 import { ProjectStrip } from "./ProjectStrip";
@@ -124,6 +125,13 @@ export function ContentHeader(props: {
   disposable?: { scope: import("./actions").DisposableScope; count: number };
   /** Hidden gets the same Delete all, over its own set (operator, 2026-09-18). */
   hidden?: { scope: import("./actions").DisposableScope; count: number };
+  /**
+   * What "Archive all" would act on: the Worth Knowing view as it is narrowed
+   * (operator, 2026-10-12, asking for it where Delete all sits). It carries no
+   * count — the button asks for its own, because the number that matters is
+   * the threads that may actually leave, not the threads on screen.
+   */
+  knowing?: { scope: import("./actions").DisposableScope };
 }) {
   const { folder, status, pathname, params, accountId, projects, groups, projectGroups, projectCounts, project } = props;
   const { categories, category, window: activeWindow, edit } = props;
@@ -225,6 +233,7 @@ export function ContentHeader(props: {
         {props.unopened ? <MarkAllOpened scope={props.unopened.scope} count={props.unopened.count} /> : null}
         {props.disposable ? <DeleteAll scope={props.disposable.scope} count={props.disposable.count} /> : null}
         {props.hidden ? <DeleteAll scope={props.hidden.scope} count={props.hidden.count} list="hidden" /> : null}
+        {props.knowing ? <ArchiveAll scope={props.knowing.scope} /> : null}
         <SyncButton />
       </div>
 
