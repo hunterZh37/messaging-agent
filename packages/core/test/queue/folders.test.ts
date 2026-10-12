@@ -7,6 +7,7 @@ import {
   countByFinance,
   disposableThreadIds,
   knowingThreadIds,
+  owedThreadIds,
   folderCounts,
   hiddenThreadIds,
   listsOfMessages,
@@ -1102,5 +1103,25 @@ describe("every row counts what its list draws", () => {
     db.update(sorts).set({ wants: "bin" }).where(eq(sorts.messageId, "a1:m1")).run();
     db.update(sorts).set({ wants: "bin" }).where(eq(sorts.messageId, "a1:m3")).run();
     expect(folderCounts(db, { since: 0 }).disposable).toBe(disposableThreadIds(db, { since: 0 }).length);
+  });
+});
+
+/**
+ * What "Move all to Worth Knowing" acts on: the Reply / Action Required list
+ * as it is narrowed (operator, 2026-10-12).
+ */
+describe("Move all to Worth Knowing", () => {
+  it("names every thread that list would show, once each", () => {
+    const db = testDb();
+    seed(db);
+    expect(owedThreadIds(db, { accountId: "a1" })).toEqual(["a1:t1"]);
+    expect(owedThreadIds(db, { accountId: "a2" })).toEqual([]);
+    expect(owedThreadIds(db, { accountId: "a1", since: 400 })).toEqual([]);
+  });
+
+  it("agrees with the number the sidebar shows for that row", () => {
+    const db = testDb();
+    seed(db);
+    expect(owedThreadIds(db, { since: 0 }).length).toBe(folderCounts(db, { since: 0 }).owed);
   });
 });

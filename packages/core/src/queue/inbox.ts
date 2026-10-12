@@ -809,6 +809,26 @@ export function disposableThreadIds(db: Db, opts: CountScope & { folder?: "inbox
 }
 
 /**
+ * Every thread the Reply / Action Required list would show for this view: what
+ * "Move all to Worth Knowing" acts on (operator, 2026-10-12). The same shape
+ * as the bulk lists around it, so it narrows the way its own list narrows.
+ */
+export function owedThreadIds(db: Db, opts: CountScope & { folder?: "inbox" | "messages" } = {}): string[] {
+  const ids = db
+    .select({ threadId: messages.threadId })
+    .from(messages)
+    .innerJoin(threads, eq(threads.id, messages.threadId))
+    .leftJoin(sorts, eq(sorts.messageId, messages.id))
+    .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
+    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
+    .where(and(...scopeConditions({ ...opts, folder: opts.folder ?? "inbox", status: "owed" })))
+    .orderBy(desc(messages.sentAt))
+    .all()
+    .map((r) => r.threadId);
+  return [...new Set(ids)];
+}
+
+/**
  * Every thread the Worth Knowing list would show for this view: what "Archive
  * all" acts on (operator, 2026-10-12, asking for the button to sit where
  * "Delete all" sits). The same shape as the two below it, so the three bulk

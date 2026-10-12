@@ -46,7 +46,7 @@ import {
   type AlexItem,
   type AlexItemRow,
   type AlexSlot,
-  setThreadWaiting, hideThreads, knowingThreadIds, archiveThreads, sweepableAmong, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, clearSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
+  setThreadWaiting, hideThreads, knowingThreadIds, owedThreadIds, moveThreadsTo, restoreVerdicts, archiveThreads, sweepableAmong, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, clearSenderRule, type KeepDestination, type PriorVerdict, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 
 type StepError = { error: string };
@@ -421,6 +421,47 @@ export async function archiveAllAction(scope: DisposableScope, list: ArchiveList
 export async function archivableCountAction(scope: DisposableScope, list: ArchiveList = "knowing"): Promise<number> {
   const { db } = core();
   return archivableIds(db, scope, list).length;
+}
+
+/**
+ * "For the Reply / Action Required can we also have a button in the header
+ * that says Move all to Worth Knowing" (operator, 2026-10-12). The row that
+ * claims them, cleared in one press when the claim turns out not to be one.
+ *
+ * Resolved when pressed, like every bulk button beside it. The undo is what
+ * each message said before, per message rather than per batch: that list holds
+ * both `reply` and `action`, and putting them all back on one rung would
+ * quietly relabel half of them.
+ */
+export async function moveAllToKnowingAction(scope: DisposableScope): Promise<{ moved: number; previous: PriorVerdict[] } | StepError> {
+  try {
+    const { db } = core();
+    const ids = owedThreadIds(db, { ...scope, folder: scope.folder ?? "inbox" });
+    const { moved, previous } = moveThreadsTo(db, ids, "knowing");
+    revalidatePath("/inbox");
+    revalidatePath("/messages");
+    return { moved, previous };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
+
+/** How many that would move right now, for the button's own label. */
+export async function owedCountAction(scope: DisposableScope): Promise<number> {
+  const { db } = core();
+  return owedThreadIds(db, { ...scope, folder: scope.folder ?? "inbox" }).length;
+}
+
+/** Puts a move back, each message on the rung it was on (2026-10-12). */
+export async function restoreVerdictsAction(previous: PriorVerdict[]): Promise<{ restored: number } | StepError> {
+  try {
+    const restored = restoreVerdicts(core().db, previous);
+    revalidatePath("/inbox");
+    revalidatePath("/messages");
+    return { restored };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
 }
 
 /** Unhide (2026-09-15): the threads are back on the four sorting lists. */

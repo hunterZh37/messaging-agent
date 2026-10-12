@@ -143,3 +143,64 @@ export function withSenderRules(db: Db, inner: Sorter): Sorter {
     },
   };
 }
+
+/**
+ * What a message's verdict was before a bulk move touched it: the whole row,
+ * or `null` where the sorter had not judged it yet. Null is the case that
+ * matters — an undo there has to take the verdict away again rather than
+ * invent one the machine never gave.
+ */
+export interface PriorVerdict {
+  messageId: string;
+  row: typeof sorts.$inferSelect | null;
+}
+
+/**
+ * Put a list of threads on a rung in one go, and hand back what each message
+ * said before (operator, 2026-10-12: "for the Reply / Action Required can we
+ * also have a button in the header that says Move all to Worth Knowing").
+ *
+ * The return value is the undo, the way `markAllOpened` works, and it has to
+ * be per message rather than one value for the batch: a list of things
+ * claiming the operator holds both `reply` and `action`, and an undo that put
+ * them all back on one rung would quietly relabel half of them. `correctThread`
+ * overwrites the reason and the model as well, so this carries the whole row.
+ */
+export function moveThreadsTo(
+  db: Db,
+  threadIds: string[],
+  wants: Wants,
+  clock: () => number = nowMs,
+): { moved: number; previous: PriorVerdict[] } {
+  if (threadIds.length === 0) return { moved: 0, previous: [] };
+  const previous: PriorVerdict[] = [];
+  let moved = 0;
+  for (const threadId of threadIds) {
+    const ids = db.select({ id: messages.id }).from(messages).where(eq(messages.threadId, threadId)).all().map((r) => r.id);
+    for (const id of ids) {
+      previous.push({ messageId: id, row: db.select().from(sorts).where(eq(sorts.messageId, id)).get() ?? null });
+    }
+    if (correctThread(db, threadId, wants, clock) > 0) moved += 1;
+  }
+  return { moved, previous };
+}
+
+/**
+ * Puts those verdicts back exactly as they were, including taking away the one
+ * a move wrote onto a message the sorter had never reached.
+ */
+export function restoreVerdicts(db: Db, previous: PriorVerdict[]): number {
+  let restored = 0;
+  for (const { messageId, row } of previous) {
+    if (row === null) {
+      restored += db.delete(sorts).where(eq(sorts.messageId, messageId)).run().changes;
+      continue;
+    }
+    restored += db
+      .insert(sorts)
+      .values(row)
+      .onConflictDoUpdate({ target: sorts.messageId, set: row })
+      .run().changes;
+  }
+  return restored;
+}

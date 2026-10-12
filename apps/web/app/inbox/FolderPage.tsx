@@ -213,6 +213,7 @@ export async function FolderPage({ folder, searchParams }: { folder: FolderKey; 
           : {})}
         {...(status === "disposable" ? { disposable: { scope: disposableScope, count: disposableThreads } } : {})}
         {...(status === "knowing" && !isTexts ? { knowing: { scope: disposableScope } } : {})}
+        {...(status === "owed" && !isTexts ? { owed: { scope: disposableScope } } : {})}
         {...(status === "hidden" ? { hidden: { scope: hiddenScope, count: hiddenThreads } } : {})}
       />
       <div className="inbox-grid">

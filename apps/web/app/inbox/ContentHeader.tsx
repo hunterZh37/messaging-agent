@@ -20,6 +20,7 @@ import { EditorDialog } from "./EditorDialog";
 import { HeaderChips, type HeaderChip } from "./HeaderChips";
 import { PencilIcon } from "./icons";
 import { ArchiveAll } from "./ArchiveAll";
+import { MoveAllToKnowing } from "./MoveAllToKnowing";
 import { DeleteAll } from "./DeleteAll";
 import { MarkAllOpened } from "./MarkAllOpened";
 import { ProjectStrip } from "./ProjectStrip";
@@ -132,6 +133,11 @@ export function ContentHeader(props: {
    * the threads that may actually leave, not the threads on screen.
    */
   knowing?: { scope: import("./actions").DisposableScope };
+  /**
+   * What "Move all to Worth Knowing" would act on: the Reply / Action Required
+   * view as it is narrowed (operator, 2026-10-12).
+   */
+  owed?: { scope: import("./actions").DisposableScope };
 }) {
   const { folder, status, pathname, params, accountId, projects, groups, projectGroups, projectCounts, project } = props;
   const { categories, category, window: activeWindow, edit } = props;
@@ -235,6 +241,7 @@ export function ContentHeader(props: {
         {props.disposable ? <ArchiveAll scope={props.disposable.scope} list="disposable" /> : null}
         {props.hidden ? <DeleteAll scope={props.hidden.scope} count={props.hidden.count} list="hidden" /> : null}
         {props.knowing ? <ArchiveAll scope={props.knowing.scope} /> : null}
+        {props.owed ? <MoveAllToKnowing scope={props.owed.scope} /> : null}
         <SyncButton />
       </div>
 
