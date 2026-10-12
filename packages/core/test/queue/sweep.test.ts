@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { testDb } from "../helpers/db";
 import { accounts, messages, sorts, threadOpens, threads } from "../../src/db/schema";
-import { sweepable, sweepableAmong, sweepWorthKnowing, SWEEP_QUIET_DAYS } from "../../src/queue/sweep";
+import { archiveThreads, sweepable, sweepableAmong, sweepWorthKnowing, SWEEP_QUIET_DAYS } from "../../src/queue/sweep";
 import { unhideThreads } from "../../src/queue/trash";
 
 /**
@@ -270,5 +270,36 @@ describe("sweepableAmong", () => {
     const db = seeded();
     thread(db, "replyish", { wants: "reply", quietDays: 3 });
     expect(sweepableAmong(db, ["a1:replyish"])).toEqual([]);
+  });
+});
+
+/**
+ * Archiving a list wholesale, with no verdict and no guarantee: what "Archive
+ * all" does on Safe to Delete (operator, 2026-10-12). The list beside it
+ * deletes these same threads outright, so holding one back for being unread
+ * would protect it from the gentler of the two buttons and not the other.
+ */
+describe("archiveThreads", () => {
+  it("takes one they have never opened, unlike the sweep", () => {
+    const db = seeded();
+    thread(db, "junk", { wants: "bin", quietDays: 1, opened: false });
+    expect(sweepableAmong(db, ["a1:junk"])).toEqual([]);
+    expect(archiveThreads(db, ["a1:junk"]).moved).toBe(1);
+  });
+
+  it("stamps the batch with one time, so one undo returns exactly it", () => {
+    const db = seeded();
+    thread(db, "one", { wants: "bin", quietDays: 1 });
+    thread(db, "two", { wants: "bin", quietDays: 2 });
+    const r = archiveThreads(db, ["a1:one", "a1:two"]);
+    expect(r.moved).toBe(2);
+    const stamps = db.select({ at: threads.hiddenAt }).from(threads).where(inArray(threads.id, r.threadIds)).all();
+    expect(new Set(stamps.map((s) => s.at)).size).toBe(1);
+    expect(stamps[0]!.at).toBe(r.at);
+  });
+
+  it("does nothing, and stamps nothing, for an empty list", () => {
+    const db = seeded();
+    expect(archiveThreads(db, [])).toEqual({ moved: 0, threadIds: [], at: 0 });
   });
 });

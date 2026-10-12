@@ -232,6 +232,7 @@ export function ContentHeader(props: {
         <span className="head-spacer" />
         {props.unopened ? <MarkAllOpened scope={props.unopened.scope} count={props.unopened.count} /> : null}
         {props.disposable ? <DeleteAll scope={props.disposable.scope} count={props.disposable.count} /> : null}
+        {props.disposable ? <ArchiveAll scope={props.disposable.scope} list="disposable" /> : null}
         {props.hidden ? <DeleteAll scope={props.hidden.scope} count={props.hidden.count} list="hidden" /> : null}
         {props.knowing ? <ArchiveAll scope={props.knowing.scope} /> : null}
         <SyncButton />

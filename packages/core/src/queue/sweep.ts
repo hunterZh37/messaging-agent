@@ -129,19 +129,36 @@ export function sweepableAmong(db: Db, threadIds: string[], opts: { days?: numbe
 }
 
 /**
+ * Archives exactly the threads it is given, asking nothing about them. One
+ * `hidden_at` for the batch, so an undo returns this press and nothing else.
+ *
+ * This is what "Archive all" does on Safe to Delete (operator, 2026-10-12:
+ * "under Safe to Delete also build a button right next to Delete All:
+ * Archive All"), and it deliberately applies no guarantee. The button beside
+ * it deletes these same threads outright; holding one back for being unread
+ * would protect it from the gentler of the two and not from the other, which
+ * protects nothing and only makes the pair behave in ways nobody could
+ * predict. On Worth Knowing the guarantee still holds, through `sweepAmong`.
+ */
+export function archiveThreads(
+  db: Db,
+  threadIds: string[],
+  opts: { now?: () => number } = {},
+): { moved: number; threadIds: string[]; at: number } {
+  if (threadIds.length === 0) return { moved: 0, threadIds: [], at: 0 };
+  const at = (opts.now ?? nowMs)();
+  const { moved } = hideThreads(db, threadIds, () => at);
+  return { moved, threadIds, at };
+}
+
+/**
  * Archives the ones it may, out of the list it was given, and says which went.
- * One `hidden_at` for the batch, as above, so the undo is this press and
- * nothing else.
+ * Nothing they have not read leaves this way.
  */
 export function sweepAmong(
   db: Db,
   threadIds: string[],
   opts: { days?: number; now?: () => number } = {},
 ): { moved: number; threadIds: string[]; at: number } {
-  const clock = opts.now ?? nowMs;
-  const take = sweepableAmong(db, threadIds, opts);
-  if (take.length === 0) return { moved: 0, threadIds: [], at: 0 };
-  const at = clock();
-  const { moved } = hideThreads(db, take, () => at);
-  return { moved, threadIds: take, at };
+  return archiveThreads(db, sweepableAmong(db, threadIds, opts), opts);
 }

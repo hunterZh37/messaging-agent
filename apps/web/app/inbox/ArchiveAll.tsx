@@ -3,12 +3,17 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSendGate } from "../queue/SendProvider";
-import { archivableCountAction, archiveAllAction, unhideThreadsAction, type DisposableScope } from "./actions";
+import { archivableCountAction, archiveAllAction, unhideThreadsAction, type ArchiveList, type DisposableScope } from "./actions";
 
 /**
- * "Archive all · N" on the Worth Knowing view, where "Delete all" sits on
- * Safe-to-delete and "Mark all opened" on Unopened (operator, 2026-10-12: "the
- * archive button should be at the same spot as Delete All").
+ * "Archive all · N", beside "Delete all" on Safe to Delete and on the Worth
+ * Knowing view (operator, 2026-10-12: "the archive button should be at the
+ * same spot as Delete All", then "under Safe to Delete also build a button
+ * right next to Delete All: Archive All").
+ *
+ * Two buttons on one list, for the two things you can do with mail you are
+ * finished with: throw it out, or put it away. Which one they reach for is the
+ * only question, so they sit together and read alike.
  *
  * It belongs in that row because it is the same kind of act: one press over
  * the list in front of them, narrowed by the window, the project and the
@@ -20,7 +25,7 @@ import { archivableCountAction, archiveAllAction, unhideThreadsAction, type Disp
  * screen: anything they have not read is held back, and saying N when N-3
  * will go would be a lie told by a button.
  */
-export function ArchiveAll({ scope }: { scope: DisposableScope }) {
+export function ArchiveAll({ scope, list = "knowing" }: { scope: DisposableScope; list?: ArchiveList }) {
   const { say } = useSendGate();
   const router = useRouter();
   const [count, setCount] = useState<number | null>(null);
@@ -28,7 +33,7 @@ export function ArchiveAll({ scope }: { scope: DisposableScope }) {
 
   useEffect(() => {
     let dropped = false;
-    void archivableCountAction(scope).then((n) => {
+    void archivableCountAction(scope, list).then((n) => {
       if (!dropped) setCount(n);
     });
     return () => {
@@ -36,11 +41,11 @@ export function ArchiveAll({ scope }: { scope: DisposableScope }) {
     };
     // The scope is a plain object rebuilt each render; its contents are what
     // matter, not its identity.
-  }, [JSON.stringify(scope)]);
+  }, [JSON.stringify(scope), list]);
 
   function archiveAll() {
     startTransition(async () => {
-      const r = await archiveAllAction(scope);
+      const r = await archiveAllAction(scope, list);
       if ("error" in r) {
         say(`Could not archive: ${r.error}`);
         return;
@@ -67,7 +72,11 @@ export function ArchiveAll({ scope }: { scope: DisposableScope }) {
       className="chip edit"
       onClick={archiveAll}
       disabled={pending}
-      title="Archive every thread here you have read. Anything you have not opened stays."
+      title={
+        list === "disposable"
+          ? "Put these away instead of deleting them. They stay findable in the Archive."
+          : "Archive every thread here you have read. Anything you have not opened stays."
+      }
     >
       <span>{pending ? "Archiving…" : `Archive all · ${count}`}</span>
     </button>

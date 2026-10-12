@@ -46,7 +46,7 @@ import {
   type AlexItem,
   type AlexItemRow,
   type AlexSlot,
-  setThreadWaiting, hideThreads, knowingThreadIds, sweepAmong, sweepableAmong, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, clearSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
+  setThreadWaiting, hideThreads, knowingThreadIds, archiveThreads, sweepableAmong, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, clearSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 
 type StepError = { error: string };
@@ -384,20 +384,31 @@ export async function hideThreadsAction(threadIds: string[]): Promise<{ moved: n
  * by hand earlier.
  */
 /**
- * What "Archive all" acts on: the Worth Knowing list exactly as it is
- * narrowed, resolved at the moment the button is pressed rather than baked
- * into the page — the same contract as "Delete all" beside it, and for the
- * same reason. A thread that has had a reply since the page was drawn is off
- * the list now and must not go with the rest.
- *
- * The view names the candidates; `sweepableAmong` decides which may leave.
- * Nothing they have not read ever does.
+ * Which list an "Archive all" is standing on. Worth Knowing archives what the
+ * sweep permits; Safe to Delete archives what the list shows, because the
+ * button beside it deletes those same threads outright and a gentler act
+ * cannot be the fussier one (operator, 2026-10-12).
  */
-export async function archiveAllAction(scope: DisposableScope): Promise<{ moved: number; threadIds: string[] } | StepError> {
+export type ArchiveList = "knowing" | "disposable";
+
+/** The threads that list is showing, resolved now rather than when the page was drawn. */
+function archivableIds(db: ReturnType<typeof core>["db"], scope: DisposableScope, list: ArchiveList): string[] {
+  const folder = scope.folder ?? "inbox";
+  if (list === "disposable") return disposableThreadIds(db, { ...scope, folder });
+  return sweepableAmong(db, knowingThreadIds(db, { ...scope, folder }));
+}
+
+/**
+ * What "Archive all" acts on: the list exactly as it is narrowed, resolved at
+ * the moment the button is pressed rather than baked into the page — the same
+ * contract as "Delete all" beside it, and for the same reason. A thread that
+ * has had a reply since the page was drawn is off the list now and must not go
+ * with the rest.
+ */
+export async function archiveAllAction(scope: DisposableScope, list: ArchiveList = "knowing"): Promise<{ moved: number; threadIds: string[] } | StepError> {
   try {
     const { db } = core();
-    const inView = knowingThreadIds(db, { ...scope, folder: scope.folder ?? "inbox" });
-    const { moved, threadIds } = sweepAmong(db, inView);
+    const { moved, threadIds } = archiveThreads(db, archivableIds(db, scope, list));
     revalidatePath("/inbox");
     revalidatePath("/messages");
     return { moved, threadIds };
@@ -407,10 +418,9 @@ export async function archiveAllAction(scope: DisposableScope): Promise<{ moved:
 }
 
 /** How many that would take right now, for the button's own label. */
-export async function archivableCountAction(scope: DisposableScope): Promise<number> {
+export async function archivableCountAction(scope: DisposableScope, list: ArchiveList = "knowing"): Promise<number> {
   const { db } = core();
-  const inView = knowingThreadIds(db, { ...scope, folder: scope.folder ?? "inbox" });
-  return sweepableAmong(db, inView).length;
+  return archivableIds(db, scope, list).length;
 }
 
 /** Unhide (2026-09-15): the threads are back on the four sorting lists. */
