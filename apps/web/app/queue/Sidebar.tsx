@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { sweepWorthKnowingAction, sweepableCountAction, unhideThreadsAction } from "@/app/inbox/actions";
 import { useEffect, useLayoutEffect, useRef, useState, useTransition } from "react";
 import type { Person } from "@messaging-agent/core";
 import type { SidebarPeople } from "./people";
@@ -287,6 +288,63 @@ const PEOPLE_COUNT_KEY = "celeste.people.count";
 /** Until when a menu that opens should stay open: set by a Mail / Messages switch made while the phone menu is open (2026-09-15). */
 let keepMenuOpenUntil = 0;
 
+/**
+ * Moves what has gone quiet out of working memory (operator, 2026-10-12:
+ * "Inbox is like RAM and Archive is like SSD"). It shows what it would take
+ * before it takes it, and nothing at all when there is nothing to take — a
+ * button that does nothing is worse than no button.
+ *
+ * Nothing the operator has not opened is ever included, which is the point of
+ * the whole thing: an inbox that empties on its own is not one they have read.
+ */
+function SweepButton({ accountId }: { accountId?: string }) {
+  const [ready, setReady] = useState<number | null>(null);
+  const [sweeping, setSweeping] = useState(false);
+  const router = useRouter();
+  const { say } = useSendGate();
+
+  useEffect(() => {
+    let dropped = false;
+    void sweepableCountAction(accountId).then((n) => {
+      if (!dropped) setReady(n);
+    });
+    return () => {
+      dropped = true;
+    };
+  }, [accountId]);
+
+  if (!ready || sweeping) return null;
+  return (
+    <button
+      type="button"
+      className="tree-sweep"
+      title={`Archive ${ready} read ${ready === 1 ? "thread" : "threads"} nothing has happened to in a fortnight`}
+      onClick={(e) => {
+        // The row is a link; the button is not a way into it.
+        e.preventDefault();
+        e.stopPropagation();
+        setSweeping(true);
+        void sweepWorthKnowingAction(accountId)
+          .then((r) => {
+            if ("error" in r) return say(r.error);
+            setReady(0);
+            router.refresh();
+            say(`Archived ${r.moved} ${r.moved === 1 ? "thread" : "threads"}`, {
+              key: "swept",
+              undo: async () => {
+                await unhideThreadsAction(r.threadIds);
+                router.refresh();
+              },
+            });
+          })
+          .finally(() => setSweeping(false));
+      }}
+    >
+      Archive {ready}
+    </button>
+  );
+}
+
 function Tree(props: { counts: TreeCounts; activeKey: string; params: ViewParams; side: TreeSide }) {
   useListAdjustVersion();
   return (
@@ -303,6 +361,7 @@ function Tree(props: { counts: TreeCounts; activeKey: string; params: ViewParams
           >
             {Glyph ? <Glyph /> : null}
             <span className="tree-label">{row.label}</span>
+            {row.key === "inbox:knowing" ? <SweepButton accountId={props.params.inbox} /> : null}
             {row.counted ? <span className="tree-count">{lessGone(row.count, listAdjust.get(row.key)?.rows)}</span> : null}
             <LinkPending />
           </Link>

@@ -91,6 +91,7 @@ export * from "./contacts/suggest";
 export * from "./contacts/people";
 export * from "./queue/inbox";
 export * from "./queue/silence";
+export * from "./queue/sweep";
 export * from "./queue/trash";
 export * from "./export";
 export * from "./pipeline";

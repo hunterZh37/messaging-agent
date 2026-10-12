@@ -46,7 +46,7 @@ import {
   type AlexItem,
   type AlexItemRow,
   type AlexSlot,
-  setThreadWaiting, hideThreads, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, clearSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
+  setThreadWaiting, hideThreads, sweepWorthKnowing, sweepable, keepThread, hiddenThreadIds, correctThread, sendersOf, setSenderRule, clearSenderRule, type KeepDestination, type Wants } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 
 type StepError = { error: string };
@@ -375,6 +375,30 @@ export async function hideThreadsAction(threadIds: string[]): Promise<{ moved: n
   } catch (err) {
     return { error: (err as Error).message };
   }
+}
+
+/**
+ * Sweeps what has gone quiet out of the inbox and into the archive (operator,
+ * 2026-10-12: "Inbox is like RAM and Archive is like SSD"). Returns the thread
+ * ids so the toast can put exactly this sweep back, and nothing they archived
+ * by hand earlier.
+ */
+export async function sweepWorthKnowingAction(accountId?: string): Promise<{ moved: number; threadIds: string[] } | StepError> {
+  try {
+    const { db } = core();
+    const { moved, threadIds } = sweepWorthKnowing(db, accountId ? { accountId } : {});
+    revalidatePath("/inbox");
+    revalidatePath("/messages");
+    return { moved, threadIds };
+  } catch (err) {
+    return { error: (err as Error).message };
+  }
+}
+
+/** How many a sweep would take right now, for the button's own label. */
+export async function sweepableCountAction(accountId?: string): Promise<number> {
+  const { db } = core();
+  return sweepable(db, accountId ? { accountId } : {}).length;
 }
 
 /** Unhide (2026-09-15): the threads are back on the four sorting lists. */

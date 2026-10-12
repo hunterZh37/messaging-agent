@@ -292,3 +292,29 @@ describe("the child rows a folder offers", () => {
     }
   });
 });
+
+/**
+ * The sidebar read as working memory and storage (operator, 2026-10-12).
+ * Their goal is not an empty inbox, which a sweep can always deliver, but
+ * "the confidence that I have personally seen every single email" — so the
+ * number that measures it is the one a sweep can never move.
+ */
+describe("the tree, as working memory and storage", () => {
+  const counts = { inbox: 40, drafts: 0, needsReply: 3, action: 2, owed: 5, knowing: 311, unopened: 28, disposable: 9, waiting: 0, hidden: 64 };
+
+  it("does not count the Archive: nobody checks how full a disk is", () => {
+    const archive = treeRows(counts).find((r) => r.key === "hidden")!;
+    expect(archive.counted).toBe(false);
+  });
+
+  it("still counts the rows that are work, including the Inbox", () => {
+    const rows = treeRows(counts);
+    for (const key of ["inbox", "inbox:unopened", "inbox:knowing"]) {
+      expect(rows.find((r) => r.key === key)!.counted, key).toBe(true);
+    }
+  });
+
+  it("keeps Unopened, the one row a sweep can never empty", () => {
+    expect(treeRows(counts).find((r) => r.key === "inbox:unopened")!.count).toBe(28);
+  });
+});

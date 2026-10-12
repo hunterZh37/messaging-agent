@@ -220,7 +220,10 @@ export function treeRows(
     { key: "trash", label: FOLDER_TITLES.trash, href: to("trash"), icon: "deleted", child: false, count: 0, counted: false },
     // Hidden is a place, not a verdict, so it stands beside Deleted items
     // rather than under Inbox (operator, 2026-09-16).
-    { key: "hidden", label: STATUS_LABELS.hidden, href: to("inbox", "hidden"), icon: "hidden", child: false, count: counts.hidden ?? 0, counted: true },
+    // Storage, not a list: nobody checks how full a disk is, and a number here
+    // invites reading the Archive as something to get through rather than
+    // something to search (operator, 2026-10-12, "Archive is like SSD").
+    { key: "hidden", label: STATUS_LABELS.hidden, href: to("inbox", "hidden"), icon: "hidden", child: false, count: counts.hidden ?? 0, counted: false },
     { key: "junk", label: FOLDER_TITLES.junk, href: to("junk"), icon: "junk", child: false, count: 0, counted: false },
     // Texts (2026-09-11): their own folder, with the two rows that matter for a chat.
     ...(counts.texts
@@ -230,7 +233,7 @@ export function treeRows(
           { key: "messages:needs_reply", label: STATUS_LABELS.needs_reply, href: to("messages", "needs_reply"), icon: null, child: true, count: counts.texts.needsReply, counted: true },
           { key: "messages:unopened", label: STATUS_LABELS.unopened, href: to("messages", "unopened"), icon: null, child: true, count: counts.texts.unopened, counted: true },
           { key: "messages:disposable", label: STATUS_LABELS.disposable, href: to("messages", "disposable"), icon: null, child: true, count: counts.texts.disposable, counted: true },
-          { key: "messages:hidden", label: STATUS_LABELS.hidden, href: to("messages", "hidden"), icon: "hidden" as const, child: false, count: counts.texts.hidden ?? 0, counted: true },
+          { key: "messages:hidden", label: STATUS_LABELS.hidden, href: to("messages", "hidden"), icon: "hidden" as const, child: false, count: counts.texts.hidden ?? 0, counted: false },
         ]
       : []),
   ];
