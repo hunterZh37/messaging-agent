@@ -30,3 +30,27 @@ describe("windowStart", () => {
     expect(windowStart("all", NOON)).toBeNull();
   });
 });
+
+/**
+ * Storage has no window (operator, 2026-10-12: "the period should
+ * automatically be there at all times"). Arriving at the Archive from an
+ * inbox narrowed to Today used to carry that narrowing in, hiding almost
+ * everything it holds behind a filter chosen for a different place.
+ */
+describe("the Archive's window", () => {
+  it("is All, whatever window the inbox was left on", () => {
+    expect(selectedWindow(undefined, "today", "hidden")).toBe("all");
+    expect(selectedWindow(undefined, "30d", "hidden")).toBe("all");
+    expect(selectedWindow(undefined, undefined, "hidden")).toBe("all");
+  });
+
+  it("still obeys a window named by the link, so narrowing inside it works", () => {
+    expect(selectedWindow("7d", "today", "hidden")).toBe("7d");
+  });
+
+  it("changes nothing anywhere else", () => {
+    expect(selectedWindow(undefined, "30d", "knowing")).toBe("30d");
+    expect(selectedWindow(undefined, "30d", undefined)).toBe("30d");
+    expect(selectedWindow(undefined, undefined, "disposable")).toBe("today");
+  });
+});

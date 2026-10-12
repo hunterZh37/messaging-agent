@@ -74,6 +74,6 @@ export function viewFromHref(href: string, windowCookie?: string): { folder: Fol
   return {
     folder,
     ...(status ? { status } : {}),
-    window: selectedWindow(params.get("since") ?? undefined, windowCookie),
+    window: selectedWindow(params.get("since") ?? undefined, windowCookie, status),
   };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STATUS_MENU, activeTreeKey, hasProjectBar, messagesLanding, parseFolder, parseStatus, rowsForSide, sideHref, sideOfPath, threadPath, treeRows, viewHref } from "../lib/folders";
+import { STATUS_MENU, headTitle, activeTreeKey, hasProjectBar, messagesLanding, parseFolder, parseStatus, rowsForSide, sideHref, sideOfPath, threadPath, treeRows, viewHref } from "../lib/folders";
 
 describe("parseStatus", () => {
   it("takes only the statuses its folder has", () => {
@@ -316,5 +316,21 @@ describe("the tree, as working memory and storage", () => {
 
   it("keeps Unopened, the one row a sweep can never empty", () => {
     expect(treeRows(counts).find((r) => r.key === "inbox:unopened")!.count).toBe(28);
+  });
+});
+
+/**
+ * "If we go to Archive the header should just be Archive instead of Inbox →
+ * Archive, because Inbox and Archive are completely two different things now"
+ * (operator, 2026-10-12).
+ */
+describe("what the header calls the Archive", () => {
+  it("names the Archive alone, with no inbox above it", () => {
+    expect(headTitle("inbox", "hidden")).toBe(null);
+  });
+
+  it("still puts the inbox above its own lists", () => {
+    expect(headTitle("inbox", "knowing")).toBe("Inbox");
+    expect(headTitle("inbox", undefined)).toBe("Inbox");
   });
 });

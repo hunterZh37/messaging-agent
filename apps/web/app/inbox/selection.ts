@@ -43,7 +43,7 @@ export interface ViewSelection {
 export async function viewSelection(
   db: Db,
   accountId: string | undefined,
-  search: { project?: string; since?: string; fin?: string } = {},
+  search: { project?: string; since?: string; fin?: string; status?: string } = {},
 ): Promise<ViewSelection> {
   const groups = inboxProjects(db);
   const projects = accountId
@@ -67,7 +67,7 @@ export async function viewSelection(
     project,
     projectId: scope.projectId,
     projectAccountId: scope.accountId,
-    window: selectedWindow(search.since, jar.get(WINDOW_COOKIE)?.value),
+    window: selectedWindow(search.since, jar.get(WINDOW_COOKIE)?.value, search.status),
     // The Income / Expense filter is gone from the header (2026-09-15), so a
     // side remembered from before, or named by an old link, narrows nothing:
     // a filter nobody can see or clear must not hide mail.

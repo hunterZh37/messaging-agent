@@ -133,10 +133,28 @@ export const DEFAULT_WINDOW = "today" satisfies WindowKey;
 export const WINDOWS = ["today", "7d", "30d", "all"] as const;
 export type WindowKey = (typeof WINDOWS)[number];
 
-/** The window every surface reaches back over: the link's, then the one picked this visit, then Today. */
-export function selectedWindow(searchParam: string | undefined, cookieValue: string | undefined): WindowKey {
+/**
+ * The window every surface reaches back over: the link's, then the one picked
+ * this visit, then Today.
+ *
+ * The Archive is the exception, and it is the whole reason this takes a status
+ * (operator, 2026-10-12: "the period should automatically be there at all
+ * times"). Storage has no window. Arriving there from an inbox left on Today
+ * carried that narrowing in, so a drawer holding years of mail showed what
+ * landed in it this morning — a filter chosen for somewhere else, applied to
+ * the one place whose point is that everything is still in it.
+ *
+ * A window named by the link still wins, so narrowing inside the Archive
+ * works; it simply is not where a visit starts.
+ */
+export function selectedWindow(
+  searchParam: string | undefined,
+  cookieValue: string | undefined,
+  status?: string,
+): WindowKey {
   const known = (v: string | undefined): v is WindowKey => WINDOWS.includes(v as WindowKey);
   if (known(searchParam)) return searchParam;
+  if (status === "hidden") return "all";
   if (known(cookieValue)) return cookieValue;
   return DEFAULT_WINDOW;
 }

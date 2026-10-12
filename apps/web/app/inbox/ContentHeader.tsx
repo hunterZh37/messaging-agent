@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { listProjects, type CategoryRow, type Db, type ProjectRow } from "@messaging-agent/core";
-import { FOLDER_TITLES, STATUS_LABELS, STATUS_MENU, viewHref, type FolderKey, type FolderStatus, type ViewParams } from "@/lib/folders";
+import { FOLDER_TITLES, STATUS_LABELS, STATUS_MENU, viewHref, type FolderKey, type FolderStatus, type ViewParams, headTitle } from "@/lib/folders";
 import { allTab, ALL_TAB, groupRow, projectTabs, projectTabsByInbox, type GroupLike, type InboxTabs, type Tab } from "@/lib/tabs";
 import {
   PROJECT_COOKIE,
@@ -201,7 +201,7 @@ export function ContentHeader(props: {
           "the window should be above projects"): the title, the window and
           the money side, then the actions and refresh on one row. */}
       <div className="head-row first">
-        <span className="head-title">{FOLDER_TITLES[folder]}</span>
+        {headTitle(folder, status) ? <span className="head-title">{headTitle(folder, status)}</span> : null}
         {STATUS_MENU[folder].length > 0 ? (
           <StatusPicker
             label={status ? STATUS_LABELS[status] : "All"}

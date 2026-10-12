@@ -339,3 +339,17 @@ export function listLimit(param: string | undefined): number {
   const n = Number(param);
   return Number.isInteger(n) && n > 0 ? n : LIST_PAGE;
 }
+
+/**
+ * What the header's first word is, or nothing when the view names itself.
+ *
+ * The Archive names itself (operator, 2026-10-12: "if we go to Archive the
+ * header should just be Archive instead of Inbox -> Archive, because Inbox and
+ * Archive are completely two different things now"). It is not a list inside
+ * the inbox the way Worth Knowing is — it is where mail goes when it leaves
+ * the inbox — and a crumb saying otherwise argued against the whole design.
+ */
+export function headTitle(folder: FolderKey, status: string | undefined): string | null {
+  if (folder === "inbox" && status === "hidden") return null;
+  return FOLDER_TITLES[folder] ?? null;
+}

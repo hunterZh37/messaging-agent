@@ -81,7 +81,7 @@ export async function FolderPage({ folder, searchParams }: { folder: FolderKey; 
   // project still means anything. The numbers on the tabs follow the window
   // (`projectCountsInWindow`, below; operator, 2026-09-15).
   const projectCounts = isTexts ? {} : countByProject(db, projectCountScope({ folder, ...(selectedId ? { accountId: selectedId } : {}), ...(status ? { status } : {}), since: null }));
-  const remembered = resolveProject(await viewSelection(db, selectedId, { project, since, fin }), projectCounts, Boolean(project));
+  const remembered = resolveProject(await viewSelection(db, selectedId, { project, since, fin, ...(status ? { status } : {}) }), projectCounts, Boolean(project));
   const { projects, project: activeProject, projectId, projectAccountId, window } = remembered;
   // Under All inboxes a chosen project narrows the list to the inbox that
   // owns it, and an inbox's Unfiled says so itself: either way the list, the
