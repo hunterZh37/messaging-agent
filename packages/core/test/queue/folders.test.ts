@@ -811,9 +811,12 @@ describe("Delete all", () => {
       .run();
     db.update(sorts).set({ wants: "bin" }).where(eq(sorts.messageId, "a1:m2")).run();
 
-    // Two rows in the list and in the tree's count, one thread to delete.
+    // Two messages, folded by ThreadGroup into one row, and one thread to
+    // delete — so one is what the count says too (2026-10-12). It read 2 here
+    // until the operator noticed the Inbox doing the same thing: "there are
+    // only two emails in the inbox but it displays three".
     expect(listInboxMessages(db, { status: "disposable" })).toHaveLength(2);
-    expect(folderCounts(db, {}).disposable).toBe(2);
+    expect(folderCounts(db, {}).disposable).toBe(1);
     expect(disposableThreadIds(db, {})).toEqual(["a1:t2"]);
   });
 
@@ -1020,5 +1023,84 @@ describe("which counted lists a message is in", () => {
 
   it("asks nothing when there is nothing on screen", () => {
     expect(listsOfMessages(testDb(), "inbox", [], { since: 0 }).size).toBe(0);
+  });
+});
+
+/**
+ * "There are only two emails in the inbox but it displays three" (operator,
+ * 2026-10-12, with a screenshot of a two-row list over an Inbox reading 3).
+ *
+ * The count was message by message, decided in 2026-09-18 when that was how
+ * the list was drawn. The list groups a conversation into one row now, with
+ * "1 earlier message" folded under it, so a thread with two inbox messages
+ * made the number one higher than the rows beneath it.
+ */
+describe("the Inbox count against the list it sits over", () => {
+  it("counts a conversation once, however many of its messages are in the inbox", () => {
+    const db = testDb();
+    seed(db);
+    const before = folderCounts(db, { since: 0 }).inbox;
+    db.insert(messages)
+      .values({
+        ...base, id: "a1:m7", accountId: "a1", providerMessageId: "INBOX:7", threadId: "a1:t1", rfcMessageId: null,
+        fromAddress: "bob@x.com", toAddresses: ["me@example.com"], subject: "Lunch", bodyText: "Still on?",
+        isFromOperator: false, folder: "inbox", sentAt: 320,
+      })
+      .run();
+    // A second message in a thread the inbox already shows adds a line to that
+    // row, not a row.
+    expect(folderCounts(db, { since: 0 }).inbox).toBe(before);
+  });
+
+  it("still counts a new conversation", () => {
+    const db = testDb();
+    seed(db);
+    const before = folderCounts(db, { since: 0 }).inbox;
+    db.insert(threads)
+      .values({ id: "a1:t9", accountId: "a1", providerThreadId: "t9", subject: "New", lastMessageAt: 900, lastFromOperator: false })
+      .run();
+    db.insert(messages)
+      .values({
+        ...base, id: "a1:m9", accountId: "a1", providerMessageId: "INBOX:9", threadId: "a1:t9", rfcMessageId: null,
+        fromAddress: "new@x.com", toAddresses: ["me@example.com"], subject: "New", bodyText: "Hello.",
+        isFromOperator: false, folder: "inbox", sentAt: 900,
+      })
+      .run();
+    expect(folderCounts(db, { since: 0 }).inbox).toBe(before + 1);
+  });
+});
+
+/**
+ * The same disagreement, one row down: Safe to Delete read 351 over a list of
+ * 333 conversations on their mailbox, and its own "Delete all" button — which
+ * has always counted threads — read 333 beside it. Every sidebar number counts
+ * what its list draws, which is conversations.
+ */
+describe("every row counts what its list draws", () => {
+  it("counts a conversation once in Safe to Delete, however many of its messages are junk", () => {
+    const db = testDb();
+    seed(db);
+    db.update(sorts).set({ wants: "bin" }).where(eq(sorts.messageId, "a1:m1")).run();
+    expect(folderCounts(db, { since: 0 }).disposable).toBe(1);
+    db.insert(messages)
+      .values({
+        ...base, id: "a1:m6", accountId: "a1", providerMessageId: "INBOX:6", threadId: "a1:t1", rfcMessageId: null,
+        fromAddress: "bob@x.com", toAddresses: ["me@example.com"], subject: "Lunch", bodyText: "More junk.",
+        isFromOperator: false, folder: "inbox", sentAt: 310,
+      })
+      .run();
+    db.insert(sorts)
+      .values({ messageId: "a1:m6", wants: "bin", scheduling: false, category: null, finance: "none", reason: "junk", model: "x", labeledAt: null, createdAt: 1 })
+      .run();
+    expect(folderCounts(db, { since: 0 }).disposable).toBe(1);
+    expect(disposableThreadIds(db, { since: 0 }).length).toBe(1);
+  });
+
+  it("agrees with the list its Delete all button acts on", () => {
+    const db = testDb();
+    seed(db);
+    db.update(sorts).set({ wants: "bin" }).where(eq(sorts.messageId, "a1:m1")).run();
+    db.update(sorts).set({ wants: "bin" }).where(eq(sorts.messageId, "a1:m3")).run();
+    expect(folderCounts(db, { since: 0 }).disposable).toBe(disposableThreadIds(db, { since: 0 }).length);
   });
 });

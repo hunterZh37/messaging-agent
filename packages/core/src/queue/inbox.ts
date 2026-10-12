@@ -498,12 +498,19 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
   // What the Inbox list itself holds (operator, 2026-09-18: "need an inbox
   // number for mails"). The rows beneath it each counted something and the
   // folder over them counted nothing, so the one row that answers "how much
-  // is there" was the one row with no answer. Counted the way that list is
-  // drawn, message by message rather than thread by thread, so the number
-  // over the list is the number of rows in it.
+  // is there" was the one row with no answer.
+  //
+  // Conversations, not messages (operator, 2026-10-12: "there are only two
+  // emails in the inbox but it displays three"). It was counted message by
+  // message when that was how the list was drawn; the list folds a
+  // conversation into one row now, with "1 earlier message" beneath it, so a
+  // thread holding two inbox messages put the number one above the rows it
+  // sat over. On their mailbox that was 1,246 against 948. Every other row in
+  // the sidebar already counts a thread once, through `latestInThread`, which
+  // is why this was the only number that disagreed with its own list.
   const inbox =
     db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(distinct ${messages.threadId})` })
       .from(messages)
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
@@ -516,7 +523,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
   // alone, whatever inbox the switcher holds.
   const textCount = (status: "needs_reply" | "unopened" | "disposable" | "hidden") =>
     db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(distinct ${messages.threadId})` })
       .from(messages)
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
@@ -528,7 +535,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
 
   const needsReply =
     db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(distinct ${messages.threadId})` })
       .from(messages)
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
@@ -540,7 +547,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
   // The two middle rungs, counted exactly as the two either side of them.
   const rungCount = (status: "action" | "knowing" | "owed") =>
     db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(distinct ${messages.threadId})` })
       .from(messages)
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
@@ -554,7 +561,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
 
   const unopened =
     db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(distinct ${messages.threadId})` })
       .from(messages)
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
@@ -565,7 +572,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
 
   const disposable =
     db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(distinct ${messages.threadId})` })
       .from(messages)
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
@@ -594,7 +601,7 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
   // other side writes again (2026-09-16).
   const hidden =
     db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: sql<number>`count(distinct ${messages.threadId})` })
       .from(messages)
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
