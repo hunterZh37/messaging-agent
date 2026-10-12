@@ -13,6 +13,12 @@ thing. They are not, and the difference is the whole design: Worth Knowing says
 how much a message wants from them, Archive says whether it is in the mailbox
 at all.
 
+The point of it, in their words: *"The goal here is that I want to reach inbox
+zero. I want to have the confidence that I have personally seen every single
+email out there."* That sentence decides more of this design than the metaphor
+does — in particular it is why nothing unopened is ever swept, and why the
+number that measures the goal is Unopened rather than Inbox.
+
 ## 1. What this is
 
 Three rows that each had their own logic now have one story.
@@ -49,10 +55,18 @@ which 262 are quiet for 14 days or more. At 90 days it would still be 155, so
 the pile is dead either way; 14 is where mail from the last fortnight still
 gets their eyes. The number is a named constant and expected to move.
 
-**Being read is deliberately not a criterion.** It sounds right and does
-nothing: they open 1,268 of 1,300 inbox threads. Everything in there has been
-looked at, so it separates nothing, and a rule that never excludes anything is
-a rule that misleads whoever reads it next.
+**Nothing they have not opened is ever swept** (operator, 2026-10-12: "I want
+to have the confidence that I have personally seen every single email out
+there"). This is a guarantee, not a filter, and the difference matters: it was
+first left out of this spec on the grounds that it barely excludes anything —
+they open 1,268 of 1,300 inbox threads — which is the wrong test. A promise is
+not worth less because it is rarely called upon. Today it would hold back 0 of
+the 262 sweepable threads, so it costs nothing and secures everything.
+
+What it buys is the goal itself. An inbox that empties on its own is not an
+inbox they have read; it is an inbox that got quieter. With this rule the only
+way a thread leaves is that they looked at it first, so an empty inbox means
+what they want it to mean.
 
 **The sweep is undoable as one action.** `hideThreads` already stamps every
 thread in a batch with the same `hidden_at` (`queue/trash.ts:127`), so the
@@ -69,7 +83,7 @@ what it holds.
 **The sweep**, in `packages/core/src/queue/`:
 
 ```
-sweepable(db, { days }) -> threadIds     // quiet, newest verdict `knowing`, not hidden
+sweepable(db, { days }) -> threadIds     // opened, quiet, newest verdict `knowing`, not hidden
 sweepWorthKnowing(db, { days }) -> { moved, at }
 ```
 
@@ -84,8 +98,11 @@ went, not everything archived since.
 
 **The sidebar**, re-read as working set and storage:
 
-- **Inbox** keeps its count, and is the only bold one. It is pressure, not
-  information: the number is meant to be falling.
+- **Unopened** is the number that measures the goal, so it is the bold one.
+  Inbox zero is reachable by sweeping; *seen everything* is only reachable by
+  looking, and this is the only row the sweep can never touch. It falls when
+  they read, and nothing else moves it.
+- **Inbox** keeps its count, plainly. It is how much is in working memory.
 - **Worth Knowing** keeps its count and gains the sweep button.
 - **Archive** shows no count and leads with search.
 
@@ -104,11 +121,16 @@ has failed and people will stop doing it.
   thread by thread from the Archive row, as it is today.
 - The sweep is manual. Nothing archives on its own, and nothing in this spec
   changes that — the sorter has never written `hidden_at` and still cannot.
+- Unopened mail accumulates until they open it, and the sweep will never help.
+  That is the design working: it is the part of the inbox that is genuinely
+  theirs to clear, and 28 threads are sitting in it today.
 - Fourteen days is a guess, informed by their distribution and nothing else.
 
 ## 5. Testing
 
-- `sweepable`: a thread whose newest message needs a reply is never returned,
+- `sweepable`: a thread never opened is never returned, however quiet and
+  however Worth Knowing — the guarantee this rests on; a thread whose newest
+  message needs a reply is never returned,
   however much Worth Knowing sits behind it; a thread quiet for 13 days is not
   returned and one quiet for 15 is; an already-archived thread is not returned
   twice.
