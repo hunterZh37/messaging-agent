@@ -136,16 +136,29 @@ export function folderConditions(opts: FolderScope = {}): SQL[] {
  * have to in order to ask the same question the list asks.
  */
 function threadUnread(): SQL {
+  return threadUnreadFor(sql`${messages.threadId}`);
+}
+
+/**
+ * The same question asked of a thread id from anywhere: has anything arrived
+ * that the operator has not seen? Exported because the sweep (`queue/sweep.ts`)
+ * has to ask exactly this and asked a weaker question instead — whether a
+ * `thread_opens` row existed at all — which let it archive mail that landed
+ * after the last time they looked (review, 2026-10-12). One definition, so the
+ * sidebar's Unopened row and the sweep can never drift apart about what
+ * "seen" means.
+ */
+export function threadUnreadFor(threadId: SQL): SQL {
   // Only mail that reached the inbox, or a text, can make a thread unread
   // again (2026-09-14): a reply that went straight to Junk or Trash used to
   // put the opened thread back in Unopened, showing the mail already read.
   return sql`(
-    (select o.opened_at from thread_opens o where o.thread_id = ${messages.threadId}) is null
+    (select o.opened_at from thread_opens o where o.thread_id = ${threadId}) is null
     or exists (
       select 1 from messages m
-      where m.thread_id = ${messages.threadId} and m.is_from_operator = 0
+      where m.thread_id = ${threadId} and m.is_from_operator = 0
         and m.folder in ('inbox', 'messages')
-        and m.sent_at > (select o.opened_at from thread_opens o where o.thread_id = ${messages.threadId})
+        and m.sent_at > (select o.opened_at from thread_opens o where o.thread_id = ${threadId})
     )
   )`;
 }

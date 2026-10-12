@@ -70,6 +70,54 @@ describe("sweepable", () => {
     expect(sweepable(db, { now: () => NOW })).toEqual([]);
   });
 
+  /**
+   * The guarantee again, and the way it actually breaks: a thread opened last
+   * year is not a thread they have read. Mail that arrived after the last time
+   * they looked is unseen, and the sidebar's own Unopened row already says so
+   * (review, 2026-10-12 — the first version of this checked only that a
+   * `thread_opens` row existed).
+   */
+  it("never returns a thread whose newest mail arrived after they last looked", () => {
+    const db = seeded();
+    thread(db, "stale", { wants: "knowing", quietDays: 40 });
+    // They opened it 40 days ago; something arrived 30 days ago that they have
+    // never seen. Quiet for a fortnight, and unread.
+    db.insert(messages)
+      .values({ ...base, id: "a1:stalem2", providerMessageId: "INBOX:stale2", threadId: "a1:stale", fromAddress: "them@example.com", toAddresses: ["me@example.com"], subject: "stale", bodyText: "unseen", isFromOperator: false, folder: "inbox", sentAt: NOW - 30 * DAY })
+      .run();
+    db.insert(sorts).values({ messageId: "a1:stalem2", wants: "knowing", scheduling: false, category: "FYI", reason: "", model: "test", sortedAt: 1, createdAt: 1 }).run();
+    db.update(threads).set({ lastMessageAt: NOW - 30 * DAY }).where(eq(threads.id, "a1:stale")).run();
+    expect(sweepable(db, { now: () => NOW })).toEqual([]);
+  });
+
+  /** Their own word arriving after the open does not make the thread unread. */
+  it("still returns one whose only later message is their own reply", () => {
+    const db = seeded();
+    thread(db, "mine", { wants: "knowing", quietDays: 40 });
+    db.insert(messages)
+      .values({ ...base, id: "a1:minem2", providerMessageId: "SENT:1", threadId: "a1:mine", fromAddress: "me@example.com", toAddresses: ["them@example.com"], subject: "mine", bodyText: "ok", isFromOperator: true, folder: "sent", sentAt: NOW - 30 * DAY })
+      .run();
+    db.update(threads).set({ lastMessageAt: NOW - 30 * DAY }).where(eq(threads.id, "a1:mine")).run();
+    expect(sweepable(db, { now: () => NOW })).toEqual(["a1:mine"]);
+  });
+
+  /**
+   * Found in their real mailbox by the review: a thread whose newest inbox
+   * message the sorter has never judged, sitting on top of an older `knowing`.
+   * The verdict was being read from the older one.
+   */
+  it("never returns a thread whose newest message has no verdict at all", () => {
+    const db = seeded();
+    thread(db, "unsorted", { wants: "knowing", quietDays: 40 });
+    db.insert(messages)
+      .values({ ...base, id: "a1:unsortedm2", providerMessageId: "INBOX:uns2", threadId: "a1:unsorted", fromAddress: "them@example.com", toAddresses: ["me@example.com"], subject: "unsorted", bodyText: "never judged", isFromOperator: false, folder: "inbox", sentAt: NOW - 35 * DAY })
+      .run();
+    // They have seen it; it simply has no sorts row.
+    db.update(threads).set({ lastMessageAt: NOW - 35 * DAY }).where(eq(threads.id, "a1:unsorted")).run();
+    db.update(threadOpens).set({ openedAt: NOW - 20 * DAY }).where(eq(threadOpens.threadId, "a1:unsorted")).run();
+    expect(sweepable(db, { now: () => NOW })).toEqual([]);
+  });
+
   it("returns a quiet Worth Knowing thread they have read", () => {
     const db = seeded();
     thread(db, "old", { wants: "knowing", quietDays: 30 });
