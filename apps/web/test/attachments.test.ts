@@ -12,6 +12,8 @@ import {
   gaveQuestion,
   isPdf,
   isPreviewable,
+  refusedLabel,
+  takeFiles,
 } from "../lib/attachments";
 
 describe("isPreviewable", () => {
@@ -163,5 +165,58 @@ describe("fileKind", () => {
     expect(fileKind("photo.JPEG")).toBe("JPEG");
     expect(fileKind("README")).toBe("FILE");
     expect(fileKind("archive.tar.gz")).toBe("GZ");
+  });
+});
+
+/**
+ * Files on the Compose page (operator, 2026-10-14: "how can I attach file
+ * here?" — there was no way). They are held in the browser until Send, so this
+ * is the only thing standing between a drop and a mail that a provider will
+ * refuse: the limits have to be checked here as well as in core.
+ */
+describe("taking files onto a compose", () => {
+  const f = (name: string, size: number) => ({ name, size });
+
+  it("takes what fits", () => {
+    const r = takeFiles([], [f("invoice.pdf", 2_000)]);
+    expect(r.accepted.map((x) => x.name)).toEqual(["invoice.pdf"]);
+    expect(r.refused).toEqual([]);
+  });
+
+  it("refuses one past the size a provider would take, and says which", () => {
+    const r = takeFiles([], [f("ok.pdf", 1_000), f("huge.mov", 26 * 1024 * 1024)]);
+    expect(r.accepted.map((x) => x.name)).toEqual(["ok.pdf"]);
+    expect(r.refused).toEqual([{ name: "huge.mov", why: "larger than 25 MB" }]);
+  });
+
+  it("stops at ten, counting what is already held", () => {
+    const held = Array.from({ length: 9 }, (_, i) => f(`held${i}.pdf`, 10));
+    const r = takeFiles(held, [f("tenth.pdf", 10), f("eleventh.pdf", 10)]);
+    expect(r.accepted.map((x) => x.name)).toEqual(["tenth.pdf"]);
+    expect(r.refused).toEqual([{ name: "eleventh.pdf", why: "more than 10 files" }]);
+  });
+
+  it("refuses an empty file, which is a folder dropped by mistake more often than not", () => {
+    const r = takeFiles([], [f("Documents", 0)]);
+    expect(r.accepted).toEqual([]);
+    expect(r.refused).toEqual([{ name: "Documents", why: "empty" }]);
+  });
+
+  it("says nothing when nothing was dropped", () => {
+    expect(takeFiles([], [])).toEqual({ accepted: [], refused: [] });
+  });
+});
+
+describe("what to tell them about refused files", () => {
+  it("says nothing when none were refused", () => {
+    expect(refusedLabel([])).toBe(null);
+  });
+
+  it("names the one file and the reason", () => {
+    expect(refusedLabel([{ name: "huge.mov", why: "larger than 25 MB" }])).toBe("huge.mov was not attached: larger than 25 MB");
+  });
+
+  it("counts them when there are several", () => {
+    expect(refusedLabel([{ name: "a", why: "empty" }, { name: "b", why: "larger than 25 MB" }])).toBe("2 files were not attached");
   });
 });

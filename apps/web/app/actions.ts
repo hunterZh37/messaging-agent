@@ -208,6 +208,15 @@ export async function composeDraftAction(input: {
 }
 
 
+/**
+ * The compose draft read back after its files have gone on, so the card that
+ * shows what will arrive shows them too (2026-10-14). `composeDraftAction`
+ * answers before the upload, which is the only reason this exists.
+ */
+export async function composeViewAction(draftId: string): Promise<DraftView | null> {
+  return getDraftView(core().db, draftId) ?? null;
+}
+
 export async function draftWithCelesteAction(input: {
   accountId: string;
   to: string[];

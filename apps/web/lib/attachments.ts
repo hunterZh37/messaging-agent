@@ -136,3 +136,64 @@ export function fileKind(filename: string): string {
   const m = /\.([A-Za-z0-9]{1,5})$/.exec(filename.trim());
   return m ? m[1]!.toUpperCase() : "FILE";
 }
+
+/** The limits core enforces too (`draft/attachments.ts`), checked here so a drop is answered at once. */
+export const MAX_COMPOSE_FILES = 10;
+export const MAX_COMPOSE_FILE_BYTES = 25 * 1024 * 1024;
+
+/** A file the composer would not take, and the reason in words a person would use. */
+export interface RefusedFile {
+  name: string;
+  why: string;
+}
+
+/**
+ * Which of these files the Compose page will carry (operator, 2026-10-14: "how
+ * can I attach file here?" — it could not).
+ *
+ * Compose holds its files in the browser until Send, because a draft cannot
+ * exist before there is a recipient and a subject and nothing else on that
+ * page is written down before Send either. So this is the only check between
+ * the drop and a provider's refusal, and it has to answer immediately and in
+ * full: every refusal names its file, because a file that silently fails to
+ * attach is discovered by the person who did not receive it.
+ *
+ * Counted against what is already held, not against the drop alone — ten files
+ * dropped one at a time is still eleven if one was there first.
+ */
+export function takeFiles<T extends { name: string; size: number }>(
+  held: readonly { name: string; size: number }[],
+  incoming: readonly T[],
+): { accepted: T[]; refused: RefusedFile[] } {
+  const accepted: T[] = [];
+  const refused: RefusedFile[] = [];
+  for (const file of incoming) {
+    // Zero bytes is a folder far more often than it is a file, and a folder
+    // dropped on a mail is a mistake worth saying out loud.
+    if (file.size === 0) {
+      refused.push({ name: file.name, why: "empty" });
+      continue;
+    }
+    if (file.size > MAX_COMPOSE_FILE_BYTES) {
+      refused.push({ name: file.name, why: "larger than 25 MB" });
+      continue;
+    }
+    if (held.length + accepted.length >= MAX_COMPOSE_FILES) {
+      refused.push({ name: file.name, why: `more than ${MAX_COMPOSE_FILES} files` });
+      continue;
+    }
+    accepted.push(file);
+  }
+  return { accepted, refused };
+}
+
+/**
+ * What to say about the ones that did not go on. One file is named with its
+ * reason, because that is what they can act on; several are counted, because a
+ * toast listing five filenames is read by nobody.
+ */
+export function refusedLabel(refused: readonly RefusedFile[]): string | null {
+  if (refused.length === 0) return null;
+  if (refused.length === 1) return `${refused[0]!.name} was not attached: ${refused[0]!.why}`;
+  return `${refused.length} files were not attached`;
+}

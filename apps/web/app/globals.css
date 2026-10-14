@@ -1866,3 +1866,14 @@ button.ask-score:focus-visible { outline: 2px solid var(--accent); outline-offse
 .ask-launch:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
 @media (max-width: 760px) { .ask-launch { right: 16px; bottom: 16px; } }
 
+/* Files on the composer (operator, 2026-10-14: "how can I attach file here?").
+   They are held in the browser until Send, so the chips are what is going,
+   not what has been stored anywhere yet. */
+.compose-files { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 4px; }
+.compose-files-hint { font-size: 12px; color: var(--muted); }
+.compose-file { display: inline-flex; align-items: center; gap: 8px; padding: 4px 8px 4px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; }
+.compose-file-size { color: var(--muted); }
+.compose-file button { background: none; border: none; padding: 0 2px; font: inherit; font-size: 14px; line-height: 1; color: var(--muted); cursor: pointer; }
+.compose-file button:hover { color: var(--danger); }
+/* The whole card is the drop target, so the edge is where it says so. */
+.compose-card.dropping { outline: 2px dashed var(--accent); outline-offset: 4px; }

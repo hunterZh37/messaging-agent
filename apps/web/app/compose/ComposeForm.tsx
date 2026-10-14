@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent as ReactDragEvent } from "react";
 import { useRouter } from "next/navigation";
 import { celesteBlockFor, composeBlockFor, parseAddressList } from "@/lib/compose";
 import { marked, toggleMark, type Mark } from "@/lib/marks";
-import { composeDraftAction, draftWithCelesteAction, firstContactAction, skipAction } from "../actions";
+import { draggingFiles, formatSize, refusedLabel, takeFiles } from "@/lib/attachments";
+import { composeDraftAction, composeViewAction, draftWithCelesteAction, firstContactAction, listDraftAttachmentsAction, skipAction } from "../actions";
+import type { CardFile } from "../queue/DraftAttachments";
 import { RecipientInput } from "./RecipientInput";
 import { SendPreviewDialog } from "../queue/SendPreviewDialog";
 import { useSendGate } from "../queue/SendProvider";
@@ -44,6 +46,18 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
   // queue carries who wrote it the way a reply's `draft.model` always does;
   // "operator" once the box has only ever held the operator's own words.
   const [model, setModel] = useState<string | null>(null);
+
+  // Files wait here until Send. A draft cannot exist before there is a
+  // recipient and a subject (`composeDraft` refuses), so attaching to one
+  // would mean telling the operator to fill the form in a particular order,
+  // and would leave a draft behind every time they changed their mind. The
+  // body is not written down before Send either; these are kept the same way.
+  const [files, setFiles] = useState<File[]>([]);
+  const [dragging, setDragging] = useState(false);
+  // What the confirm card shows: the files as the draft now holds them.
+  const [attached, setAttached] = useState<CardFile[]>([]);
+  const dragDepth = useRef(0);
+  const filePicker = useRef<HTMLInputElement>(null);
 
   const [celestePending, setCelestePending] = useState(false);
   const [celesteError, setCelesteError] = useState<string | undefined>(undefined);
@@ -92,19 +106,73 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
       .finally(() => setCelestePending(false));
   }
 
+  function addFiles(list: FileList | File[] | null) {
+    const { accepted, refused } = takeFiles(files, Array.from(list ?? []));
+    if (accepted.length > 0) setFiles((held) => [...held, ...accepted]);
+    const said = refusedLabel(refused);
+    if (said) gate.say(said);
+  }
+
+  function onDragEnter(ev: ReactDragEvent) {
+    if (!draggingFiles(ev.dataTransfer?.types)) return;
+    dragDepth.current++;
+    setDragging(true);
+  }
+
+  function onDragLeave(ev: ReactDragEvent) {
+    if (!draggingFiles(ev.dataTransfer?.types)) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDragging(false);
+  }
+
+  function onDrop(ev: ReactDragEvent) {
+    if (!draggingFiles(ev.dataTransfer?.types)) return;
+    ev.preventDefault();
+    dragDepth.current = 0;
+    setDragging(false);
+    addFiles(ev.dataTransfer?.files ?? null);
+  }
+
+  /**
+   * The files onto the draft that was just made, before the card that shows
+   * what will arrive. One failure stops the send: a mail that goes without the
+   * invoice it was written to carry is worse than one that does not go.
+   */
+  async function uploadTo(draftId: string): Promise<string | null> {
+    for (const file of files) {
+      const body = new FormData();
+      body.set("file", file);
+      const res = await fetch(`/api/drafts/${encodeURIComponent(draftId)}/attachments`, { method: "POST", body });
+      if (!res.ok) {
+        const said = (await res.json().catch(() => null)) as { error?: string } | null;
+        return `${file.name} could not be attached: ${said?.error ?? res.statusText}`;
+      }
+    }
+    return null;
+  }
+
   /** Make the draft, then show it as it will arrive. Nothing has gone yet. */
   function review() {
     setAddError(undefined);
     setAddPending(true);
     setFirstContact(null);
     void composeDraftAction({ accountId, to: toList, cc: ccList, subject, text, ...(model ? { model } : {}) })
-      .then((r) => {
-        setAddPending(false);
+      .then(async (r) => {
         if (!r.ok) {
+          setAddPending(false);
           setAddError(r.error);
           return;
         }
-        setReady(r.view);
+        const failed = await uploadTo(r.draftId);
+        setAddPending(false);
+        if (failed) {
+          setAddError(failed);
+          return;
+        }
+        // Read back with the files on it, so the card shows what will go.
+        const withFiles = await composeViewAction(r.draftId);
+        setAttached(files.length > 0 ? await listDraftAttachmentsAction(r.draftId) : []);
+        setReady(withFiles ?? r.view);
         // Who has never had mail from this account, for the warning on the
         // card. Send waits for this answer (spec 2026-09-22).
         void firstContactAction(accountId, [...toList, ...ccList])
@@ -128,13 +196,24 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
     setCc("");
     setSubject("");
     setText("");
+    setFiles([]);
+    setAttached([]);
     setInstruction("");
     setModel(null);
     router.refresh();
   }
 
   return (
-    <div className="card compose-card" style={{ marginTop: 16 }}>
+    <div
+      className={`card compose-card${dragging ? " dropping" : ""}`}
+      style={{ marginTop: 16 }}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={(e) => {
+        if (draggingFiles(e.dataTransfer?.types)) e.preventDefault();
+      }}
+      onDrop={onDrop}
+    >
       <label htmlFor="compose-from">From</label>
       <select id="compose-from" className="field" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
         <option value="" disabled>
@@ -185,6 +264,40 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
         }}
       />
 
+      <div className="compose-files">
+        <button type="button" className="chip" onClick={() => filePicker.current?.click()}>
+          <span>Attach a file</span>
+        </button>
+        <input
+          ref={filePicker}
+          type="file"
+          multiple
+          hidden
+          onChange={(e) => {
+            addFiles(e.target.files);
+            // Cleared, or picking the same file twice in a row does nothing.
+            e.target.value = "";
+          }}
+        />
+        {files.length === 0 ? (
+          <span className="compose-files-hint">or drop one anywhere on this form</span>
+        ) : (
+          files.map((f, i) => (
+            <span key={`${f.name}:${i}`} className="compose-file">
+              <span>{f.name}</span>
+              <span className="compose-file-size">{formatSize(f.size)}</span>
+              <button
+                type="button"
+                aria-label={`Remove ${f.name}`}
+                onClick={() => setFiles((held) => held.filter((_, at) => at !== i))}
+              >
+                ×
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+
       <label htmlFor="compose-instruction">Draft with Celeste</label>
       <div className="row compose-celeste-row">
         {/* What to say is often a paragraph, not a line: an order number, an
@@ -231,7 +344,7 @@ export function ComposeForm({ accounts }: { accounts: ComposeAccount[] }) {
           text={text}
           to={toList}
           cc={ccList}
-          files={[]}
+          files={attached}
           firstContact={firstContact}
           onSend={sendItNow}
           onClose={() => {
