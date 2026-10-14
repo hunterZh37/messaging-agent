@@ -8,4 +8,3 @@ export * from "./files";
 export * from "./context";
 export * from "./ask";
 export * from "./anthropic";
-export * from "./explain";

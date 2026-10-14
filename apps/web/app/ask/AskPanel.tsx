@@ -44,10 +44,6 @@ import {
   scoreTone,
   hasWhy,
   whyOpen,
-  explainState,
-  type Explained,
-  rememberExplained,
-  type Explanations,
 } from "@/lib/chat";
 import {
   attachedQuestion,
@@ -76,7 +72,6 @@ import {
   type ChatFile,
   type ChatHistoryRow,
   deleteChatAction,
-  explainAction,
 } from "./actions";
 import { useAsk, type LookingAtDraft } from "./AskProvider";
 
@@ -320,57 +315,20 @@ function closeOnPhone(close: () => void) {
 }
 
 /**
- * Why a message scored what it did. The sentence from the ranking is there the
- * instant the operator points at the number and costs nothing; Explain asks
- * Celeste about that one message, which costs a fraction of a cent, and only
- * for the result they asked about (spec 2026-10-07). A failed ask leaves the
- * free text standing — they pressed a button for more, and getting less than
- * they already had would be the worst answer.
+ * Why a message scored what it did, from the ranking that produced the number
+ * (spec 2026-10-07). An Explain link sat here and asked Celeste to write a
+ * sentence about the one message, for a fraction of a cent; the operator asked
+ * for it to go (2026-10-13). The free text was always the thing worth reading
+ * — it is the score accounting for itself, which is what a person hovering a
+ * number wants — and nothing here spends money now.
  */
-function WhyPopover({
-  citation,
-  question,
-  held,
-  onAnswer,
-  onLeave,
-}: {
-  citation: Citation;
-  question: string;
-  held: Explained | null;
-  onAnswer: (answer: Explained) => void;
-  onLeave: () => void;
-}) {
-  const [asking, setAsking] = useState(false);
-  const shown = explainState({ free: citation.why ?? "", asked: held });
+function WhyPopover({ citation, onLeave }: { citation: Citation; onLeave: () => void }) {
   return (
     <div className="ask-why" role="tooltip" onMouseLeave={onLeave}>
       <div className="ask-why-title">Relevance {citation.score}/100</div>
-      <div>{shown.text}</div>
-      {shown.failed ? <div className="ask-why-failed">Celeste could not say more: {shown.failed}</div> : null}
+      <div>{citation.why}</div>
       <div className="ask-why-foot">
-        <span>{shown.source === "celeste" ? "Written by Celeste" : "From how it was ranked"}</span>
-        {shown.source === "celeste" ? null : (
-          <button
-            type="button"
-            className="ask-why-explain"
-            disabled={asking}
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              if (asking) return;
-              setAsking(true);
-              // The answer goes up to the turn, which outlives this popover:
-              // held here it was thrown away the moment the pointer left, and
-              // the next press paid for it again (review, 2026-10-07).
-              void explainAction(citation.messageId, question)
-                .then((r) => onAnswer("error" in r ? { error: r.error } : { sentence: r.sentence }))
-                .catch((err: Error) => onAnswer({ error: err.message }))
-                .finally(() => setAsking(false));
-            }}
-          >
-            {asking ? "Asking…" : "Explain ▸"}
-          </button>
-        )}
+        <span>From how it was ranked</span>
       </div>
     </div>
   );
@@ -383,7 +341,6 @@ function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; quest
   const [whyFor, setWhyFor] = useState<string | null>(null);
   // What Celeste has already said about each message in this turn. Kept here
   // rather than in the popover, which unmounts whenever the pointer leaves it.
-  const [explained, setExplained] = useState<Explanations>({});
   // Escape closes it without closing the panel underneath, which is what a
   // popover over a conversation has to do to be usable.
   useEffect(() => {
@@ -448,13 +405,7 @@ function AssistantTurn({ turn, question, applied, drafted }: { turn: Turn; quest
                     <div style={{ width: `${c.score}%` }} />
                   </div>
                   {whyOpen(c.messageId, whyFor) && c.why ? (
-                    <WhyPopover
-                      citation={c}
-                      question={question}
-                      held={explained[c.messageId] ?? null}
-                      onAnswer={(answer) => setExplained((held) => rememberExplained(held, c.messageId, answer))}
-                      onLeave={() => setWhyFor(null)}
-                    />
+                    <WhyPopover citation={c} onLeave={() => setWhyFor(null)} />
                   ) : null}
                 </div>
               )}

@@ -47,10 +47,15 @@ full height.
 **The ranked cards replace the chips, inside the panel** (operator, 2026-10-07:
 "the result ... should be inside the ask list panel"). No separate search page.
 
-**The hover is free; Celeste is asked only on a click.** The text under the
-score comes from the signals that produced it and costs nothing. An Explain
-link fetches her sentence about that one message, which costs a fraction of a
-cent, and only for the result they asked about.
+**The hover is free, and nothing in it spends money** (operator, 2026-10-13:
+"remove explain"). The text under the score comes from the signals that
+produced it and costs nothing.
+
+An Explain link sat beside it and fetched Celeste's sentence about that one
+message for a fraction of a cent. It is gone. The free text was always the
+thing worth reading, because it is the score accounting for itself, which is
+what a person who hovers a number is asking for; a sentence describing the
+message answered a different question, and one they could get by opening it.
 
 **The score greys out below 70.** Not the operator's instruction; mine, and
 reversible. With a list where everything is confident, nothing is.
@@ -115,18 +120,12 @@ Clicking it opens the thread, as the chip does now.
 it has to survive the pointer travelling into it. Keyboard-reachable, since the
 score is the control.
 
-**Explain** is a server action over one message id, returning one sentence.
-It is the only part of this that spends money, and it spends it only when
-clicked. A failure says so in the popover and leaves the free text standing.
-
 ## 4. Known limits (accepted)
 
 - A citation from `get_thread` or `list_mail` has no score, and will not get
   one. Ranking a message nobody searched for would mean inventing a question.
 - The score's weights are a guess until they can be looked at. The first week
   of using this is the measurement.
-- Explain re-reads one message and says what it is about; it does not re-derive
-  the score, so a sentence can describe a message the score rated low.
 - The scores move as the backfill proceeds: a message with no vector yet can
   only score on words. This settles once embedding finishes.
 
@@ -141,5 +140,3 @@ clicked. A failure says so in the popover and leaves the free text standing.
   before today's shape renders the old row.
 - The panel at phone width, where a 620px panel cannot float: it covers, as the
   current one does.
-- Explain: the click spends once, a second click does not re-ask, a failure
-  leaves the free text.
