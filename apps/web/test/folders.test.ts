@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STATUS_MENU, headTitle, activeTreeKey, hasProjectBar, messagesLanding, parseFolder, parseStatus, rowsForSide, sideHref, sideOfPath, threadPath, treeRows, viewHref } from "../lib/folders";
+import { STATUS_MENU, archiveAllLabel, headTitle, activeTreeKey, hasProjectBar, messagesLanding, parseFolder, parseStatus, rowsForSide, sideHref, sideOfPath, threadPath, treeRows, viewHref } from "../lib/folders";
 
 describe("parseStatus", () => {
   it("takes only the statuses its folder has", () => {
@@ -332,5 +332,31 @@ describe("what the header calls the Archive", () => {
   it("still puts the inbox above its own lists", () => {
     expect(headTitle("inbox", "knowing")).toBe("Inbox");
     expect(headTitle("inbox", undefined)).toBe("Inbox");
+  });
+});
+
+/**
+ * "Archive all · 2" over a row reading 7 (operator, 2026-10-16, with a
+ * screenshot). Both numbers were right — the chip counts what will actually
+ * move and holds back anything unread — but a button that disagrees with the
+ * row above it looks broken whichever number is correct, so it now says both.
+ */
+describe("what the Archive all chip says", () => {
+  it("says the plain count when everything in view can go", () => {
+    expect(archiveAllLabel(7, 7)).toBe("Archive all · 7");
+  });
+
+  it("says both numbers when some are held back", () => {
+    expect(archiveAllLabel(2, 7)).toBe("Archive all · 2 of 7");
+  });
+
+  it("says nothing at all when nothing can go", () => {
+    expect(archiveAllLabel(0, 7)).toBe(null);
+    expect(archiveAllLabel(0, 0)).toBe(null);
+  });
+
+  it("never claims more than the view holds", () => {
+    // A count taken a moment later than the list cannot read as "9 of 7".
+    expect(archiveAllLabel(9, 7)).toBe("Archive all · 7");
   });
 });

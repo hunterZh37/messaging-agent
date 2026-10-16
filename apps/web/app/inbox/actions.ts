@@ -417,10 +417,17 @@ export async function archiveAllAction(scope: DisposableScope, list: ArchiveList
   }
 }
 
-/** How many that would take right now, for the button's own label. */
-export async function archivableCountAction(scope: DisposableScope, list: ArchiveList = "knowing"): Promise<number> {
+/**
+ * What the button would take, and what the list it sits over holds. Both, so
+ * the chip can say "2 of 7" rather than a 2 that disagrees with the row above
+ * it (operator, 2026-10-16).
+ */
+export async function archivableCountAction(scope: DisposableScope, list: ArchiveList = "knowing"): Promise<{ archivable: number; inView: number }> {
   const { db } = core();
-  return archivableIds(db, scope, list).length;
+  const folder = scope.folder ?? "inbox";
+  const inView = list === "disposable" ? disposableThreadIds(db, { ...scope, folder }) : knowingThreadIds(db, { ...scope, folder });
+  const archivable = list === "disposable" ? inView : sweepableAmong(db, inView);
+  return { archivable: archivable.length, inView: inView.length };
 }
 
 /**

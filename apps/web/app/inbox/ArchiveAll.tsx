@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useSendGate } from "../queue/SendProvider";
 import { archivableCountAction, archiveAllAction, unhideThreadsAction, type ArchiveList, type DisposableScope } from "./actions";
+import { archiveAllLabel } from "@/lib/folders";
 
 /**
  * "Archive all · N", beside "Delete all" on Safe to Delete and on the Worth
@@ -28,7 +29,7 @@ import { archivableCountAction, archiveAllAction, unhideThreadsAction, type Arch
 export function ArchiveAll({ scope, list = "knowing" }: { scope: DisposableScope; list?: ArchiveList }) {
   const { say } = useSendGate();
   const router = useRouter();
-  const [count, setCount] = useState<number | null>(null);
+  const [count, setCount] = useState<{ archivable: number; inView: number } | null>(null);
   const [pending, startTransition] = useTransition();
 
   useEffect(() => {
@@ -54,7 +55,7 @@ export function ArchiveAll({ scope, list = "knowing" }: { scope: DisposableScope
         say("Nothing to archive");
         return;
       }
-      setCount(0);
+      setCount({ archivable: 0, inView: 0 });
       say(`Archived ${r.moved} ${r.moved === 1 ? "thread" : "threads"}`, {
         undo: async () => {
           await unhideThreadsAction(r.threadIds);
@@ -65,7 +66,8 @@ export function ArchiveAll({ scope, list = "knowing" }: { scope: DisposableScope
     });
   }
 
-  if (count === null || count === 0) return null;
+  const label = count ? archiveAllLabel(count.archivable, count.inView) : null;
+  if (!label) return null;
   return (
     <button
       type="button"
@@ -75,10 +77,12 @@ export function ArchiveAll({ scope, list = "knowing" }: { scope: DisposableScope
       title={
         list === "disposable"
           ? "Put these away instead of deleting them. They stay findable in the Archive."
-          : "Archive every thread here you have read. Anything you have not opened stays."
+          : count && count.archivable < count.inView
+            ? `Archive the ${count.archivable} you have read. The other ${count.inView - count.archivable} stay until you open them.`
+            : "Archive every thread here you have read. Anything you have not opened stays."
       }
     >
-      <span>{pending ? "Archiving…" : `Archive all · ${count}`}</span>
+      <span>{pending ? "Archiving…" : label}</span>
     </button>
   );
 }

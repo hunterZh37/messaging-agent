@@ -900,8 +900,21 @@ button.chip:disabled { cursor: default; color: var(--muted); }
    it. Mid-height at the right, clear of the time above and the snippet's
    ellipsis below, so it never sits on top of a word. */
 .row-tools {
-  position: absolute; top: 50%; right: 10px; transform: translateY(-50%);
-  display: flex; align-items: center; gap: 2px; padding: 3px;
+  /* On the date's line, not mid-row (operator, 2026-10-16, with a screenshot
+     of the strip lying across a sender and a subject). Mid-height was chosen
+     when a row read account / date, sender, one-line subject, snippet — there
+     was nothing in the middle to cover. A subject that wraps to three lines
+     fills exactly that band, and the strip then hid the sender and the
+     subject: the two things the operator reads to decide whether to file,
+     move or delete, covered by the buttons that do it. Measured at 173px of a
+     353px subject.
+
+     The top line holds the account on the left and the timestamp on the
+     right, and the timestamp is the one thing on the row nobody needs while
+     aiming at these buttons. Everything that decides the question stays
+     legible. */
+  position: absolute; top: 4px; right: 10px;
+  display: flex; align-items: center; gap: 2px; padding: 2px;
   border-radius: 10px; background: var(--bg-elev); border: 1px solid var(--line);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
   opacity: 0; transition: opacity 120ms;
@@ -910,14 +923,14 @@ button.chip:disabled { cursor: default; color: var(--muted); }
 /* The buttons are now laid out by the strip, so they drop their own ground. */
 .row-tools .inbox-row-del, .row-tools .inbox-row-hide {
   position: static; transform: none; background: none; box-shadow: none;
-  opacity: 1; width: 26px; height: 26px; border-radius: 7px;
+  opacity: 1; width: 26px; height: 24px; border-radius: 7px;
   display: inline-flex; align-items: center; justify-content: center; color: var(--muted);
 }
 .row-tools .inbox-row-del:hover { color: var(--fg); background: color-mix(in srgb, var(--fg) 9%, transparent); }
 .inbox-row-del svg { width: 13px; height: 13px; }
 .inbox-row-keep { position: relative; }
 .keep-btn {
-  display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px;
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px;
   font: inherit; font-size: 12px; font-weight: 500; color: var(--muted);
   background: none; border: 0; border-radius: 7px; cursor: pointer; transition: color 120ms, background-color 120ms;
 }
@@ -1086,7 +1099,13 @@ textarea.compose-instruction { min-height: 6.5rem; resize: vertical; }
 /* A subject with no space in it (a file name, a token) wraps rather than
    pushing the row past the screen (phone stress audit, 2026-09-11: a 360px
    list scrolled sideways by 23px). */
-.inbox-subject { font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+/* Two lines at most (2026-10-16): a long subject pushed the snippet out of
+   the row and made rows of wildly different heights, which is hard to scan.
+   The tail is in the snippet beneath it either way. */
+.inbox-subject {
+  font-size: 14px; overflow-wrap: anywhere; min-width: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 .inbox-empty { padding: 12px 16px 24px; color: var(--muted); }
 /* The rows past the first page wait behind this (operator, 2026-09-11). */
 .inbox-more { display: block; padding: 14px 16px 18px; color: var(--muted); font-size: 13px; text-decoration: none; }

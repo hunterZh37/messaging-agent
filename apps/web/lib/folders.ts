@@ -353,3 +353,20 @@ export function headTitle(folder: FolderKey, status: string | undefined): string
   if (folder === "inbox" && status === "hidden") return null;
   return FOLDER_TITLES[folder] ?? null;
 }
+
+/**
+ * What the "Archive all" chip reads, given what may go and what the list holds.
+ *
+ * The two numbers differ whenever something in view is unread, because nothing
+ * unopened is ever archived. Showing only the first made the chip look wrong
+ * against the row above it (operator, 2026-10-16: a screenshot of "Archive all
+ * · 2" under "Worth Knowing 7"); showing only the second would be a button
+ * that lies about what it is about to do. So it says both, and only when they
+ * differ — "2 of 7" explains itself, while "7 of 7" is noise.
+ */
+export function archiveAllLabel(archivable: number, inView: number): string | null {
+  if (archivable <= 0) return null;
+  // A count read a moment after the list cannot come back larger than it.
+  const take = Math.min(archivable, inView);
+  return take >= inView ? `Archive all · ${take}` : `Archive all · ${take} of ${inView}`;
+}
