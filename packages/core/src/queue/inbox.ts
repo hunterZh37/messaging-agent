@@ -206,20 +206,28 @@ export interface InboxScope extends FolderScope {
   now?: number;
 }
 
-/** How far before an inbox was connected its mail is live (operator, 2026-09-14): the status rows never reach further back. */
-export const LIVE_BEFORE_CONNECT_MS = 30 * 86_400_000;
 /** A chat needs a reply for this long after the other person's last word, then it has gone quiet (operator, 2026-09-14). */
 export const CHAT_REPLY_WINDOW_MS = 14 * 86_400_000;
 
-/**
- * Only what arrived since the account was live: the 30 days before it was
- * connected, and everything after. History pulled in behind that stays
- * searchable and stays out of Need to reply, Unopened, Safe to delete and
- * Waiting (operator, 2026-09-14: "there shouldn't be 217 need to reply").
+/*
+ * The live line is gone (operator, 2026-10-18: "drop the rule"). It held every
+ * status row to mail from the 30 days before an inbox was connected and after,
+ * and it was asked for on 2026-09-14 — "there shouldn't be 217 need to reply"
+ * — when connecting an inbox tipped a year of history into the rows that claim
+ * the operator.
+ *
+ * Five weeks later it was doing the opposite harm. Of 836 threads in their
+ * inbox, 422 were held out of every row by this line while the Inbox count
+ * above went on counting them: mail never answered, invisible in the only
+ * lists that would have said so, under a heading reading 836 over four zeroes.
+ * Safe to delete had already been exempted for the same reason — "on this row
+ * flooding is the point" — and this finishes that thought for the rest.
+ *
+ * What it protected against is real but temporary: the day an inbox is
+ * connected. What it cost was permanent, and ran against the thing the whole
+ * inbox is for — "the confidence that I have personally seen every single
+ * email out there."
  */
-function liveOnly(): SQL {
-  return sql`${messages.sentAt} >= (select a.created_at from accounts a where a.id = ${messages.accountId}) - ${LIVE_BEFORE_CONNECT_MS}`;
-}
 
 /** The digits of a handle, so "+1 (415) 555-0133" and "+14155550133" read as one number. */
 function digitsOf(col: SQL): SQL {
@@ -308,7 +316,7 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // message instead, an exchange answered three replies ago stayed on the
   // list forever, once for every question ever asked in it.
   if (folder === "inbox" && opts.status === "needs_reply") {
-    conditions.push(latestInThread(), eq(sorts.wants, "reply"), isNull(handledActions.id), liveOnly());
+    conditions.push(latestInThread(), eq(sorts.wants, "reply"), isNull(handledActions.id));
   }
   // A chat needs a reply when the other person had the last word and nobody
   // has marked it handled: a fact, not a verdict (operator, 2026-09-11: the
@@ -324,7 +332,6 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
     conditions.push(
       latestInThread(),
       isNull(handledActions.id),
-      liveOnly(),
       gte(messages.sentAt, (opts.now ?? nowMs()) - CHAT_REPLY_WINDOW_MS),
       or(and(sql`not (${isGroupChat()})`, eq(messages.isFromOperator, false)), and(isGroupChat(), eq(messages.mentionsOperator, true)))!,
       sql`(not ${noName()} or exists (select 1 from messages o where o.thread_id = ${messages.threadId} and o.is_from_operator = 1))`,
@@ -335,11 +342,11 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // shows the newest message the operator received, which is what the inbox
   // shows for a thread.
   if (folder === "inbox" && opts.status === "unopened") {
-    conditions.push(latestInboxInThread(), threadUnread(), liveOnly());
+    conditions.push(latestInboxInThread(), threadUnread());
   }
   // Texts (2026-09-11): the same two rows, over the chat's newest text.
   if (folder === "messages" && opts.status === "unopened") {
-    conditions.push(latestInThread(), threadUnread(), liveOnly());
+    conditions.push(latestInThread(), threadUnread());
   }
   // "Safe to delete" cuts across the other rows as Unopened does: what the
   // sorter says nobody will need again once it has been read (spec 7,
@@ -359,17 +366,17 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // which "action" keeps because it is a claim on the operator, and the bin
   // does not because clearing out old junk is the point of that row.
   if (folder === "inbox" && opts.status === "action") {
-    conditions.push(latestInThread(), eq(sorts.wants, "action"), isNull(handledActions.id), liveOnly());
+    conditions.push(latestInThread(), eq(sorts.wants, "action"), isNull(handledActions.id));
   }
   // The two rungs that claim the operator, read as one list (operator,
   // 2026-09-19: "put Reply/Action Required the same tab"). They stay apart
   // in the data — the difference between owing words and owing a signature
   // is real — and come together only where the operator looks.
   if (folder === "inbox" && opts.status === "owed") {
-    conditions.push(latestInThread(), inArray(sorts.wants, ["reply", "action"]), isNull(handledActions.id), liveOnly());
+    conditions.push(latestInThread(), inArray(sorts.wants, ["reply", "action"]), isNull(handledActions.id));
   }
   if (folder === "inbox" && opts.status === "knowing") {
-    conditions.push(latestInThread(), eq(sorts.wants, "knowing"), liveOnly());
+    conditions.push(latestInThread(), eq(sorts.wants, "knowing"));
   }
   if (folder === "inbox" && opts.status === "disposable") {
     conditions.push(eq(sorts.wants, "bin"));
@@ -381,16 +388,11 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   if (folder === "messages" && opts.status === "disposable") {
     conditions.push(
       latestInThread(),
-      liveOnly(),
       sql`not (${isGroupChat()})`,
       eq(messages.isFromOperator, false),
       noName(),
       sql`not exists (select 1 from messages o where o.thread_id = ${messages.threadId} and o.is_from_operator = 1)`,
     );
-  }
-  // Waiting is read off the text (applyWaiting), but only over live mail.
-  if (folder === "sent" && (opts.status === "waiting" || opts.status === "not_waiting")) {
-    conditions.push(liveOnly());
   }
   // "No need to reply" is everything else in the inbox: unsorted mail, mail
   // the sorter cleared, mail already handled, and every message that is not

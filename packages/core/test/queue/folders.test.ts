@@ -859,9 +859,72 @@ describe("Safe to delete and the live line", () => {
 
     expect(disposableThreadIds(db, {})).toContain("a1:told");
     expect(folderCounts(db, {}).disposable).toBeGreaterThan(0);
-    // The rows that exist to say the operator owes something still do not
-    // reach back: that is what the live line is for.
-    expect(listInboxMessages(db, { status: "needs_reply" }).map((r) => r.message.id)).not.toContain("a1:mold");
+  });
+});
+
+/**
+ * Every row reaches back now (operator, 2026-10-18: "drop the rule"), which
+ * finishes what exempting Safe to delete began.
+ *
+ * The live line was asked for on 2026-09-14 — "there shouldn't be 217 need to
+ * reply" — when connecting an inbox tipped a year of history into the rows
+ * that claim the operator. Five weeks on it was doing the opposite harm: of
+ * 836 threads in their inbox, 422 were held out of every row by it while the
+ * Inbox count above went on counting them. Mail they had never answered,
+ * invisible in the only list that would have said so, under a heading that
+ * read 836 over four zeroes.
+ */
+describe("mail from before the inbox was connected", () => {
+  function longBefore(db: ReturnType<typeof testDb>, wants: string, id: string) {
+    const connected = db.select().from(accounts).where(eq(accounts.id, "a1")).get()!.createdAt;
+    const old = connected - 365 * 86_400_000;
+    db.insert(threads)
+      .values({ id: `a1:${id}`, accountId: "a1", providerThreadId: id, subject: id, lastMessageAt: old, lastFromOperator: false })
+      .run();
+    db.insert(messages)
+      .values({
+        ...base, id: `a1:${id}m`, accountId: "a1", providerMessageId: `INBOX:${id}`, threadId: `a1:${id}`, rfcMessageId: null,
+        fromAddress: "them@example.com", toAddresses: ["me@example.com"], subject: id,
+        bodyText: "From before.", isFromOperator: false, folder: "inbox", sentAt: old, receivedAt: old,
+      })
+      .run();
+    db.insert(sorts)
+      .values({ messageId: `a1:${id}m`, wants: wants as never, scheduling: false, category: null, finance: "none", reason: "r", model: "x", labeledAt: null, createdAt: 1 })
+      .run();
+    return `a1:${id}m`;
+  }
+
+  it("counts toward Reply / Action Required", () => {
+    const db = testDb();
+    seed(db);
+    const mid = longBefore(db, "reply", "oldreply");
+    expect(listInboxMessages(db, { status: "needs_reply" }).map((r) => r.message.id)).toContain(mid);
+    expect(listInboxMessages(db, { status: "owed" }).map((r) => r.message.id)).toContain(mid);
+  });
+
+  it("counts toward Worth Knowing", () => {
+    const db = testDb();
+    seed(db);
+    const mid = longBefore(db, "knowing", "oldknowing");
+    expect(listInboxMessages(db, { status: "knowing" }).map((r) => r.message.id)).toContain(mid);
+  });
+
+  it("counts toward Unopened, which is the number the operator steers by", () => {
+    const db = testDb();
+    seed(db);
+    const mid = longBefore(db, "knowing", "oldunopened");
+    expect(listInboxMessages(db, { status: "unopened" }).map((r) => r.message.id)).toContain(mid);
+  });
+
+  it("leaves the rows adding up to the Inbox above them", () => {
+    const db = testDb();
+    seed(db);
+    longBefore(db, "reply", "sumreply");
+    const c = folderCounts(db, {});
+    // Nothing in the inbox is now invisible to every row at once.
+    const inRows = owedThreadIds(db, {}).length + knowingThreadIds(db, {}).length + disposableThreadIds(db, {}).length;
+    expect(inRows).toBeGreaterThan(0);
+    expect(c.owed).toBeGreaterThan(0);
   });
 });
 
@@ -961,15 +1024,25 @@ describe("Need to reply for chats: people you know, recently", () => {
     expect(listInboxMessages(db, { folder: "messages", status: "needs_reply", now: NOW + 14 * DAY }).map((r) => r.thread.subject)).toEqual([]);
   });
 
-  it("history from before the inbox was live never reaches a status row, whatever the window", () => {
+  it("history from before the inbox was live reaches the rows like everything else", () => {
     const db = testDb();
-    // Connected today: live from 30 days ago. Aunt's text is 40 days old.
+    // Connected today; Aunt's text is 40 days old. The live line used to hold
+    // it out of every status row (operator, 2026-10-18: "drop the rule").
     seedChats(db, NOW);
-    expect(unopenedThreadIds(db, { folder: "messages" })).not.toContain("im:hist");
-    expect(disposableThreadIds(db, { folder: "messages" })).not.toContain("im:hist");
-    // Still in the plain Messages list, and still searchable.
+    expect(unopenedThreadIds(db, { folder: "messages" })).toContain("im:hist");
     expect(listInboxMessages(db, { folder: "messages" }).map((r) => r.thread.subject)).toContain("Aunt");
-    expect(folderCounts(db, { now: NOW }).texts.unopened).toBe(listInboxMessages(db, { folder: "messages", status: "unopened" }).length);
+    // The one thing that must not change: a row's number is what its list holds.
+    expect(folderCounts(db, { now: NOW }).texts.unopened).toBe(
+      new Set(listInboxMessages(db, { folder: "messages", status: "unopened" }).map((r) => r.thread.id)).size,
+    );
+  });
+
+  it("still leaves a quiet old chat out of Need to reply, which is its own rule", () => {
+    const db = testDb();
+    seedChats(db, NOW);
+    // CHAT_REPLY_WINDOW_MS, not the live line: a chat goes quiet after a
+    // fortnight whatever else changed.
+    expect(listInboxMessages(db, { folder: "messages", status: "needs_reply" }).map((r) => r.thread.id)).not.toContain("im:hist");
   });
 });
 
