@@ -1345,3 +1345,43 @@ describe("a row and its list, again", () => {
     expect(folderCounts(db, {}).waiting).toBe(before - 1);
   });
 });
+
+/**
+ * A thread only leaves the inbox when Sent will actually show it (found
+ * 2026-10-18, hours after the inbox/Sent split shipped).
+ *
+ * The split read "the operator spoke last" and let the thread go. But 19 of
+ * their threads end with a message of their own that the provider filed in
+ * the inbox rather than in Sent — a calendar confirmation sent on their
+ * behalf, a forward that came back round. Sent lists `folder = 'sent'`, so
+ * those 19 left the inbox and arrived nowhere: the exact disappearance this
+ * codebase has now removed three other rules for causing.
+ */
+describe("a thread may only leave the inbox for somewhere that shows it", () => {
+  function mineLast(db: ReturnType<typeof testDb>, folder: "sent" | "inbox") {
+    db.insert(messages)
+      .values({
+        ...base, id: `a1:mine-${folder}`, accountId: "a1", providerMessageId: `X:${folder}`, threadId: "a1:t1", rfcMessageId: null,
+        fromAddress: "me@example.com", toAddresses: ["bob@x.com"], subject: "Lunch", bodyText: "Booked.",
+        isFromOperator: true, folder, sentAt: 900, receivedAt: 900,
+      })
+      .run();
+  }
+
+  it("lets go of one whose reply is in Sent", () => {
+    const db = testDb();
+    seed(db);
+    mineLast(db, "sent");
+    expect(ids(listInboxMessages(db))).not.toContain("a1:m1");
+    expect(ids(listInboxMessages(db, { folder: "sent" }))).toContain("a1:mine-sent");
+  });
+
+  it("keeps one whose own last message the provider filed in the inbox", () => {
+    const db = testDb();
+    seed(db);
+    mineLast(db, "inbox");
+    // Sent cannot show it, so the inbox must.
+    expect(ids(listInboxMessages(db, { folder: "sent" }))).not.toContain("a1:mine-inbox");
+    expect(ids(listInboxMessages(db))).toContain("a1:m1");
+  });
+});

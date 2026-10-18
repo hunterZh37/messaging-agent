@@ -181,17 +181,29 @@ function latestInboxInThread(): SQL {
 }
 
 /**
- * Did the operator speak last in this thread? Their own reply, in whatever
- * folder it landed, after everything anyone else sent. Ties break on id, the
- * way every other newest-message question here does.
+ * Did the operator speak last in this thread, with a reply the Sent folder
+ * will show? Ties break on id, the way every other newest-message question
+ * here does.
  */
 function answeredLast(): SQL {
-  return sql`(
-    select m.is_from_operator from messages m
+  // `folder = 'sent'` as well as the operator's own, because this is what lets
+  // a thread leave the inbox and the Sent list is what has to receive it
+  // (2026-10-18). Nineteen of their threads end with a message of their own
+  // that the provider filed in the inbox rather than in Sent — a calendar
+  // confirmation sent on their behalf, a forward come back round. Reading only
+  // "they spoke last" let those out of the inbox and into nowhere, which is
+  // the disappearance three other rules have been deleted for causing.
+  return sql`exists (
+    select 1 from messages m
     where m.thread_id = ${messages.threadId}
-    order by m.sent_at desc, m.id desc
-    limit 1
-  ) = 1`;
+      and m.is_from_operator = 1 and m.folder = 'sent'
+      and m.id = (
+        select m2.id from messages m2
+        where m2.thread_id = ${messages.threadId}
+        order by m2.sent_at desc, m2.id desc
+        limit 1
+      )
+  )`;
 }
 
 /**

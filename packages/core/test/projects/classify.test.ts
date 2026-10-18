@@ -604,14 +604,14 @@ describe("countByProject", () => {
     addMessage(db, { id: "m3", accountId: "a2", subject: "Other inbox", body: "x" });
     fileThread(db, "a1:t1", project.id);
 
-    // a1:t1 is answered: the operator replied last, so it is Sent's now and
-    // the inbox bar no longer counts it (2026-10-18).
-    expect(countByProject(db, { accountId: "a1" })).toEqual({ [UNFILED_KEY]: 1, [ALL_KEY]: 1 });
+    // The operator's reply here is filed in the inbox, not Sent, so the
+    // thread stays and the bar still counts it (2026-10-18).
+    expect(countByProject(db, { accountId: "a1" })).toEqual({ [project.id]: 1, [UNFILED_KEY]: 1, [ALL_KEY]: 2 });
     // A message the pass has explicitly called Unfiled counts the same as one it never reached.
     await embedPending(db, new FakeEmbedder(), {});
     await classifyProjects(db, new FakeEmbedder(), "a1");
-    expect(countByProject(db, { accountId: "a1" })).toEqual({ [UNFILED_KEY]: 1, [ALL_KEY]: 1 });
-    expect(countByProject(db)).toEqual({ [UNFILED_KEY]: 2, [ALL_KEY]: 2 });
+    expect(countByProject(db, { accountId: "a1" })).toEqual({ [project.id]: 1, [UNFILED_KEY]: 1, [ALL_KEY]: 2 });
+    expect(countByProject(db)).toEqual({ [project.id]: 1, [UNFILED_KEY]: 2, [ALL_KEY]: 3 });
   });
 
   it("keeps its counts through a rename and moves them to Unfiled on a delete", async () => {
