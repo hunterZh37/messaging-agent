@@ -296,7 +296,6 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   }
   if (opts.important) {
     conditions.push(ne(sorts.wants, "bin"));
-    conditions.push(isNull(handledActions.id));
   }
   if (opts.category) conditions.push(eq(sorts.category, opts.category));
   // Money is its own axis, so this narrows the whole list rather than only
@@ -316,7 +315,7 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // message instead, an exchange answered three replies ago stayed on the
   // list forever, once for every question ever asked in it.
   if (folder === "inbox" && opts.status === "needs_reply") {
-    conditions.push(latestInThread(), eq(sorts.wants, "reply"), isNull(handledActions.id));
+    conditions.push(latestInThread(), eq(sorts.wants, "reply"));
   }
   // A chat needs a reply when the other person had the last word and nobody
   // has marked it handled: a fact, not a verdict (operator, 2026-09-11: the
@@ -331,7 +330,6 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   if (folder === "messages" && opts.status === "needs_reply") {
     conditions.push(
       latestInThread(),
-      isNull(handledActions.id),
       gte(messages.sentAt, (opts.now ?? nowMs()) - CHAT_REPLY_WINDOW_MS),
       or(and(sql`not (${isGroupChat()})`, eq(messages.isFromOperator, false)), and(isGroupChat(), eq(messages.mentionsOperator, true)))!,
       sql`(not ${noName()} or exists (select 1 from messages o where o.thread_id = ${messages.threadId} and o.is_from_operator = 1))`,
@@ -366,14 +364,14 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // which "action" keeps because it is a claim on the operator, and the bin
   // does not because clearing out old junk is the point of that row.
   if (folder === "inbox" && opts.status === "action") {
-    conditions.push(latestInThread(), eq(sorts.wants, "action"), isNull(handledActions.id));
+    conditions.push(latestInThread(), eq(sorts.wants, "action"));
   }
   // The two rungs that claim the operator, read as one list (operator,
   // 2026-09-19: "put Reply/Action Required the same tab"). They stay apart
   // in the data — the difference between owing words and owing a signature
   // is real — and come together only where the operator looks.
   if (folder === "inbox" && opts.status === "owed") {
-    conditions.push(latestInThread(), inArray(sorts.wants, ["reply", "action"]), isNull(handledActions.id));
+    conditions.push(latestInThread(), inArray(sorts.wants, ["reply", "action"]));
   }
   if (folder === "inbox" && opts.status === "knowing") {
     conditions.push(latestInThread(), eq(sorts.wants, "knowing"));
@@ -395,14 +393,13 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
     );
   }
   // "No need to reply" is everything else in the inbox: unsorted mail, mail
-  // the sorter cleared, mail already handled, and every message that is not
-  // the last word in its thread.
+  // the sorter cleared, and every message that is not the last word in its
+  // thread. Being marked handled no longer puts a thread here (2026-10-18).
   if (folder === "inbox" && opts.status === "no_reply") {
     conditions.push(
       or(
         isNull(sorts.messageId),
         ne(sorts.wants, "reply"),
-        isNotNull(handledActions.id),
         sql`not (${latestInThread()})`,
       )!,
     );
@@ -626,7 +623,6 @@ export function countByCategory(db: Db, opts: { accountId?: string; since?: numb
     eq(messages.isFromOperator, false),
     ne(sorts.wants, "bin"),
     isNotNull(sorts.category),
-    isNull(handledActions.id),
   ];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
   if (opts.since !== undefined) conditions.push(gte(messages.sentAt, opts.since));
@@ -684,13 +680,14 @@ export function countByFinance(db: Db, opts: CountScope = {}): { income: number;
 }
 
 /**
- * How many important, unhandled messages one inbox holds, for the counts on
- * the inbox switcher (spec 10a). Same population as
+ * How many important messages one inbox holds, for the counts on the inbox
+ * switcher (spec 10a). Same population as
  * `listInboxMessages({ important: true })`: inbound only, sorted important,
- * no `handled` action, and inside `since` when one is given.
+ * and inside `since` when one is given. The `handled` mark stopped excluding
+ * anything on 2026-10-18, here too, so this count still equals its list.
  */
 export function countImportantUnhandled(db: Db, opts: { accountId?: string; since?: number } = {}): number {
-  const conditions = [eq(messages.isFromOperator, false), ne(sorts.wants, "bin"), isNull(handledActions.id)];
+  const conditions = [eq(messages.isFromOperator, false), ne(sorts.wants, "bin")];
   if (opts.accountId) conditions.push(eq(messages.accountId, opts.accountId));
   if (opts.since !== undefined) conditions.push(gte(messages.sentAt, opts.since));
 

@@ -95,14 +95,19 @@ describe("listInboxMessages", () => {
     expect(rows[0]?.message.id).toBe("a1:t1:m2");
   });
 
-  it("marks a row handled once a handled action exists for its message, and hides it from the important filter", () => {
+  /**
+   * The row still says it was handled; nothing is hidden for it any more
+   * (operator, 2026-10-18).
+   */
+  it("marks a row handled once a handled action exists, and still lists it", () => {
     const db = testDb();
     seed(db);
     recordAction(db, { kind: "handled", messageId: "a1:t1:m2", payload: {} });
     const all = listInboxMessages(db);
     expect(all.find((r) => r.message.id === "a1:t1:m2")?.handled).toBe(true);
     const important = listInboxMessages(db, { important: true });
-    expect(important.map((r) => r.message.id)).toEqual(["a2:t3:m1"]);
+    expect(important.map((r) => r.message.id)).toContain("a1:t1:m2");
+    expect(important.map((r) => r.message.id)).toContain("a2:t3:m1");
   });
 });
 
@@ -113,12 +118,13 @@ describe("countByCategory", () => {
     expect(countByCategory(db)).toEqual({ Scheduling: 1, "Needs reply": 1 });
   });
 
-  it("drops handled messages and scopes to one account", () => {
+  it("scopes to one account, and keeps counting a handled message (2026-10-18)", () => {
     const db = testDb();
     seed(db);
     expect(countByCategory(db, { accountId: "a2" })).toEqual({ "Needs reply": 1 });
+    const before = countByCategory(db);
     recordAction(db, { kind: "handled", messageId: "a2:t3:m1", payload: {} });
-    expect(countByCategory(db)).toEqual({ Scheduling: 1 });
+    expect(countByCategory(db)).toEqual(before);
   });
 
   it("is empty when nothing important is sorted", () => {
@@ -228,14 +234,15 @@ describe("countImportantUnhandled", () => {
     expect(countImportantUnhandled(db, {})).toBe(2);
   });
 
-  it("drops handled messages and mail older than `since`", () => {
+  it("drops mail older than `since`, and keeps a handled message (2026-10-18)", () => {
     const db = testDb();
     seed(db);
     expect(countImportantUnhandled(db, { accountId: "a1", since: 250 })).toBe(1);
     expect(countImportantUnhandled(db, { accountId: "a2", since: 250 })).toBe(0);
+    const before = countImportantUnhandled(db, { accountId: "a1" });
     recordAction(db, { kind: "handled", messageId: "a1:t1:m2", payload: {} });
-    expect(countImportantUnhandled(db, { accountId: "a1" })).toBe(0);
-    expect(countImportantUnhandled(db, {})).toBe(1);
+    // The mark no longer hides anything, here as everywhere else.
+    expect(countImportantUnhandled(db, { accountId: "a1" })).toBe(before);
   });
 });
 

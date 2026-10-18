@@ -97,12 +97,17 @@ describe("listInboxMessages folders", () => {
     expect(ids(listInboxMessages(db, { status: "no_reply" }))).toEqual(["a1:m3", "a1:m2"]);
   });
 
-  it("drops a message from needs_reply once it is marked handled", () => {
+  /**
+   * The mark stopped moving mail between rows on 2026-10-18 ("drop the handled
+   * rules and bring back sorted reply/action"): it is invisible on the row, so
+   * a list silently shorter than its verdicts said looked like a bug.
+   */
+  it("keeps a message in needs_reply even when it is marked handled", () => {
     const db = testDb();
     seed(db);
     recordAction(db, { kind: "handled", messageId: "a1:m1", payload: {} });
-    expect(ids(listInboxMessages(db, { status: "needs_reply" }))).toEqual([]);
-    expect(ids(listInboxMessages(db, { status: "no_reply" }))).toEqual(["a1:m3", "a1:m2", "a1:m1"]);
+    expect(ids(listInboxMessages(db, { status: "needs_reply" }))).toEqual(["a1:m1"]);
+    expect(ids(listInboxMessages(db, { status: "no_reply" }))).toEqual(["a1:m3", "a1:m2"]);
   });
 
   it("narrows sent to what is waiting: still ends the thread and asks something once quoted text is gone", () => {
@@ -1196,5 +1201,53 @@ describe("Move all to Worth Knowing", () => {
     const db = testDb();
     seed(db);
     expect(owedThreadIds(db, { since: 0 }).length).toBe(folderCounts(db, { since: 0 }).owed);
+  });
+});
+
+/**
+ * Marking a thread handled no longer takes it off the row (operator,
+ * 2026-10-18: "drop the handled rules and bring back sorted reply/action").
+ *
+ * Thirteen threads sat in their inbox sorted reply or action while Reply /
+ * Action Required read 0, every one of them marked handled at some point. The
+ * mark is invisible — nothing on the row says it is there — so the row simply
+ * looked broken, which is the same complaint the live line drew.
+ */
+const NOW_F = 1_000;
+
+describe("a thread marked handled", () => {
+  function owedThread(db: ReturnType<typeof testDb>, id: string, wants: string) {
+    db.insert(threads)
+      .values({ id: `a1:${id}`, accountId: "a1", providerThreadId: id, subject: id, lastMessageAt: NOW_F, lastFromOperator: false })
+      .run();
+    db.insert(messages)
+      .values({
+        ...base, id: `a1:${id}m`, accountId: "a1", providerMessageId: `INBOX:${id}`, threadId: `a1:${id}`, rfcMessageId: null,
+        fromAddress: "them@example.com", toAddresses: ["me@example.com"], subject: id,
+        bodyText: "Please advise.", isFromOperator: false, folder: "inbox", sentAt: NOW_F, receivedAt: NOW_F,
+      })
+      .run();
+    db.insert(sorts)
+      .values({ messageId: `a1:${id}m`, wants: wants as never, scheduling: false, category: null, finance: "none", reason: "r", model: "x", labeledAt: null, createdAt: 1 })
+      .run();
+    return `a1:${id}m`;
+  }
+
+  it("is still Reply / Action Required", () => {
+    const db = testDb();
+    seed(db);
+    const mid = owedThread(db, "handledreply", "reply");
+    recordAction(db, { kind: "handled", messageId: mid, payload: {} });
+    expect(listInboxMessages(db, { status: "owed" }).map((r) => r.message.id)).toContain(mid);
+    expect(listInboxMessages(db, { status: "needs_reply" }).map((r) => r.message.id)).toContain(mid);
+  });
+
+  it("is still counted where it is listed", () => {
+    const db = testDb();
+    seed(db);
+    const mid = owedThread(db, "handledaction", "action");
+    recordAction(db, { kind: "handled", messageId: mid, payload: {} });
+    expect(folderCounts(db, {}).owed).toBe(owedThreadIds(db, {}).length);
+    expect(owedThreadIds(db, {})).toContain("a1:handledaction");
   });
 });
