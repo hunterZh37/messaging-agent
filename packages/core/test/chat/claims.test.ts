@@ -105,7 +105,7 @@ describe("changesTheDraft", () => {
 
   it("is false when nothing was proposed at all, which is what happened", () => {
     expect(changesTheDraft([], OPEN)).toBe(false);
-    expect(changesTheDraft([{ kind: "mark_handled", threadIds: [OPEN] }], OPEN)).toBe(false);
+    expect(changesTheDraft([{ kind: "open_thread", threadIds: [OPEN] }], OPEN)).toBe(false);
   });
 
   it("is false when no draft is open, whatever was proposed", () => {

@@ -173,9 +173,9 @@ describe("togglesAsk", () => {
 
 describe("threadsOf", () => {
   it("reads the list, and the single thread a stored proposal used to carry", () => {
-    expect(threadsOf({ kind: "mark_handled", threadIds: ["t1", "t2"] })).toEqual(["t1", "t2"]);
-    expect(threadsOf({ kind: "mark_handled", threadIds: [], threadId: "t1" })).toEqual(["t1"]);
-    expect(threadsOf({ kind: "mark_handled", threadIds: [] })).toEqual([]);
+    expect(threadsOf({ kind: "open_thread", threadIds: ["t1", "t2"] })).toEqual(["t1", "t2"]);
+    expect(threadsOf({ kind: "open_thread", threadIds: [], threadId: "t1" })).toEqual(["t1"]);
+    expect(threadsOf({ kind: "open_thread", threadIds: [] })).toEqual([]);
   });
 });
 
@@ -196,7 +196,6 @@ describe("actionLabel", () => {
     expect(actionLabel({ kind: "draft_follow_up", threadIds: ["t"] })).toBe("Follow up");
     expect(actionLabel({ kind: "file_to_project", threadIds: ["t"], projectName: "Acme" })).toBe("File to Acme");
     expect(actionLabel({ kind: "file_to_project", threadIds: ["t"] })).toBe("File to a project");
-    expect(actionLabel({ kind: "mark_handled", threadIds: ["t"] })).toBe("Mark handled");
     expect(actionLabel({ kind: "open_thread", threadIds: ["t"] })).toBe("Open");
     expect(actionLabel({ kind: "apply_draft", threadIds: ["t"], text: "New body." })).toBe("Apply to draft");
   });
@@ -204,7 +203,6 @@ describe("actionLabel", () => {
   it("carries the count when a proposal covers several threads", () => {
     const six = ["1", "2", "3", "4", "5", "6"];
     expect(actionLabel({ kind: "file_to_project", threadIds: six, projectName: "Immigration" })).toBe("File 6 threads to Immigration");
-    expect(actionLabel({ kind: "mark_handled", threadIds: six })).toBe("Mark 6 handled");
     expect(actionLabel({ kind: "draft_reply", threadIds: ["1", "2", "3"] })).toBe("Draft replies to 3 threads");
     expect(actionLabel({ kind: "draft_follow_up", threadIds: ["1", "2", "3"] })).toBe("Draft follow-ups to 3 threads");
     expect(actionLabel({ kind: "open_thread", threadIds: ["1", "2", "3"] })).toBe("Open 3 threads");
@@ -221,7 +219,7 @@ describe("actionLabel", () => {
   });
 
   it("reads a proposal stored before proposals could hold several threads", () => {
-    expect(actionLabel({ kind: "mark_handled", threadIds: [], threadId: "t1" })).toBe("Mark handled");
+    expect(actionLabel({ kind: "open_thread", threadIds: [], threadId: "t1" })).toBe("Open");
   });
 });
 
@@ -231,7 +229,6 @@ describe("actionDoneLabel", () => {
     expect(actionDoneLabel("draft_reply", 1, 0)).toBe("1 draft created");
     expect(actionDoneLabel("draft_follow_up", 2, 1)).toBe("2 drafts created, 1 failed");
     expect(actionDoneLabel("file_to_project", 6, 0, "Immigration")).toBe("Filed 6 to Immigration");
-    expect(actionDoneLabel("mark_handled", 6, 0)).toBe("6 marked handled");
     expect(actionDoneLabel("apply_draft", 1, 0)).toBe("Applied to the draft");
   });
 });
@@ -259,7 +256,6 @@ describe("threadChipLabel", () => {
     expect(threadChipLabel(action, "t2", 1)).toBe("(no subject) · noreply@example.com");
   });
   it("falls back to the position for turns stored without names", () => {
-    expect(threadChipLabel({ kind: "mark_handled", threadIds: ["t1", "t9"] }, "t9", 1)).toBe("Thread 2");
     expect(threadChipLabel(action, "t9", 2)).toBe("Thread 3");
   });
 });
@@ -433,8 +429,8 @@ describe("autoRunsDraft", () => {
   });
 
   it("ignores everything that is not a draft", () => {
-    const handled = { kind: "mark_handled" as const, threadIds: ["a1:t1"] };
-    expect(autoRunsDraft([handled], { threadId: "a1:t1" })).toBeNull();
-    expect(autoRunsDraft([handled, reply("a1:t1")], { threadId: "a1:t1" })?.threadId).toBe("a1:t1");
+    const opened = { kind: "open_thread" as const, threadIds: ["a1:t1"] };
+    expect(autoRunsDraft([opened], { threadId: "a1:t1" })).toBeNull();
+    expect(autoRunsDraft([opened, reply("a1:t1")], { threadId: "a1:t1" })?.threadId).toBe("a1:t1");
   });
 });

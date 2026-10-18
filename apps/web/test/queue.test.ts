@@ -25,7 +25,6 @@ import {
   openedPane,
   threadCountLabel,
   restoredToastLabel,
-  handledThreadIds,
   trashedToastLabel,
   trashJob,
   undoTarget,
@@ -605,24 +604,6 @@ describe("undo is instant", () => {
   });
 });
 
-describe("mark handled through the gate", () => {
-  // Operator, 2026-09-11: Shift marks the mail handled, snappy, like Delete.
-  const empty: SendState = { pending: [], inFlight: [], sent: [], trash: [], trashInFlight: [], trashed: [], gone: [], done: [], restoring: [], returning: [], handling: [], handled: [] };
-  it("keeps the thread off the Need-to-reply list from the press until the server has it", () => {
-    let s = sendReducer(empty, { type: "handle_started", threadId: "a1:t1" });
-    expect(s.handling).toEqual(["a1:t1"]);
-    expect(handledThreadIds(s)).toEqual(["a1:t1"]);
-    s = sendReducer(s, { type: "handle_done", threadId: "a1:t1" });
-    expect(s.handling).toEqual([]);
-    expect(handledThreadIds(s)).toEqual(["a1:t1"]);
-  });
-  it("puts the thread back when the server refuses", () => {
-    let s = sendReducer(empty, { type: "handle_started", threadId: "a1:t1" });
-    s = sendReducer(s, { type: "handle_failed", threadId: "a1:t1" });
-    expect(handledThreadIds(s)).toEqual([]);
-  });
-});
-
 describe("deletes in a row share one toast", () => {
   // Operator, 2026-09-11: three stacked "Deleted 1 thread" toasts on the phone.
   const empty: SendState = { pending: [], inFlight: [], sent: [], trash: [], trashInFlight: [], trashed: [], gone: [], done: [], restoring: [], returning: [], handling: [], handled: [] };
@@ -774,48 +755,39 @@ describe("hidden threads stay in the folder", () => {
  * rather than as a change, it opened the pane already empty.
  */
 describe("paneSweep", () => {
-  const nothing = { going: false, handled: false, back: false };
+  const nothing = { going: false, back: false };
 
   it("does not sweep a thread that was already gone when the pane opened", () => {
-    expect(paneSweep({ ...nothing, going: true }, { going: true, handled: false })).toBe("");
+    expect(paneSweep({ ...nothing, going: true }, { going: true })).toBe("");
   });
 
   it("sweeps the thread the operator deletes while reading it", () => {
-    expect(paneSweep({ ...nothing, going: true }, { going: false, handled: false })).toBe(" deleting");
-  });
-
-  it("does not sweep a thread that was already handled when the pane opened", () => {
-    expect(paneSweep({ ...nothing, handled: true }, { going: false, handled: true })).toBe("");
-  });
-
-  it("sweeps the thread the operator marks handled while reading it", () => {
-    expect(paneSweep({ ...nothing, handled: true }, { going: false, handled: false })).toBe(" handling");
+    expect(paneSweep({ ...nothing, going: true }, { going: false })).toBe(" deleting");
   });
 
   it("runs the sweep in reverse on the way back from Cmd-Z", () => {
-    expect(paneSweep({ ...nothing, back: true }, { going: false, handled: false })).toBe(" returning");
+    expect(paneSweep({ ...nothing, back: true }, { going: false })).toBe(" returning");
   });
 
   it("stays put when nothing is happening to the thread", () => {
-    expect(paneSweep(nothing, { going: false, handled: false })).toBe("");
+    expect(paneSweep(nothing, { going: false })).toBe("");
   });
 
-  /** Both at once: a delete decides it, and an old one still reads. */
-  it("keeps a gone-and-handled thread readable rather than filing it away", () => {
-    expect(paneSweep({ going: true, handled: true, back: false }, { going: true, handled: true })).toBe("");
+  it("keeps a thread that was already gone readable rather than sweeping it", () => {
+    expect(paneSweep({ going: true, back: false }, { going: true })).toBe("");
   });
 });
 
 describe("openedPane", () => {
   it("keeps the old baseline for the same thread, so a delete mid-read still sweeps", () => {
-    const previous = { threadId: "a1:t1", going: false, handled: false };
-    const current = { threadId: "a1:t1", going: true, handled: false };
+    const previous = { threadId: "a1:t1", going: false };
+    const current = { threadId: "a1:t1", going: true };
     expect(openedPane(previous, current)).toBe(previous);
   });
 
   it("takes the new baseline on a switch to a different thread", () => {
-    const previous = { threadId: "a1:t1", going: true, handled: false };
-    const current = { threadId: "a1:t2", going: false, handled: false };
+    const previous = { threadId: "a1:t1", going: true };
+    const current = { threadId: "a1:t2", going: false };
     expect(openedPane(previous, current)).toBe(current);
   });
 });
@@ -833,7 +805,7 @@ describe("a thread read in Deleted items after this session deleted it", () => {
     const going = deletingThreadIds(s).includes("a1:t1");
     expect(going).toBe(true);
     // The pane opens with the delete already done: nothing sweeps.
-    expect(paneSweep({ going, handled: false, back: false }, { going, handled: false })).toBe("");
+    expect(paneSweep({ going, back: false }, { going })).toBe("");
   });
 
   /**
@@ -845,12 +817,12 @@ describe("a thread read in Deleted items after this session deleted it", () => {
   it("still sweeps a thread deleted after navigating away from a thread read in Deleted items", () => {
     let s = sendReducer(empty, { type: "trash_done", job: trashJob(["a1:t1"], 1, "d1") });
     // Opens on the already-deleted thread first.
-    let opened = { threadId: "a1:t1", going: deletingThreadIds(s).includes("a1:t1"), handled: false };
+    let opened = { threadId: "a1:t1", going: deletingThreadIds(s).includes("a1:t1") };
     // React reuses the pane on a client navigation to a live thread: the baseline reseeds.
-    opened = openedPane(opened, { threadId: "a1:t2", going: deletingThreadIds(s).includes("a1:t2"), handled: false });
+    opened = openedPane(opened, { threadId: "a1:t2", going: deletingThreadIds(s).includes("a1:t2") });
     // The operator deletes the thread they are now looking at.
     s = sendReducer(s, { type: "trash_done", job: trashJob(["a1:t2"], 2, "d2") });
     const going = deletingThreadIds(s).includes("a1:t2");
-    expect(paneSweep({ going, handled: false, back: false }, opened)).toBe(" deleting");
+    expect(paneSweep({ going, back: false }, opened)).toBe(" deleting");
   });
 });

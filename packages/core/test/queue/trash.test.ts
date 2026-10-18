@@ -769,7 +769,8 @@ describe("Deleted items, last in first out", () => {
   it("leaves every other folder in the order it always had", () => {
     const db = testDb();
     seed(db);
-    // Newest mail first, by its own date, in Inbox as before.
-    expect(listInboxMessages(db, { folder: "inbox" }).map((r) => r.message.id)).toEqual(["a2:m4", "a1:m3", "a1:m2", "a1:m1"]);
+    // Newest mail first, by its own date, in Inbox as before — less the
+    // thread the operator answered, which is Sent's now (2026-10-18).
+    expect(listInboxMessages(db, { folder: "inbox" }).map((r) => r.message.id)).toEqual(["a2:m4", "a1:m3"]);
   });
 });

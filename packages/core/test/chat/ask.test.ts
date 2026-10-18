@@ -311,8 +311,8 @@ describe("askCeleste", () => {
     const chat = getOrCreateChat(db);
     const client = new FakeChatClient([
       toolResponse([
-        { id: "tu1", name: "propose_action", input: { kind: "mark_handled" } },
-        { id: "tu2", name: "propose_action", input: { kind: "mark_handled", thread_ids: Array.from({ length: 51 }, (_, i) => `t${i}`) } },
+        { id: "tu1", name: "propose_action", input: { kind: "open_thread" } },
+        { id: "tu2", name: "propose_action", input: { kind: "open_thread", thread_ids: Array.from({ length: 51 }, (_, i) => `t${i}`) } },
         { id: "tu3", name: "propose_action", input: { kind: "file_to_project", thread_id: "a1:t-m1" } },
       ]),
       textResponse("Nothing to offer."),
@@ -975,12 +975,12 @@ describe("askCeleste: a draft proposal carries the operator's words", () => {
     const client = new FakeChatClient([
       toolResponse([
         { id: "tu1", name: "propose_action", input: { kind: "draft_reply", thread_id: "a1:t-m1", instruction: "   " } },
-        { id: "tu2", name: "propose_action", input: { kind: "mark_handled", thread_id: "a1:t-m1", instruction: "say hello" } },
+        { id: "tu2", name: "propose_action", input: { kind: "open_thread", thread_id: "a1:t-m1", instruction: "say hello" } },
       ]),
       textResponse("Done."),
     ]);
     const turn = await askCeleste(db, { client, clock: clockFrom(1000) }, { chatId: chat.id, question: "?", contextThreadId: "a1:t-m1" });
-    expect(turn.actions.map((a) => a.kind)).toEqual(["draft_reply", "mark_handled"]);
+    expect(turn.actions.map((a) => a.kind)).toEqual(["draft_reply", "open_thread"]);
     for (const a of turn.actions) expect(a).not.toHaveProperty("instruction");
   });
 

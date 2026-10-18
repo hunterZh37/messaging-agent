@@ -19,16 +19,15 @@ import { useSendGate } from "../queue/SendProvider";
  * On the fresh page those rows are gone from the list, so what is taken off
  * is zero again: nothing is ever taken off twice.
  */
-export function ListCount({ rows, handledLeaves = false }: {
+export function ListCount({ rows }: {
   rows: { threadId: string; keys: string[] }[];
-  handledLeaves?: boolean;
 }) {
-  const { leavingThreads, handledThreads, returningThreads } = useSendGate();
+  const { leavingThreads, returningThreads } = useSendGate();
   const gone = useMemo(() => {
     const back = new Set(returningThreads);
-    const leaving = [...leavingThreads, ...(handledLeaves ? handledThreads : [])].filter((id) => !back.has(id));
+    const leaving = leavingThreads.filter((id) => !back.has(id));
     return goneByKey(rows, leaving);
-  }, [rows, leavingThreads, handledThreads, returningThreads, handledLeaves]);
+  }, [rows, leavingThreads, returningThreads]);
 
   // What this list last took off, so a key it no longer touches is put back
   // rather than left short for as long as the page stands.

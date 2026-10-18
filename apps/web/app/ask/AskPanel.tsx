@@ -65,7 +65,6 @@ import {
   askComposeAction,
   askDraftAction,
   askFileAction,
-  askMarkHandledAction,
   attachChatFileToDraftAction,
   listChatFilesAction,
   listChatsAction,
@@ -274,10 +273,6 @@ function ActionButton({
         const r = await askFileAction(threadIds, action.projectName ?? "", action.createProject === true);
         if ("error" in r) return setError(r.error);
         setRan({ label: actionDoneLabel(action.kind, r.filed, 0, action.projectName) });
-      } else {
-        const r = await askMarkHandledAction(threadIds);
-        if ("error" in r) return setError(r.error);
-        setRan({ label: actionDoneLabel(action.kind, r.marked, r.failed) });
       }
       router.refresh();
     });

@@ -53,7 +53,6 @@ describe("listInboxMessages", () => {
     expect(rows[0]?.account.email).toBe("me@example.com");
     expect(rows[0]?.thread.id).toBe("a1:t1");
     expect(rows[0]?.sort?.reason).toBe("asks to confirm Friday");
-    expect(rows[0]?.handled).toBe(false);
   });
 
   it("filters to the rows worth surfacing when important is asked for", () => {
@@ -96,18 +95,16 @@ describe("listInboxMessages", () => {
   });
 
   /**
-   * The row still says it was handled; nothing is hidden for it any more
-   * (operator, 2026-10-18).
+   * "Mark handled" is gone entirely (operator, 2026-10-18: "remove mark
+   * handled completely"). An `actions` row of that kind may still sit in the
+   * log from before, and it changes nothing anywhere.
    */
-  it("marks a row handled once a handled action exists, and still lists it", () => {
+  it("ignores a handled action left in the log from before", () => {
     const db = testDb();
     seed(db);
+    const before = listInboxMessages(db, { important: true }).map((r) => r.message.id);
     recordAction(db, { kind: "handled", messageId: "a1:t1:m2", payload: {} });
-    const all = listInboxMessages(db);
-    expect(all.find((r) => r.message.id === "a1:t1:m2")?.handled).toBe(true);
-    const important = listInboxMessages(db, { important: true });
-    expect(important.map((r) => r.message.id)).toContain("a1:t1:m2");
-    expect(important.map((r) => r.message.id)).toContain("a2:t3:m1");
+    expect(listInboxMessages(db, { important: true }).map((r) => r.message.id)).toEqual(before);
   });
 });
 

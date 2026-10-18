@@ -34,7 +34,6 @@ export interface InboxRow {
   /** The project this message is filed under, null when Unfiled (spec 10d). */
   project: ProjectRow | null;
   /** True once a `handled` action has been recorded for this message. */
-  handled: boolean;
   /**
    * Something inbound has arrived in this thread since the operator last
    * opened it, or they never have (spec 10a). Read on the row that stands
@@ -44,7 +43,6 @@ export interface InboxRow {
 }
 
 /** Shared alias: a message is "handled" when a row of this kind exists for it. */
-export const handledActions = alias(actions, "handled_actions");
 
 /**
  * The child rows under Inbox and Sent in the folder tree (spec 10a).
@@ -177,6 +175,20 @@ function latestInboxInThread(): SQL {
 }
 
 /**
+ * Did the operator speak last in this thread? Their own reply, in whatever
+ * folder it landed, after everything anyone else sent. Ties break on id, the
+ * way every other newest-message question here does.
+ */
+function answeredLast(): SQL {
+  return sql`(
+    select m.is_from_operator from messages m
+    where m.thread_id = ${messages.threadId}
+    order by m.sent_at desc, m.id desc
+    limit 1
+  ) = 1`;
+}
+
+/**
  * Is this row the newest message in its thread? Sent mail counts: a thread the
  * operator has answered is not waiting on them, whichever folder the answer
  * sits in. Ties break on id, so exactly one message of a thread ever matches.
@@ -293,6 +305,17 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
     // answer, not eight hundred. The newest thing the operator *received* is
     // the row, so a thread they answered last is still listed.
     if (opts.status === "hidden") conditions.push(folder === "inbox" ? latestInboxInThread() : latestInThread());
+    // A thread the operator answered last is the other person's turn, so it
+    // is Sent's to show, not the inbox's (operator, 2026-10-18: "that 90
+    // threads should then not [be] inside inbox and be inside sent because I
+    // sent the last message"). It was the last of the arithmetic: answered,
+    // owing nothing, claimed by no status row while the Inbox heading went on
+    // counting it. It is already in Sent under Waiting for reply, and it
+    // returns here the moment they write again.
+    //
+    // Not on Archive, which answers "what am I not being shown" and must show
+    // it whoever spoke last.
+    if (opts.status !== "hidden") conditions.push(sql`not (${answeredLast()})`);
   }
   if (opts.important) {
     conditions.push(ne(sorts.wants, "bin"));
@@ -448,7 +471,6 @@ export function inboxRowsWhere(db: Db, conditions: SQL[], limit: number, orderBy
       sort: sorts,
       thread: threads,
       project: projects,
-      handledId: handledActions.id,
       unread: sql<number>`${threadUnread()}`,
     })
     .from(messages)
@@ -457,7 +479,6 @@ export function inboxRowsWhere(db: Db, conditions: SQL[], limit: number, orderBy
     .leftJoin(sorts, eq(sorts.messageId, messages.id))
     .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
     .leftJoin(projects, eq(projects.id, projectAssignments.projectId))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...conditions))
     .orderBy(orderBy)
     .limit(limit)
@@ -468,7 +489,6 @@ export function inboxRowsWhere(db: Db, conditions: SQL[], limit: number, orderBy
       sort: r.sort,
       thread: r.thread,
       project: r.project,
-      handled: r.handledId !== null,
       unread: r.unread === 1,
     }));
 }
@@ -514,7 +534,6 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
       .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...scopeConditions({ since: opts.since, accountId: opts.accountId, folder: "inbox", ...(opts.now === undefined ? {} : { now: opts.now }) })))
       .get()?.count ?? 0;
 
@@ -527,7 +546,6 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
       .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...scopeConditions({ since: opts.since, folder: "messages", status, ...(opts.now === undefined ? {} : { now: opts.now }) })))
       .get()?.count ?? 0;
   const texts = { needsReply: textCount("needs_reply"), unopened: textCount("unopened"), disposable: textCount("disposable"), hidden: textCount("hidden") };
@@ -539,7 +557,6 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
       .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status: "needs_reply" })))
       .get()?.count ?? 0;
 
@@ -551,7 +568,6 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
       .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status })))
       .get()?.count ?? 0;
   const action = rungCount("action");
@@ -565,7 +581,6 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
       .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status: "unopened" })))
       .get()?.count ?? 0;
 
@@ -576,7 +591,6 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
       .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status: "disposable" })))
       .get()?.count ?? 0;
 
@@ -592,7 +606,6 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
     .innerJoin(threads, eq(threads.id, messages.threadId))
     .leftJoin(sorts, eq(sorts.messageId, messages.id))
     .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...scopeConditions(sent)))
     .all();
 
@@ -605,7 +618,6 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
       .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...scopeConditions({ ...opts, folder: "inbox", status: "hidden" })))
       .get()?.count ?? 0;
 
@@ -631,7 +643,6 @@ export function countByCategory(db: Db, opts: { accountId?: string; since?: numb
     .select({ category: sorts.category, count: sql<number>`count(*)` })
     .from(messages)
     .innerJoin(sorts, eq(sorts.messageId, messages.id))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...conditions))
     .groupBy(sorts.category)
     .all();
@@ -669,7 +680,6 @@ export function countByFinance(db: Db, opts: CountScope = {}): { income: number;
     .innerJoin(threads, eq(threads.id, messages.threadId))
     .innerJoin(sorts, eq(sorts.messageId, messages.id))
     .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     // Grouping by the money axis, so the money filter is the one thing left out.
     .where(and(...scopeConditions({ ...opts, folder: "inbox", finance: undefined })))
     .groupBy(sorts.finance)
@@ -696,7 +706,6 @@ export function countImportantUnhandled(db: Db, opts: { accountId?: string; sinc
       .select({ count: sql<number>`count(*)` })
       .from(messages)
       .innerJoin(sorts, eq(sorts.messageId, messages.id))
-      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...conditions))
       .get()?.count ?? 0
   );
@@ -779,7 +788,6 @@ export function unopenedThreadIds(db: Db, opts: CountScope & { folder?: "inbox" 
     .innerJoin(threads, eq(threads.id, messages.threadId))
     .leftJoin(sorts, eq(sorts.messageId, messages.id))
     .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...scopeConditions({ ...opts, folder: opts.folder ?? "inbox", status: "unopened" })))
     .all()
     .map((r) => r.threadId);
@@ -799,7 +807,6 @@ export function disposableThreadIds(db: Db, opts: CountScope & { folder?: "inbox
     .innerJoin(threads, eq(threads.id, messages.threadId))
     .leftJoin(sorts, eq(sorts.messageId, messages.id))
     .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...scopeConditions({ ...opts, folder: opts.folder ?? "inbox", status: "disposable" })))
     .orderBy(desc(messages.sentAt))
     .all()
@@ -819,7 +826,6 @@ export function owedThreadIds(db: Db, opts: CountScope & { folder?: "inbox" | "m
     .innerJoin(threads, eq(threads.id, messages.threadId))
     .leftJoin(sorts, eq(sorts.messageId, messages.id))
     .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...scopeConditions({ ...opts, folder: opts.folder ?? "inbox", status: "owed" })))
     .orderBy(desc(messages.sentAt))
     .all()
@@ -844,7 +850,6 @@ export function knowingThreadIds(db: Db, opts: CountScope & { folder?: "inbox" |
     .innerJoin(threads, eq(threads.id, messages.threadId))
     .leftJoin(sorts, eq(sorts.messageId, messages.id))
     .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...scopeConditions({ ...opts, folder: opts.folder ?? "inbox", status: "knowing" })))
     .orderBy(desc(messages.sentAt))
     .all()
@@ -867,7 +872,6 @@ export function hiddenThreadIds(db: Db, opts: CountScope & { folder?: "inbox" | 
     .innerJoin(threads, eq(threads.id, messages.threadId))
     .leftJoin(sorts, eq(sorts.messageId, messages.id))
     .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...scopeConditions({ ...opts, folder: opts.folder ?? "inbox", status: "hidden" })))
     .orderBy(desc(messages.sentAt))
     .all()
@@ -1093,7 +1097,6 @@ export function listsOfMessages(
         .innerJoin(threads, eq(threads.id, messages.threadId))
         .leftJoin(sorts, eq(sorts.messageId, messages.id))
         .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-        .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
         .where(and(inArray(messages.id, ids), ...scopeConditions({ ...opts, folder, ...(status ? { status: status as CountScope["status"] } : {}) })))
         .all();
       for (const r of rows) add(r.id, status ?? folder);

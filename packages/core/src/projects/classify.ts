@@ -3,7 +3,7 @@ import { and, asc, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "dri
 import type { Config } from "../config";
 import { now, type Db } from "../db/client";
 import { accounts, embeddingState, messages, projectAssignments, projects, sorts, threads, type ProjectRow } from "../db/schema";
-import { applyWaiting, handledActions, scopeConditions, type CountScope } from "../queue/inbox";
+import { applyWaiting, scopeConditions, type CountScope } from "../queue/inbox";
 import { stripQuoted } from "../text/quoted";
 import { createOllamaEmbedder, EmbeddingsUnavailableError, type Embedder } from "./embedder";
 import { groupKey, listProjects } from "./projects";
@@ -517,7 +517,6 @@ export function countByProject(db: Db, opts: CountScope = {}): Record<string, nu
       .innerJoin(threads, eq(threads.id, messages.threadId))
       .leftJoin(sorts, eq(sorts.messageId, messages.id))
       .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-      .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
       .where(and(...conditions))
       .all();
     for (const row of applyWaiting(rows, opts)) add(row.projectId, 1);
@@ -531,7 +530,6 @@ export function countByProject(db: Db, opts: CountScope = {}): Record<string, nu
     .innerJoin(threads, eq(threads.id, messages.threadId))
     .leftJoin(sorts, eq(sorts.messageId, messages.id))
     .leftJoin(projectAssignments, eq(projectAssignments.messageId, messages.id))
-    .leftJoin(handledActions, and(eq(handledActions.messageId, messages.id), eq(handledActions.kind, "handled")))
     .where(and(...conditions))
     .groupBy(projectAssignments.projectId)
     .all();

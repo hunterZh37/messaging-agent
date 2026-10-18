@@ -136,7 +136,6 @@ export function InboxList(props: {
    */
   limit: number;
   /** True on the Need-to-reply list, where a thread marked handled leaves (operator, 2026-09-11: Shift). */
-  handledLeaves?: boolean;
 }) {
   // Named `activeWindow` so nothing here reads like the browser's `window`.
   const { rows, folder, params, window: activeWindow, selectedThreadId } = props;
@@ -195,7 +194,7 @@ export function InboxList(props: {
     }
     if (!props.deletable) return <Fragment key={key}>{link}</Fragment>;
     return (
-      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} handledLeaves={props.handledLeaves ?? false} hideable={(folder === "messages" || folder === "inbox") && params.status !== "hidden"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]} ruled={r.message.isFromOperator ? null : ruleFor(r.message.fromAddress)} projects={folder === "inbox" ? projectsFor(r.account.id) : []} groups={folder === "inbox" ? groupsFor(r.account.id) : []} accountId={r.account.id} projectId={r.project?.id ?? null} unfiledLabel={UNFILED}>
+      <TrashRow key={key} threadId={r.thread.id} subject={r.message.subject} hideable={(folder === "messages" || folder === "inbox") && params.status !== "hidden"} statusList={Boolean(params.status)} keepable={folder === "inbox"} wants={r.sort?.wants ?? null} senders={r.message.isFromOperator ? [] : [r.message.fromAddress]} ruled={r.message.isFromOperator ? null : ruleFor(r.message.fromAddress)} projects={folder === "inbox" ? projectsFor(r.account.id) : []} groups={folder === "inbox" ? groupsFor(r.account.id) : []} accountId={r.account.id} projectId={r.project?.id ?? null} unfiledLabel={UNFILED}>
         {link}
       </TrashRow>
     );
@@ -224,7 +223,7 @@ export function InboxList(props: {
       {/* The counts drop with the cards, not when the provider is done
           (2026-09-15), and every count a card was in rather than only the one
           over this list (operator, 2026-09-20: "really snappy"). */}
-      {countRows.length > 0 ? <ListCount rows={countRows} handledLeaves={props.handledLeaves ?? false} /> : null}
+      {countRows.length > 0 ? <ListCount rows={countRows} /> : null}
       <div className="inbox-rows">
         {rows.length === 0 ? (
           <div className="inbox-empty">

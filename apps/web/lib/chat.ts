@@ -466,8 +466,6 @@ export function actionLabel(action: ProposedAction): string {
       if (action.createProject) return many ? `Create ${name} and file ${count} threads` : `Create ${name} and file this thread`;
       return many ? `File ${count} threads to ${name}` : action.projectName ? `File to ${name}` : "File to a project";
     }
-    case "mark_handled":
-      return many ? `Mark ${count} handled` : "Mark handled";
     case "open_thread":
       return many ? `Open ${count} threads` : "Open";
     // One draft, always: the card the operator has open. The click puts
@@ -490,8 +488,6 @@ export function actionDoneLabel(kind: ProposedAction["kind"], done: number, fail
       return `${done} ${done === 1 ? "draft" : "drafts"} created${tail}`;
     case "file_to_project":
       return `Filed ${done} to ${projectName ?? "the project"}${tail}`;
-    case "mark_handled":
-      return `${done} marked handled${tail}`;
     case "open_thread":
       return "Opened";
     case "apply_draft":

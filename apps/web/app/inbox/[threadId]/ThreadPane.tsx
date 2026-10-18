@@ -18,11 +18,8 @@ import { useSendGate } from "../../queue/SendProvider";
  * nothing to read (operator, 2026-09-25).
  */
 export function ThreadPane({ threadId, children, statusList = false }: { threadId: string; children: ReactNode; /** Opened from a sorting list, which a hide takes the thread out of (2026-09-15). */ statusList?: boolean }) {
-  const { leavingThreads, deletingThreads, returningThreads, handledThreads } = useSendGate();
+  const { leavingThreads, deletingThreads, returningThreads } = useSendGate();
   const going = (statusList ? leavingThreads : deletingThreads).includes(threadId);
-  // Marked handled (operator, 2026-09-11: Shift): the same sweep, in the
-  // colour of a thing done rather than a thing thrown away.
-  const handled = handledThreads.includes(threadId);
   // Back from Cmd-Z: the sweep runs in reverse (operator, 2026-09-11).
   const back = returningThreads.includes(threadId);
   // What was already true when this thread was opened. A pane only sweeps for
@@ -30,12 +27,12 @@ export function ThreadPane({ threadId, children, statusList = false }: { threadI
   // across a move from one thread to the next, so the answer is kept per
   // thread rather than per pane: otherwise a delete after reading a deleted
   // one would not sweep at all.
-  const opened = useRef({ threadId, going, handled });
-  opened.current = openedPane(opened.current, { threadId, going, handled });
+  const opened = useRef({ threadId, going });
+  opened.current = openedPane(opened.current, { threadId, going });
   // `thread-detail` scopes the phone-only room the sticky action bar needs at
   // the foot of this pane (spec 10a, 2026-09-11) to the thread page alone: the
   // Drafts page reuses `.inbox-detail` for its own pane, which has no such
   // bar and must not gain the padding meant for this one.
-  const className = `inbox-detail thread-detail${paneSweep({ going, handled, back }, opened.current)}`;
+  const className = `inbox-detail thread-detail${paneSweep({ going, back }, opened.current)}`;
   return <div className={className}>{children}</div>;
 }

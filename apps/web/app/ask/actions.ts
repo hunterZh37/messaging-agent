@@ -36,7 +36,6 @@ import {
 } from "@messaging-agent/core";
 import { core } from "@/lib/core";
 import { ACCOUNT_COOKIE, ACCOUNT_COOKIE_MAX_AGE, ASK_COOKIE, selectedAccountId } from "@/lib/selection";
-import { markHandledAction } from "../inbox/actions";
 
 type StepError = { error: string };
 
@@ -335,29 +334,3 @@ export async function askFileAction(threadIds: string[], projectName: string, cr
   }
 }
 
-/** A proposed "Mark handled", clicked: each thread's newest inbound message is what gets marked. */
-export async function askMarkHandledAction(threadIds: string[]): Promise<{ marked: number; failed: number } | StepError> {
-  const { db } = core();
-  let marked = 0;
-  let failed = 0;
-  let firstError: string | undefined;
-  for (const threadId of threadIds) {
-    const view = getThread(db, threadId);
-    const latestInbound = view ? [...view.messages].reverse().find((m) => !m.isFromOperator) : undefined;
-    if (!latestInbound) {
-      // Nothing of anyone else's in it, so there is nothing to mark handled.
-      failed++;
-      firstError ??= view ? "That thread is only your own mail." : "Thread not found.";
-      continue;
-    }
-    const result = await markHandledAction(latestInbound.id);
-    if ("error" in result) {
-      failed++;
-      firstError ??= result.error;
-      continue;
-    }
-    marked++;
-  }
-  if (marked === 0) return { error: firstError ?? "Nothing to mark." };
-  return { marked, failed };
-}

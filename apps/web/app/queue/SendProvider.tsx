@@ -13,7 +13,6 @@ import {
   sendsOnLeaving,
   sentToastLabel,
   restoredToastLabel,
-  handledThreadIds,
   trashedToastLabel,
   trashJob,
   undoTarget,
@@ -22,7 +21,7 @@ import {
   type PendingTrash,
   type SendState, keptToastLabel, hiddenToastLabel, blockedToastLabel, trashChunkSize } from "@/lib/queue";
 import { sendAction } from "../actions";
-import { hideThreadsAction, markHandledAction, restoreThreadsAction, trashThreadsAction } from "../inbox/actions";
+import { hideThreadsAction, restoreThreadsAction, trashThreadsAction } from "../inbox/actions";
 import { isUndoKey } from "@/lib/keys";
 import { threadPath } from "@/lib/folders";
 import { syncStep } from "../inboxes/actions";
@@ -81,17 +80,13 @@ interface SendGate {
    * sweeps off as the server is told (operator, 2026-09-11: Shift, "snappy,
    * with a satisfying animation, the same as Delete").
    */
-  markHandled: (messageId: string, threadId: string) => void;
   /** Threads handled this session, or on their way to it: off the Need-to-reply list. */
-  handledThreads: string[];
 }
 
 const GateContext = createContext<SendGate>({
   leaving: [],
   leavingThreads: [],
   deletingThreads: [],
-  markHandled: () => {},
-  handledThreads: [],
   send: () => {},
   undo: () => {},
   trash: () => "",
@@ -387,23 +382,6 @@ export function SendProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "notice", id, label, now: Date.now(), ...(opts.undo ? { undoJobId: id } : {}) });
     setNow(Date.now());
   }, []);
-  const markHandled = useCallback(
-    (messageId: string, threadId: string) => {
-      dispatch({ type: "handle_started", threadId });
-      void (async () => {
-        const r = await markHandledAction(messageId);
-        if ("error" in r) {
-          dispatch({ type: "handle_failed", threadId });
-          say(`Could not mark it handled: ${r.error}`);
-          return;
-        }
-        dispatch({ type: "handle_done", threadId });
-        router.refresh();
-      })();
-    },
-    [router, say],
-  );
-  const handledThreads = useMemo(() => handledThreadIds(state), [state]);
 
   const undoNotice = useCallback(
     (id: string) => {
@@ -429,8 +407,8 @@ export function SendProvider({ children }: { children: ReactNode }) {
   );
   const returningThreads = state.returning;
   const value = useMemo<SendGate>(
-    () => ({ leaving, leavingThreads, deletingThreads, send, undo, trash, undoDelete, undoable, returningThreads, say, markHandled, handledThreads }),
-    [leaving, leavingThreads, deletingThreads, send, undo, trash, undoDelete, undoable, returningThreads, say, markHandled, handledThreads],
+    () => ({ leaving, leavingThreads, deletingThreads, send, undo, trash, undoDelete, undoable, returningThreads, say }),
+    [leaving, leavingThreads, deletingThreads, send, undo, trash, undoDelete, undoable, returningThreads, say],
   );
 
   return (

@@ -227,7 +227,6 @@ export async function FolderPage({ folder, searchParams }: { folder: FolderKey; 
             countScope={countScope}
             deletable={isInbox || isTexts}
             restorable={folder === "trash"}
-            handledLeaves={status === "needs_reply"}
             pathname={FOLDER_PATHS[folder]}
             limit={limit}
           />

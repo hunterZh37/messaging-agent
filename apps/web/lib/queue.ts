@@ -251,11 +251,8 @@ export type SendEvent =
   /** One notice taken down early, its Undo having been pressed. */
   | { type: "dismiss"; id: string }
   /** Shift, or the button: the thread sweeps off as handled while the server is told. */
-  | { type: "handle_started"; threadId: string }
   /** The server has the handled action: the thread stays off the list. */
-  | { type: "handle_done"; threadId: string }
   /** The server would not take it: the thread is back as it was. */
-  | { type: "handle_failed"; threadId: string };
 
 export function sendReducer(s: SendState, e: SendEvent): SendState {
   switch (e.type) {
@@ -357,19 +354,9 @@ export function sendReducer(s: SendState, e: SendEvent): SendState {
     }
     case "dismiss":
       return { ...s, trashed: s.trashed.filter((n) => n.id !== e.id) };
-    case "handle_started":
-      return { ...s, handling: [...new Set([...s.handling, e.threadId])] };
-    case "handle_done":
-      return { ...s, handling: s.handling.filter((id) => id !== e.threadId), handled: [...new Set([...s.handled, e.threadId])] };
-    case "handle_failed":
-      return { ...s, handling: s.handling.filter((id) => id !== e.threadId) };
   }
 }
 
-/** Threads a Need-to-reply list must not show: handled this session, or on their way to it. */
-export function handledThreadIds(s: SendState): string[] {
-  return [...new Set([...s.handling, ...s.handled])];
-}
 
 /**
  * What happens the moment the server says the mail left (spec 8, 2026-09-10).
@@ -615,12 +602,11 @@ export function deletingThreadIds(s: SendState): string[] {
  * there.
  */
 export function paneSweep(
-  now: { going: boolean; handled: boolean; back: boolean },
-  opened: { going: boolean; handled: boolean },
-): "" | " deleting" | " handling" | " returning" {
+  now: { going: boolean; back: boolean },
+  opened: { going: boolean },
+): "" | " deleting" | " returning" {
   // Already gone when this pane opened: it is being read, not thrown away.
   if (now.going) return opened.going ? "" : " deleting";
-  if (now.handled) return opened.handled ? "" : " handling";
   if (now.back) return " returning";
   return "";
 }

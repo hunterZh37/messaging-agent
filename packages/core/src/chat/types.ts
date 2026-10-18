@@ -76,13 +76,12 @@ export interface ContextChatFile {
 }
 
 /** What Celeste can offer to do. Every one of these needs the operator's click. */
-export type ProposedActionKind = "draft_reply" | "draft_follow_up" | "file_to_project" | "mark_handled" | "open_thread" | "apply_draft" | "compose";
+export type ProposedActionKind = "draft_reply" | "draft_follow_up" | "file_to_project" | "open_thread" | "apply_draft" | "compose";
 
 export const PROPOSED_ACTION_KINDS: ProposedActionKind[] = [
   "draft_reply",
   "draft_follow_up",
   "file_to_project",
-  "mark_handled",
   "open_thread",
   "apply_draft",
   "compose",

@@ -30,7 +30,6 @@ export function TrashRow({
   threadId,
   subject,
   children,
-  handledLeaves = false,
   hideable = false,
   statusList = false,
   keepable = false,
@@ -47,7 +46,6 @@ export function TrashRow({
   subject: string;
   children: ReactNode;
   /** On the Need-to-reply list a thread marked handled leaves (operator, 2026-09-11: Shift). */
-  handledLeaves?: boolean;
   /** A chat: it can also be hidden, leaving Celeste and staying in its app (operator, 2026-09-11). */
   hideable?: boolean;
   /** One of the four sorting lists, which a hidden thread leaves; Inbox and Messages themselves keep it (2026-09-15). */
@@ -71,7 +69,7 @@ export function TrashRow({
   /** Core's reserved name for no project (operator, 2026-09-20). */
   unfiledLabel?: string;
 }) {
-  const { trash, leavingThreads, deletingThreads, returningThreads, handledThreads } = useSendGate();
+  const { trash, leavingThreads, deletingThreads, returningThreads } = useSendGate();
   const [going, setGoing] = useState(false);
   const [openMenus, setOpenMenus] = useState(0);
   const menuOpen = openMenus > 0;
@@ -81,7 +79,6 @@ export function TrashRow({
   const [drag, setDrag] = useState(0);
   const touch = useRef<{ x: number; y: number; horizontal: boolean | null } | null>(null);
   if ((statusList ? leavingThreads : deletingThreads).includes(threadId)) return null;
-  if (handledLeaves && handledThreads.includes(threadId)) return null;
   // Back from Cmd-Z: the slide-out runs in reverse (operator, 2026-09-11).
   const back = returningThreads.includes(threadId);
 

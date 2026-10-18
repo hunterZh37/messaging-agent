@@ -74,7 +74,7 @@ describe("listInboxMessages folders", () => {
   it("defaults to the inbox and leaves sent, deleted and junk out of it", () => {
     const db = testDb();
     seed(db);
-    expect(ids(listInboxMessages(db))).toEqual(["a1:m3", "a1:m2", "a1:m1"]);
+    expect(ids(listInboxMessages(db))).toEqual(["a1:m3", "a1:m1"]);
   });
 
   it("lists the operator's own mail under sent", () => {
@@ -94,7 +94,7 @@ describe("listInboxMessages folders", () => {
     const db = testDb();
     seed(db);
     expect(ids(listInboxMessages(db, { status: "needs_reply" }))).toEqual(["a1:m1"]);
-    expect(ids(listInboxMessages(db, { status: "no_reply" }))).toEqual(["a1:m3", "a1:m2"]);
+    expect(ids(listInboxMessages(db, { status: "no_reply" }))).toEqual(["a1:m3"]);
   });
 
   /**
@@ -107,7 +107,7 @@ describe("listInboxMessages folders", () => {
     seed(db);
     recordAction(db, { kind: "handled", messageId: "a1:m1", payload: {} });
     expect(ids(listInboxMessages(db, { status: "needs_reply" }))).toEqual(["a1:m1"]);
-    expect(ids(listInboxMessages(db, { status: "no_reply" }))).toEqual(["a1:m3", "a1:m2"]);
+    expect(ids(listInboxMessages(db, { status: "no_reply" }))).toEqual(["a1:m3"]);
   });
 
   it("narrows sent to what is waiting: still ends the thread and asks something once quoted text is gone", () => {
@@ -131,14 +131,14 @@ describe("listInboxMessages folders", () => {
     const project = createProject(db, "a1", "Consulting", "client work");
     fileThread(db, "a1:t2", project.id);
 
-    expect(ids(listInboxMessages(db, { projectId: project.id }))).toEqual(["a1:m2"]);
+    expect(ids(listInboxMessages(db, { projectId: project.id }))).toEqual([]);
     expect(ids(listInboxMessages(db, { folder: "sent", projectId: project.id }))).toEqual(["a1:s1"]);
     expect(ids(listInboxMessages(db, { folder: "sent", projectId: "unfiled" }))).toEqual(["a1:s2", "a1:s3"]);
     expect(ids(listInboxMessages(db, { folder: "trash", projectId: "unfiled" }))).toEqual(["a1:d1"]);
     expect(ids(listInboxMessages(db, { folder: "trash", projectId: project.id }))).toEqual([]);
     // A project narrows a tree child row rather than replacing it.
     expect(ids(listInboxMessages(db, { status: "no_reply", projectId: "unfiled" }))).toEqual(["a1:m3"]);
-    expect(ids(listInboxMessages(db, { status: "no_reply", projectId: project.id }))).toEqual(["a1:m2"]);
+    expect(ids(listInboxMessages(db, { status: "no_reply", projectId: project.id }))).toEqual([]);
     expect(ids(listInboxMessages(db, { folder: "sent", status: "waiting", projectId: project.id }))).toEqual(["a1:s1"]);
     expect(ids(listInboxMessages(db, { folder: "sent", status: "waiting", projectId: "unfiled" }))).toEqual([]);
   });
@@ -201,8 +201,8 @@ describe("folderCounts", () => {
       })
       .run();
 
-    expect(folderCounts(db, { since: 0 })).toEqual({ inbox: 3, action: expect.any(Number), owed: expect.any(Number), knowing: expect.any(Number), drafts: 1, needsReply: 1, unopened: expect.any(Number), disposable: 0, waiting: 1, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
-    expect(folderCounts(db, { accountId: "a1", since: 0 })).toEqual({ inbox: 3, action: expect.any(Number), owed: expect.any(Number), knowing: expect.any(Number), drafts: 1, needsReply: 1, unopened: expect.any(Number), disposable: 0, waiting: 1, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
+    expect(folderCounts(db, { since: 0 })).toEqual({ inbox: 2, action: expect.any(Number), owed: expect.any(Number), knowing: expect.any(Number), drafts: 1, needsReply: 1, unopened: expect.any(Number), disposable: 0, waiting: 1, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
+    expect(folderCounts(db, { accountId: "a1", since: 0 })).toEqual({ inbox: 2, action: expect.any(Number), owed: expect.any(Number), knowing: expect.any(Number), drafts: 1, needsReply: 1, unopened: expect.any(Number), disposable: 0, waiting: 1, hidden: 0, texts: { needsReply: 0, unopened: 0, disposable: 0, hidden: 0 } });
   });
 
   it("counts nothing outside the window, and nothing for another inbox", () => {
@@ -412,8 +412,11 @@ describe("unread", () => {
         isFromOperator: true, folder: "sent", sentAt: 500,
       })
       .run();
-    // They were there when they sent it.
-    expect(unreadOf(db)["a1:m1"]).toBe(false);
+    // Their own send takes the thread out of the inbox altogether now — it is
+    // the other person's turn, so it is Sent's to show (2026-10-18) — which
+    // says what this test always meant more strongly than the flag did.
+    expect(unreadOf(db)["a1:m1"]).toBeUndefined();
+    expect(ids(listInboxMessages(db, { folder: "sent" }))).toContain("a1:s9");
   });
 
   it("moves the time forward when a thread is opened again", () => {
@@ -543,7 +546,7 @@ describe("Unopened", () => {
     const db = testDb();
     seed(db);
     // t1 holds m1, t2 m2, t4 m3: three inbox threads, none opened.
-    expect(listed(db).sort()).toEqual(["a1:m1", "a1:m2", "a1:m3"]);
+    expect(listed(db).sort()).toEqual(["a1:m1", "a1:m3"]);
   });
 
   it("drops a thread the moment it is opened, and takes it back when new mail lands", () => {
@@ -600,7 +603,7 @@ describe("a money side with nothing in scope", () => {
     // Nothing in the fixture carries a money verdict, so both sides are empty
     // and both say so — which is the state the web has to notice and drop.
     expect(folderCounts(db, { accountId: "a1", finance: "income" }).unopened).toBe(0);
-    expect(folderCounts(db, { accountId: "a1" }).unopened).toBe(3);
+    expect(folderCounts(db, { accountId: "a1" }).unopened).toBe(2);
   });
 });
 
@@ -610,7 +613,7 @@ describe("Mark all opened", () => {
   it("names every thread the list would show, and nothing else", () => {
     const db = testDb();
     seed(db);
-    expect(unopenedThreadIds(db, { accountId: "a1" }).sort()).toEqual(["a1:t1", "a1:t2", "a1:t4"]);
+    expect(unopenedThreadIds(db, { accountId: "a1" }).sort()).toEqual(["a1:t1", "a1:t4"]);
     // The scope narrows it the way it narrows the list.
     expect(unopenedThreadIds(db, { accountId: "a2" })).toEqual([]);
     expect(unopenedThreadIds(db, { accountId: "a1", since: 400 }).sort()).toEqual(["a1:t4"]);
@@ -622,24 +625,25 @@ describe("Mark all opened", () => {
     // One thread was opened long ago; the others never.
     markThreadOpened(db, "a1:t1", 50);
     const before = listed(db).sort();
-    expect(before).toHaveLength(3);
+    // Two: the thread the operator answered is Sent's now (2026-10-18).
+    expect(before).toHaveLength(2);
 
     const previous = markThreadsOpened(db, unopenedThreadIds(db, {}), 1000);
     expect(listed(db)).toEqual([]);
     expect(previous.find((p) => p.threadId === "a1:t1")).toEqual({ threadId: "a1:t1", openedAt: 50, markedAt: 1000 });
-    expect(previous.filter((p) => p.openedAt === null)).toHaveLength(2);
+    expect(previous.filter((p) => p.openedAt === null)).toHaveLength(1);
 
     restoreThreadOpens(db, previous);
     expect(listed(db).sort()).toEqual(before);
     // The thread that had been opened before keeps that time, not none.
-    expect(unopenedThreadIds(db, {}).sort()).toEqual(["a1:t1", "a1:t2", "a1:t4"]);
+    expect(unopenedThreadIds(db, {}).sort()).toEqual(["a1:t1", "a1:t4"]);
   });
 
   it("only touches the threads it was given", () => {
     const db = testDb();
     seed(db);
     markThreadsOpened(db, ["a1:t1"], 1000);
-    expect(listed(db).sort()).toEqual(["a1:m2", "a1:m3"]);
+    expect(listed(db).sort()).toEqual(["a1:m3"]);
   });
 
   it("acts on the scope on screen, not the whole inbox", () => {
@@ -649,7 +653,7 @@ describe("Mark all opened", () => {
     markThreadsOpened(db, unopenedThreadIds(db, narrow), 1000);
     expect(listed(db, narrow)).toEqual([]);
     // Everything outside the window is untouched.
-    expect(listed(db, { accountId: "a1" }).sort()).toEqual(["a1:m1", "a1:m2"]);
+    expect(listed(db, { accountId: "a1" }).sort()).toEqual(["a1:m1"]);
   });
 
   it("undo keeps a thread the operator opened by hand after the mark (2026-09-14)", () => {
@@ -661,7 +665,7 @@ describe("Mark all opened", () => {
     markThreadOpened(db, "a1:t1", 2000);
     restoreThreadOpens(db, previous);
     // t1 stays opened at their time; the others go back to never.
-    expect(unopenedThreadIds(db, {}).sort()).toEqual(["a1:t2", "a1:t4"]);
+    expect(unopenedThreadIds(db, {}).sort()).toEqual(["a1:t4"]);
     expect(threadOpensOf(db, ["a1:t1"])).toEqual({ "a1:t1": 2000 });
   });
 
@@ -680,9 +684,9 @@ describe("Mark all opened", () => {
     const db = testDb();
     seed(db);
     expect(markThreadsOpened(db, [], 1000)).toEqual([]);
-    expect(listed(db)).toHaveLength(3);
+    expect(listed(db)).toHaveLength(2);
     restoreThreadOpens(db, []);
-    expect(listed(db)).toHaveLength(3);
+    expect(listed(db)).toHaveLength(2);
   });
 });
 
@@ -698,7 +702,7 @@ describe("Safe to delete", () => {
     const db = testDb();
     seed(db);
     junkmail(db);
-    expect(listed(db)).toEqual(["a1:m2"]);
+    expect(listed(db)).toEqual([]);
   });
 
   it("leaves out mail with no verdict at all, however quiet it looks", () => {
@@ -756,9 +760,11 @@ describe("Safe to delete", () => {
       .values({ messageId: "a2:m9", wants: "bin", scheduling: false, category: null, finance: "none",  reason: "a promotion", model: "x", labeledAt: null, createdAt: 1 })
       .run();
 
-    expect(folderCounts(db, {}).disposable).toBe(2);
-    expect(folderCounts(db, { accountId: "a1" }).disposable).toBe(1);
-    expect(listed(db).sort()).toEqual(["a1:m2", "a2:m9"]);
+    // a1's junk sits on the thread the operator answered, which is Sent's
+    // now, so only a2's is in an inbox (2026-10-18).
+    expect(folderCounts(db, {}).disposable).toBe(1);
+    expect(folderCounts(db, { accountId: "a1" }).disposable).toBe(0);
+    expect(listed(db).sort()).toEqual(["a2:m9"]);
   });
 });
 
@@ -796,7 +802,7 @@ describe("Delete all", () => {
     const db = testDb();
     seed(db);
     db.update(sorts).set({ wants: "bin", }).where(eq(sorts.messageId, "a1:m2")).run();
-    expect(disposableThreadIds(db, { accountId: "a1" })).toEqual(["a1:t2"]);
+    expect(disposableThreadIds(db, { accountId: "a1" })).toEqual([]);
     expect(disposableThreadIds(db, { accountId: "a2" })).toEqual([]);
     // The window narrows it the way it narrows the list.
     expect(disposableThreadIds(db, { accountId: "a1", since: 400 })).toEqual([]);
@@ -809,7 +815,9 @@ describe("Delete all", () => {
       .values({
         ...base, id: "a1:m8", accountId: "a1", providerMessageId: "INBOX:8", threadId: "a1:t2", rfcMessageId: null,
         fromAddress: "carol@x.com", toAddresses: ["me@example.com"], subject: "Deck", bodyText: "One more thing.",
-        isFromOperator: false, folder: "inbox", sentAt: 360,
+        // After the operator's reply, so the thread is theirs to deal with
+        // again and stays in the inbox (2026-10-18).
+        isFromOperator: false, folder: "inbox", sentAt: 500,
       })
       .run();
     db.insert(sorts)
@@ -949,7 +957,7 @@ describe("Delete all, over Hidden", () => {
     expect(hiddenThreadIds(db, {})).toEqual(["a1:t1"]);
     // The two lists do not overlap: a hidden thread has left the mailbox's
     // sorting rows, so Safe to delete never offers it as well.
-    expect(disposableThreadIds(db, {})).toEqual(["a1:t2"]);
+    expect(disposableThreadIds(db, {})).toEqual([]);
   });
 
   it("follows the inbox and the window, the way the list above it does", () => {
@@ -1249,5 +1257,54 @@ describe("a thread marked handled", () => {
     recordAction(db, { kind: "handled", messageId: mid, payload: {} });
     expect(folderCounts(db, {}).owed).toBe(owedThreadIds(db, {}).length);
     expect(owedThreadIds(db, {})).toContain("a1:handledaction");
+  });
+});
+
+/**
+ * "That 90 threads should then not [be] inside inbox and be inside sent
+ * because I sent the last message" (operator, 2026-10-18).
+ *
+ * They were the last of the arithmetic: threads answered and therefore owing
+ * nothing, which no status row claimed while the Inbox heading counted them.
+ * The operator reads the mailbox by whose turn it is, and a thread they
+ * answered is the other person's turn. It is already in Sent, under Waiting
+ * for reply.
+ */
+describe("a thread whose last word is the operator's", () => {
+  it("is out of the inbox list", () => {
+    const db = testDb();
+    seed(db);
+    // a1:t2 is Carol's mail with the operator's reply after it (a1:s1).
+    expect(ids(listInboxMessages(db))).not.toContain("a1:m2");
+  });
+
+  it("is out of the inbox count, and out of every row under it", () => {
+    const db = testDb();
+    seed(db);
+    const inboxThreads = new Set(listInboxMessages(db).map((r) => r.thread.id));
+    expect(inboxThreads.has("a1:t2")).toBe(false);
+    expect(folderCounts(db, { since: 0 }).inbox).toBe(inboxThreads.size);
+  });
+
+  it("is still in Sent, which is where it now belongs", () => {
+    const db = testDb();
+    seed(db);
+    expect(ids(listInboxMessages(db, { folder: "sent" }))).toContain("a1:s1");
+  });
+
+  it("comes back the moment they write again", () => {
+    const db = testDb();
+    seed(db);
+    db.insert(messages)
+      .values({
+        ...base, id: "a1:m2b", accountId: "a1", providerMessageId: "INBOX:2b", threadId: "a1:t2", rfcMessageId: null,
+        fromAddress: "carol@x.com", toAddresses: ["me@example.com"], subject: "Deck", bodyText: "Any thoughts?",
+        isFromOperator: false, folder: "inbox", sentAt: 500, receivedAt: 500,
+      })
+      .run();
+    db.insert(sorts)
+      .values({ messageId: "a1:m2b", wants: "reply", scheduling: false, category: null, finance: "none", reason: "asks", model: "x", labeledAt: null, createdAt: 1 })
+      .run();
+    expect(ids(listInboxMessages(db))).toContain("a1:m2b");
   });
 });

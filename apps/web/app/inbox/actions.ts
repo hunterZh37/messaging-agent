@@ -100,18 +100,6 @@ export async function sendTextAction(threadId: string, text: string): Promise<St
   revalidatePath("/messages");
 }
 
-/** Thread view's "Mark handled": records the action and removes the row from the Important filter. */
-export async function markHandledAction(messageId: string): Promise<{ ok: true } | StepError> {
-  try {
-    const { db } = core();
-    recordAction(db, { kind: "handled", messageId, payload: {} });
-    revalidatePath("/inbox");
-    return { ok: true };
-  } catch (err) {
-    return { error: (err as Error).message };
-  }
-}
-
 /** Category editor's Save: writes the whole ordered list, or returns the validation error to show under it. */
 export async function saveCategoriesAction(items: { id?: string; name: string; description: string }[]): Promise<StepError | void> {
   try {

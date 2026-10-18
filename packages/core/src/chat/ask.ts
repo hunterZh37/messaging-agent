@@ -133,7 +133,7 @@ const TOOLS: ChatToolDef[] = [
           type: "string",
           enum: PROPOSED_ACTION_KINDS,
           description:
-            "draft_reply, draft_follow_up, file_to_project, mark_handled, open_thread, apply_draft or compose. Use compose for mail to someone this is not already a thread with: it needs to, subject and instruction, and no thread id.",
+            "draft_reply, draft_follow_up, file_to_project, open_thread, apply_draft or compose. Use compose for mail to someone this is not already a thread with: it needs to, subject and instruction, and no thread id.",
         },
         thread_ids: { type: "array", items: { type: "string" }, description: `Every thread this action covers, up to ${MAX_PROPOSAL_THREADS}. Each id is the whole string a citation carries, "<account>:<thread>", colon included.` },
         thread_id: { type: "string", description: "One thread, when that is all it covers." },
