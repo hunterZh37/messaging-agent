@@ -1308,3 +1308,40 @@ describe("a thread whose last word is the operator's", () => {
     expect(ids(listInboxMessages(db))).toContain("a1:m2b");
   });
 });
+
+/**
+ * Two counts that disagreed with their own lists, found by a fresh read of the
+ * mailbox on 2026-10-18 and confirmed against it.
+ */
+describe("a row and its list, again", () => {
+  it("still claims the operator when their newest message was deleted", () => {
+    const db = testDb();
+    seed(db);
+    // Bob wrote again and the operator binned that one message. The thread
+    // still wants a reply: 15 of their threads were invisible this way,
+    // because the rung read the newest message in the thread whatever folder
+    // it had ended up in.
+    db.insert(messages)
+      .values({
+        ...base, id: "a1:m1b", accountId: "a1", providerMessageId: "INBOX:1b", threadId: "a1:t1", rfcMessageId: null,
+        fromAddress: "bob@x.com", toAddresses: ["me@example.com"], subject: "Lunch", bodyText: "Bumping this.",
+        isFromOperator: false, folder: "trash", sentAt: 900, receivedAt: 900,
+      })
+      .run();
+    expect(ids(listInboxMessages(db, { status: "owed" }))).toContain("a1:m1");
+    expect(folderCounts(db, {}).owed).toBe(owedThreadIds(db, {}).length);
+  });
+
+  it("does not count a Waiting thread the operator has dismissed", () => {
+    const db = testDb();
+    seed(db);
+    const before = folderCounts(db, {}).waiting;
+    expect(before).toBeGreaterThan(0);
+    db.update(threads).set({ waitingDismissedAt: 1_000 }).where(eq(threads.id, "a1:t2")).run();
+    // The list stops showing it, so the count must stop too: six of their
+    // threads were dismissed and counted anyway.
+    const listed = listInboxMessages(db, { folder: "sent", status: "waiting" }).length;
+    expect(folderCounts(db, {}).waiting).toBe(listed);
+    expect(folderCounts(db, {}).waiting).toBe(before - 1);
+  });
+});

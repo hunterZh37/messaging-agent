@@ -164,6 +164,12 @@ export function threadUnreadFor(threadId: SQL): SQL {
 /**
  * Is this row the newest message the operator received in its thread? What
  * the inbox shows for a thread, as opposed to what the thread ends with.
+ *
+ * The rungs read this rather than the newest message of any kind (2026-10-18).
+ * `latestInThread` scans every folder, so one deleted reply put a thread out
+ * of Reply / Action Required altogether: fifteen threads that wanted an answer
+ * were in no list that said so. What a row is about is the newest mail they
+ * were sent and still have; whose turn it is, `answeredLast` decides.
  */
 function latestInboxInThread(): SQL {
   return sql`${messages.id} = (
@@ -338,7 +344,7 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // message instead, an exchange answered three replies ago stayed on the
   // list forever, once for every question ever asked in it.
   if (folder === "inbox" && opts.status === "needs_reply") {
-    conditions.push(latestInThread(), eq(sorts.wants, "reply"));
+    conditions.push(latestInboxInThread(), eq(sorts.wants, "reply"));
   }
   // A chat needs a reply when the other person had the last word and nobody
   // has marked it handled: a fact, not a verdict (operator, 2026-09-11: the
@@ -387,17 +393,17 @@ export function scopeConditions(opts: InboxScope = {}): SQL[] {
   // which "action" keeps because it is a claim on the operator, and the bin
   // does not because clearing out old junk is the point of that row.
   if (folder === "inbox" && opts.status === "action") {
-    conditions.push(latestInThread(), eq(sorts.wants, "action"));
+    conditions.push(latestInboxInThread(), eq(sorts.wants, "action"));
   }
   // The two rungs that claim the operator, read as one list (operator,
   // 2026-09-19: "put Reply/Action Required the same tab"). They stay apart
   // in the data — the difference between owing words and owing a signature
   // is real — and come together only where the operator looks.
   if (folder === "inbox" && opts.status === "owed") {
-    conditions.push(latestInThread(), inArray(sorts.wants, ["reply", "action"]));
+    conditions.push(latestInboxInThread(), inArray(sorts.wants, ["reply", "action"]));
   }
   if (folder === "inbox" && opts.status === "knowing") {
-    conditions.push(latestInThread(), eq(sorts.wants, "knowing"));
+    conditions.push(latestInboxInThread(), eq(sorts.wants, "knowing"));
   }
   if (folder === "inbox" && opts.status === "disposable") {
     conditions.push(eq(sorts.wants, "bin"));
@@ -600,7 +606,11 @@ export function folderCounts(db: Db, opts: TreeScope = {}): { inbox: number; dra
   const sentRows = db
     .select({
       message: { sentAt: messages.sentAt, bodyText: messages.bodyText },
-      thread: { lastFromOperator: threads.lastFromOperator, lastMessageAt: threads.lastMessageAt },
+      // `waitingDismissedAt` as well as the other two (2026-10-18): without
+      // it `isWaitingReply` never saw a dismissal, so the row counted six
+      // threads its own list had stopped showing. The field is optional on
+      // `WaitingThread`, which is why leaving it out compiled.
+      thread: { lastFromOperator: threads.lastFromOperator, lastMessageAt: threads.lastMessageAt, waitingDismissedAt: threads.waitingDismissedAt },
     })
     .from(messages)
     .innerJoin(threads, eq(threads.id, messages.threadId))
