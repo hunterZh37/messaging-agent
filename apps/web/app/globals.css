@@ -142,6 +142,16 @@ h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.015em; margin: 0 0 8p
 .att-chip .att-name { font-weight: 600; color: var(--fg); }
 .att-chip .att-open, .att-chip .att-dl { display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-decoration: none; cursor: pointer; }
 .att-chip .att-dl { padding: 4px; border-radius: 999px; }
+/* Where there is no pointer, the things on a message have to be big enough to
+   hit with a thumb (audit, 2026-10-19): the download on an attachment was 21
+   pixels tall and the format toggle 18, on the screen the operator reads mail
+   on most. The sizes only apply to touch, so the desktop rows keep their
+   density. */
+@media (hover: none) {
+  .att-chip .att-dl { min-width: 44px; min-height: 44px; justify-content: center; padding: 4px 10px; }
+  .att-chip .att-open { min-height: 44px; }
+  .toggle-format { min-height: 44px; display: inline-flex; align-items: center; padding: 0 4px; }
+}
 .att-chip svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 .att-name { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .att-size { opacity: 0.7; }
@@ -294,6 +304,20 @@ kbd { font-family: inherit; font-size: 11px; color: var(--muted); border: 1px so
 /* A locked-out inbox is on every page now, and reads as a warning rather
    than as a note in the margin (operator, 2026-10-01). */
 .topbar-banner { margin-top: 8px; text-align: right; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent); border-radius: 10px; background: color-mix(in srgb, var(--danger) 10%, transparent); }
+/* Reconnect was the smallest thing on the page: a bare inline link, 17px of
+   line box, on the one banner that appears when an inbox has stopped letting
+   Celeste in (audit, 2026-10-19). It is the most urgent control in the app and
+   it was the hardest to hit, which is backwards. A chip, and a full 44px of it
+   where there is no pointer to aim with. */
+.topbar-banner a {
+  display: inline-flex; align-items: center; min-height: 32px; margin-left: 6px; padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent); border-radius: 999px;
+  font-weight: 600; text-decoration: none;
+}
+.topbar-banner a:hover { background: color-mix(in srgb, var(--danger) 18%, transparent); }
+@media (hover: none) {
+  .topbar-banner a { min-height: 44px; padding: 4px 16px; }
+}
 .signin-dialog .dialog-title { margin: 0 0 4px; font-size: 17px; }
 .signin-dialog .signin-list { margin: 8px 0 16px; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
 .signin-dialog .row { display: flex; align-items: center; gap: 10px; }
