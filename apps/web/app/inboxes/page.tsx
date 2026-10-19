@@ -14,6 +14,7 @@ import { ConnectWhatsapp } from "./ConnectWhatsapp";
 import { relativeTime } from "@/lib/format";
 import { AlsoYou } from "./AlsoYou";
 import { DisconnectButton } from "./DisconnectButton";
+import { reconnectWith } from "@/lib/reconnect";
 import { aliasesForForm } from "./aliases";
 
 export const dynamic = "force-dynamic";
@@ -69,7 +70,6 @@ export default async function InboxesPage({ searchParams }: { searchParams: Prom
   const microsoftReady = Boolean(cfg.microsoft.clientId);
   const googleReady = Boolean(cfg.google.clientId && cfg.google.clientSecret);
   // Which IMAP inboxes sign in with Google rather than a password (2026-09-11): their Reconnect goes through Google.
-  const withGoogle = new Set(db.select({ id: schema.oauthTokens.accountId }).from(schema.oauthTokens).all().map((r) => r.id));
   const withPassword = new Set(db.select({ id: schema.mailCredentials.accountId }).from(schema.mailCredentials).all().map((r) => r.id));
 
   const accountRows = db.select().from(schema.accounts).all();
@@ -135,7 +135,7 @@ export default async function InboxesPage({ searchParams }: { searchParams: Prom
                   {a.status === "disconnected" ? <span style={{ color: "var(--muted)" }}>disconnected</span> : null}
                 </div>
                 {a.status !== "ok" ? (
-                  a.provider === "outlook" || (a.provider === "imap" && withGoogle.has(a.id) && !withPassword.has(a.id)) ? (
+                  reconnectWith(a.provider, { hasPassword: withPassword.has(a.id) }) !== "password" ? (
                     <div className="row" style={{ marginTop: 8 }}>
                       <a className="btn" href={a.provider === "outlook" ? "/api/oauth/microsoft/start" : "/api/oauth/google/start"}>
                         Reconnect
